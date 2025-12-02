@@ -1,0 +1,240 @@
+[
+  {
+    "svr_redundant_fields":"",
+    "clt_tab":"client_assembly_items",
+    "same_fileds":"name, part_critical_name, id, part_critical_prob, assemble_parts",
+    "clt_redundant_fields":"",
+    "svr_tab":"assembly_items"
+  },
+  {
+    "svr_redundant_fields":"",
+    "clt_tab":"client_assembly_items__assemble_parts__data",
+    "same_fileds":"part_item, id, part_item_num",
+    "clt_redundant_fields":"",
+    "svr_tab":"assembly_items__assemble_parts__data"
+  },
+  {
+    "svr_redundant_fields":"combo3_prob, combine_difficulty, combo4_prob, progress_failure_adj, combo2_prob, combo2_timeadj, combo1_timeadj, combo1_prob, progress_success_adj, combine_failure",
+    "clt_tab":"client_combine_recipe",
+    "same_fileds":"qualification_race, auto_learn, combo1_product, product, combo2_product, craft_delay_id, combo3_product, product_quantity, combineskill, mobile_event, highdeva_type, require_dp, max_production_count, combo4_product, required_skillpoint, name, craft_delay_time, id, combine_recipe_expansion, task_type, desc",
+    "clt_redundant_fields":"desc_craftman",
+    "svr_tab":"combine_recipe"
+  },
+  {
+    "svr_redundant_fields":"compo2_recovery, compo6_recovery, compo4_recovery, compo1_recovery, compo7_recovery, compo3_recovery, compo5_recovery, compo8_recovery",
+    "clt_tab":"client_combine_recipe__combine_recipe_expansion__data",
+    "same_fileds":"component1, component2, component3, component4, compo5_quantity, compo3_quantity, component5, compo2_quantity, component6, component7, compo6_quantity, component8, compo1_quantity, compo7_quantity, id, compo8_quantity, compo4_quantity, component_quantity",
+    "clt_redundant_fields":"",
+    "svr_tab":"combine_recipe__combine_recipe_expansion__data"
+  },
+  {
+    "svr_redundant_fields":"onlyone",
+    "clt_tab":"client_disassembly_item",
+    "same_fileds":"disassemble_set_list, retry_max_count, component_per_retry, per_retry, name, per_retry_rate, component_per_retry_count, component_per_retry_type, id, per_type",
+    "clt_redundant_fields":"slot_effect",
+    "svr_tab":"disassembly_item"
+  },
+  {
+    "svr_redundant_fields":"",
+    "clt_tab":"client_disassembly_item__disassemble_set_list__data",
+    "same_fileds":"apply_level_, apply_class_, apply_race_, id, rate_, set_list_name_",
+    "clt_redundant_fields":"",
+    "svr_tab":"disassembly_item__disassemble_set_list__data"
+  },
+  {
+    "svr_redundant_fields":"",
+    "clt_tab":"client_disassembly_item_setlist",
+    "same_fileds":"disassembly_create_item_list, name, id",
+    "clt_redundant_fields":"",
+    "svr_tab":"disassembly_item_setlist"
+  },
+  {
+    "svr_redundant_fields":"",
+    "clt_tab":"client_enchant_cpstone",
+    "same_fileds":"base_cpstone, enchant_cpstone_list, name, id",
+    "clt_redundant_fields":"",
+    "svr_tab":"enchant_cpstone"
+  },
+  {
+    "svr_redundant_fields":"enchant_chance_exceed, enchant_chance_cpstone",
+    "clt_tab":"client_enchant_cpstone__enchant_cpstone_list__data",
+    "same_fileds":"id, enchant_cpstone",
+    "clt_redundant_fields":"",
+    "svr_tab":"enchant_cpstone__enchant_cpstone_list__data"
+  },
+  {
+    "svr_redundant_fields":"",
+    "clt_tab":"client_exchange_equipment",
+    "same_fileds":"period_end, replace_list, period_start, name, id",
+    "clt_redundant_fields":"",
+    "svr_tab":"exchange_equipment"
+  },
+  {
+    "svr_redundant_fields":"",
+    "clt_tab":"client_exchange_equipment__replace_list__data",
+    "same_fileds":"after_replace_level, replace_level, replace_type, id, replace_name",
+    "clt_redundant_fields":"",
+    "svr_tab":"exchange_equipment__replace_list__data"
+  },
+  {
+    "svr_redundant_fields":"",
+    "clt_tab":"client_item_upgrade",
+    "same_fileds":"name, id, upgrade_list",
+    "clt_redundant_fields":"",
+    "svr_tab":"item_upgrade"
+  },
+  {
+    "svr_redundant_fields":"upgrade_authorize_count, check_authorize_count, upgrade_authorize_type",
+    "clt_tab":"client_item_upgrade__upgrade_list__data",
+    "same_fileds":"upgrade_enchant_count, need_abyss_point, sub_material_item5, upgrade_enchant_type, sub_material_item4, sub_material_item3, sub_material_item2, sub_material_item1, upgrade_npc, sub_material_item_count1, sub_material_item_count2, sub_material_item_count3, sub_material_item_count4, check_enchant_count, sub_material_item_count5, id, need_qina, upgrade_item",
+    "clt_redundant_fields":"",
+    "svr_tab":"item_upgrade__upgrade_list__data"
+  },
+  {
+    "svr_redundant_fields":"",
+    "clt_tab":"client_login_event",
+    "same_fileds":"attend_type, name, active, reward_item_list, id, attend_stamp_title, attend_stamp_sub_title",
+    "clt_redundant_fields":"",
+    "svr_tab":"login_event"
+  },
+  {
+    "svr_redundant_fields":"",
+    "clt_tab":"client_login_event__reward_item_list__data",
+    "same_fileds":"reward_permit_level, reward_item, id, reward_item_count",
+    "clt_redundant_fields":"",
+    "svr_tab":"login_event__reward_item_list__data"
+  },
+  {
+    "svr_redundant_fields":"",
+    "clt_tab":"client_luna_consume_reward",
+    "same_fileds":"name, id, luna_sum_count, gacha_cost, num_1, num_2, create_2, create_1",
+    "clt_redundant_fields":"",
+    "svr_tab":"luna_consume_reward"
+  },
+  {
+    "svr_redundant_fields":"",
+    "clt_tab":"client_luna_cost",
+    "same_fileds":"price_increase, price07, price08, price_max_type, price09, price_max_count, type_value, price10, price01, price02, price03, price04, price05, price06, name, price_type, free_turn, id, value, reset_type",
+    "clt_redundant_fields":"",
+    "svr_tab":"luna_cost"
+  },
+  {
+    "svr_redundant_fields":"",
+    "clt_tab":"client_luna_gotcha",
+    "same_fileds":"qualification_race, reward_list_name, reward_total, group_name, name, dice_set_name, id, dice_set_special_flag",
+    "clt_redundant_fields":"",
+    "svr_tab":"luna_gotcha"
+  },
+  {
+    "svr_redundant_fields":"",
+    "clt_tab":"client_luna_gotcha_reward_list",
+    "same_fileds":"luna_reward_create_item_list, name, id",
+    "clt_redundant_fields":"",
+    "svr_tab":"luna_gotcha_reward_list"
+  },
+  {
+    "svr_redundant_fields":"",
+    "clt_tab":"client_luna_indun",
+    "same_fileds":"wed_am1, wed_am2, wed_am3, wed_am4, wed_am0, wed_am10, id, wed_am11, sun_am11, sun_am10, sun_pm8, sun_pm9, wed_am9, sun_pm6, active, sat_am0, sun_pm7, sun_pm4, sun_pm5, wed_am5, sat_am3, sun_pm2, wed_am6, sat_am4, sun_pm3, wed_am7, sat_am1, sun_pm0, wed_am8, sat_am2, sun_pm1, sat_am7, sat_am8, tue_pm11, sat_am5, sat_am6, sat_am9, tue_pm10, mon_am11, mon_am10, fri_am6, sat_pm10, fri_am7, fri_am8, fri_am9, sat_pm11, sun_am9, sun_am7, sun_am8, sun_am5, sun_am6, fri_am0, sun_am3, fri_am1, sun_am4, fri_am2, sun_am1, fri_am3, sun_am2, fri_am4, fri_am5, sun_am0, wed_pm3, wed_pm2, wed_pm5, wed_pm4, tue_am8, fri_pm10, tue_am7, fri_pm11, wed_pm1, tue_am9, wed_pm0, sun_pm10, thu_pm3, mon_am9, thu_pm4, mon_am8, thu_pm5, mon_am7, thu_pm6, thu_pm7, sun_pm11, thu_pm8, thu_pm9, mon_am2, tue_am4, sat_pm0, mon_am1, tue_am3, sat_pm1, mon_am0, tue_am6, tue_am5, mon_am6, tue_am0, wed_pm7, thu_pm10, sat_pm4, mon_am5, wed_pm6, thu_pm0, thu_pm11, sat_pm5, mon_am4, tue_am2, wed_pm9, thu_pm1, sat_pm2, mon_am3, tue_am1, wed_pm8, thu_pm2, sat_pm3, fri_pm7, sat_pm8, fri_pm8, sat_pm9, fri_pm9, sat_pm6, sat_pm7, mon_pm8, mon_pm9, mon_pm4, mon_pm5, fri_pm0, mon_pm6, fri_pm1, mon_pm7, fri_pm2, mon_pm0, fri_pm3, mon_pm1, fri_pm4, mon_pm2, fri_pm5, mon_pm3, fri_pm6, tue_pm8, tue_pm9, thu_am2, thu_am3, thu_am4, thu_am5, tue_am11, thu_am6, tue_am10, thu_am7, thu_am8, thu_am9, tue_pm6, tue_pm7, tue_pm4, tue_pm5, tue_pm2, tue_pm3, tue_pm0, thu_am0, tue_pm1, thu_am1, wed_pm10, wed_pm11, name, sat_am10, sat_am11, luna_price_name, insname, thu_am11, thu_am10, price_ratio, mon_pm11, mon_pm10, fri_am11, fri_am10",
+    "clt_redundant_fields":"default_check, desc_long, dir, image, drop_itemlist, desc_info, worldname",
+    "svr_tab":"luna_indun"
+  },
+  {
+    "svr_redundant_fields":"check_item_",
+    "clt_tab":"client_quest",
+    "same_fileds":"selectable_reward_item1_10, reward_title_ext, selectable_reward_item1_15, areas, selectable_reward_item1_12, selectable_reward_item1_11, selectable_reward_item1_14, selectable_reward_item1_13, reward_gold_ext, quest_permitted_worlds, bm_restrict_category, selectable_reward_item2_9, selectable_reward_item2_8, selectable_reward_item2_7, gender_permitted, extra_category, drop_item_4, class_permitted, selectable_reward_item2_6, selectable_reward_item2_5, selectable_reward_item2_4, selectable_reward_item2_3, reward_extend_stigma1, drop_item_1, selectable_reward_item2_2, inventory_item_name3, selectable_reward_item2_1, inventory_item_name2, drop_item_3, inventory_item_name1, drop_item_2, check_item3_1, count_recover_limitedquest, can_report, drop_prob_1, maxlevel_permitted, drop_prob_4, drop_prob_3, drop_prob_2, selectable_reward_item3_6, drop_monster_1, drop_monster_2, drop_monster_3, drop_monster_4, burningreward_item, reward_item1_3, reward_item1_4, reward_item1_1, reward_item1_2, reward_item1_5, check_item4_1, selectable_reward_item3_5, selectable_reward_item3_4, selectable_reward_item3_3, selectable_reward_item3_2, selectable_reward_item3_1, chanter_selectable_reward, reward_cp1, reward_title1, selectable_reward_item_ext_2, selectable_reward_item_ext_1, reward_title2, reward_glory_point1, client_level, use_class_reward, fighter_selectable_reward, selectable_reward_item_ext_9, selectable_reward_item_ext_8, quest_cooltime, selectable_reward_item_ext_7, selectable_reward_item_ext_6, selectable_reward_item_ext_5, selectable_reward_item_ext_4, selectable_reward_item_ext_3, assassin_selectable_reward, wizard_selectable_reward, reward_item2_2, reward_item2_1, name, desc, reward_dp1, title, max_repeat_count, finished_quest_cond6, finished_quest_cond5, finished_quest_cond4, finished_quest_cond3, finished_quest_cond2, finished_quest_cond1, selectable_reward_item1_9, selectable_reward_item1_8, target_type, reward_item3_1, reward_item3_2, reward_extend_inventory1, selectable_reward_item1_7, selectable_reward_item1_6, selectable_reward_item1_5, selectable_reward_item1_4, reward_repeat_count, selectable_reward_item1_3, combine_skillpoint, selectable_reward_item1_2, selectable_reward_item1_1, reward_exp_boost1, reward_score_ext, npcfaction_name, reward_abyss_point1, reward_abyss_point2, reward_abyss_point3, mobile_event, reward_abyss_point4, combineskill, burningreward_duration, bard_selectable_reward, burningreward_time_begin, unfinished_quest_cond5, unfinished_quest_cond6, unfinished_quest_cond3, unfinished_quest_cond4, id, f_mission, priest_selectable_reward, reward_item4_1, selectable_reward_item6_1, reward_exp5, reward_exp6, cannot_share, reward_exp1, reward_exp2, reward_exp_ext, collect_progress, reward_exp3, reward_exp4, package_permitted, max_count_limitedquest, quest_repeat_cycle, reward_gold1, reward_gold2, reward_gold3, reward_gold4, reward_gold5, reward_gold6, acquired_quest_cond2, acquired_quest_cond1, noacquired_quest_cond2, noacquired_quest_cond1, noacquired_quest_cond6, noacquired_quest_cond5, noacquired_quest_cond4, rider_selectable_reward, noacquired_quest_cond3, __type_desc__, reward_item5_1, mentor_quest_type, minlevel_permitted, collect_item2, quest_work_item2, collect_item3, quest_work_item3, selectable_reward_item_ext_11, collect_item1, quest_work_item1, selectable_reward_item_ext_10, collect_item4, finished_quest_count1, finished_quest_count2, quest_repeat_count, can_repeat_reward, cannot_giveup, quest_work_item4, category2, selectable_reward_item2_10, selectable_reward_item2_11, category1, selectable_reward_item4_5, elementalist_selectable_reward, selectable_reward_item2_12, selectable_reward_item2_13, reward_item6_1, check_item1_4, selectable_reward_item4_4, selectable_reward_item4_3, recipe_name, selectable_reward_item4_2, reward_score1, selectable_reward_item4_1, check_item1_1, abyss_rank, pcguild_level, check_item1_2, check_item1_3, reward_item_ext_2, reward_item_ext_3, reward_item_ext_4, knight_selectable_reward, reward_challenge_task1, equiped_item_name5, race_permitted, equiped_item_name3, equiped_item_name4, equiped_item_name1, equiped_item_name2, reward_item_ext_1, drop_each_member_3, drop_each_member_4, drop_each_member_1, drop_each_member_2, dev_name, ranger_selectable_reward, selectable_reward_item5_5, selectable_reward_item5_4, unfinished_quest_cond1, unfinished_quest_cond2, selectable_reward_item5_3, selectable_reward_item5_2, reward_abyss_op_point1, selectable_reward_item5_1, gunner_selectable_reward, check_item2_1, check_item2_2",
+    "clt_redundant_fields":"",
+    "svr_tab":"quest"
+  },
+  {
+    "svr_redundant_fields":"",
+    "clt_tab":"client_quest__assassin_selectable_reward__data",
+    "same_fileds":"assassin_selectable_item, id",
+    "clt_redundant_fields":"",
+    "svr_tab":"quest__assassin_selectable_reward__data"
+  },
+  {
+    "svr_redundant_fields":"",
+    "clt_tab":"client_quest__bard_selectable_reward__data",
+    "same_fileds":"bard_selectable_item, id",
+    "clt_redundant_fields":"",
+    "svr_tab":"quest__bard_selectable_reward__data"
+  },
+  {
+    "svr_redundant_fields":"",
+    "clt_tab":"client_quest__chanter_selectable_reward__data",
+    "same_fileds":"chanter_selectable_item, id",
+    "clt_redundant_fields":"",
+    "svr_tab":"quest__chanter_selectable_reward__data"
+  },
+  {
+    "svr_redundant_fields":"",
+    "clt_tab":"client_quest__elementalist_selectable_reward__data",
+    "same_fileds":"id, elementalist_selectable_item",
+    "clt_redundant_fields":"",
+    "svr_tab":"quest__elementalist_selectable_reward__data"
+  },
+  {
+    "svr_redundant_fields":"",
+    "clt_tab":"client_quest__fighter_selectable_reward__data",
+    "same_fileds":"fighter_selectable_item, id",
+    "clt_redundant_fields":"",
+    "svr_tab":"quest__fighter_selectable_reward__data"
+  },
+  {
+    "svr_redundant_fields":"",
+    "clt_tab":"client_quest__gunner_selectable_reward__data",
+    "same_fileds":"gunner_selectable_item, id",
+    "clt_redundant_fields":"",
+    "svr_tab":"quest__gunner_selectable_reward__data"
+  },
+  {
+    "svr_redundant_fields":"",
+    "clt_tab":"client_quest__knight_selectable_reward__data",
+    "same_fileds":"knight_selectable_item, id",
+    "clt_redundant_fields":"",
+    "svr_tab":"quest__knight_selectable_reward__data"
+  },
+  {
+    "svr_redundant_fields":"",
+    "clt_tab":"client_quest__priest_selectable_reward__data",
+    "same_fileds":"priest_selectable_item, id",
+    "clt_redundant_fields":"",
+    "svr_tab":"quest__priest_selectable_reward__data"
+  },
+  {
+    "svr_redundant_fields":"",
+    "clt_tab":"client_quest__ranger_selectable_reward__data",
+    "same_fileds":"id, ranger_selectable_item",
+    "clt_redundant_fields":"",
+    "svr_tab":"quest__ranger_selectable_reward__data"
+  },
+  {
+    "svr_redundant_fields":"",
+    "clt_tab":"client_quest__rider_selectable_reward__data",
+    "same_fileds":"rider_selectable_item, id",
+    "clt_redundant_fields":"",
+    "svr_tab":"quest__rider_selectable_reward__data"
+  },
+  {
+    "svr_redundant_fields":"",
+    "clt_tab":"client_quest__wizard_selectable_reward__data",
+    "same_fileds":"id, wizard_selectable_item",
+    "clt_redundant_fields":"",
+    "svr_tab":"quest__wizard_selectable_reward__data"
+  },
+  {
+    "svr_redundant_fields":"",
+    "clt_tab":"client_setitem",
+    "same_fileds":"piece_bonus5, piece_bonus4, piece_bonus3, item2, item1, piece_bonus2, fullset_bonus, piece_bonus6, name, item7, id, item4, item3, item6, desc, item5",
+    "clt_redundant_fields":"",
+    "svr_tab":"setitem"
+  },
+  {
+    "svr_redundant_fields":"",
+    "clt_tab":"client_skill_learns",
+    "same_fileds":"autolearn, pc_level, race, skill, name, skill_level, id, class",
+    "clt_redundant_fields":"ui_display, stigma_display",
+    "svr_tab":"skill_learns"
+  }
+]

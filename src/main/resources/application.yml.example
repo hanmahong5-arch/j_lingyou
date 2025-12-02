@@ -1,0 +1,45 @@
+server:
+  port: 8081
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/xmldb_suiyue?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true
+    username: root
+    password: "your-password"
+    driver-class-name: com.mysql.cj.jdbc.Driver
+ALIYUN:
+  ACCESS_KEY_ID: ${ALIYUN_ACCESS_KEY_ID:your_access_key_id_here}
+  ACCESS_KEY_SECRET: ${ALIYUN_ACCESS_KEY_SECRET:your_access_key_secret_here}
+  URL: mt.aliyuncs.com
+file:
+  homePath: D:\workspace\dbxmlTool\src\main\resources\
+  confPath: D:\workspace\dbxmlTool\src\main\resources\CONF\
+  cltDataPath: D:\workspace\dbxmlTool\data\DATA\CLT_DATA\
+  svrDataPath: D:\workspace\dbxmlTool\data\DATA\SVR_DATA\
+  worldSvrDataPath: D:\workspace\dbxmlTool\data\DATA\SVR_DATA\Worlds\
+  exportDataPath: D:\workspace\dbxmlTool\data\TEMP\
+world:
+  specialTabName: world__npc_spawn__territory__npcs
+xmlPath:
+  xmldb_suiyue: D:\AionReal58\AionMap\XML
+  xmldb: null
+insight:
+  checkDatabaseSync: false
+aion:
+  xmlPath: D:\AionReal58\AionMap\XML
+  localizedPath: D:\AionReal58\AionMap\XML\China
+ai:
+  qwen:
+    apikey: ${AI_QWEN_APIKEY:your-qwen-api-key}
+    model: qwen-plus
+  doubao:
+    apikey: ${AI_DOUBAO_APIKEY:your-doubao-api-key}
+    model: doubao-seed-1-6-250615
+  kimi:
+    apikey: ${AI_KIMI_APIKEY:your-kimi-api-key}
+    model: Moonshot-Kimi-K2-Instruct
+  deepseek:
+    apikey: ${AI_DEEPSEEK_APIKEY:your-deepseek-api-key}
+    model: deepseek-r1
+  promptKey:
+    common:
+    - 请你帮我改写以下内容

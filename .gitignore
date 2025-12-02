@@ -1,0 +1,18 @@
+# IDE
+.idea/
+*.iml
+
+# Build
+target/
+*.class
+
+# Logs
+*.log
+audit.log
+
+# Sensitive config - DO NOT commit real API keys
+src/main/resources/application.yml
+
+# Temp files
+nul
+*.tmp
