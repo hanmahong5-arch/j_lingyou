@@ -476,6 +476,21 @@ public class Dbxmltool extends Application {
             "→ 验证数据完整性"
         ));
 
+        // 机制关系图按钮 - 27个机制间的依赖关系可视化
+        Button mechanismRelationBtn = new Button("🔗 关系图");
+        mechanismRelationBtn.setTooltip(new Tooltip(
+            "游戏机制关系图可视化\n\n" +
+            "🎯 核心功能:\n" +
+            "• 27个游戏机制的依赖网络\n" +
+            "• 力导向布局自动排列\n" +
+            "• 依赖链追踪和影响分析\n" +
+            "• 交互式节点探索\n\n" +
+            "💡 适用场景:\n" +
+            "→ 理解机制间的整体关系\n" +
+            "→ 新增BOSS时分析涉及的机制\n" +
+            "→ 评估修改的影响范围"
+        ));
+
         // ==================== 安全管理模块 ====================
         // 提供数据安全和灾难恢复功能
 
@@ -575,6 +590,19 @@ public class Dbxmltool extends Application {
             } catch (Exception e) {
                 log.error("打开设计洞察窗口失败", e);
                 showError("打开设计洞察窗口失败: " + e.getMessage());
+            }
+        });
+
+        // 机制关系图 - 打开机制关系图可视化窗口
+        mechanismRelationBtn.setOnAction(event -> {
+            try {
+                log.info("打开机制关系图窗口");
+                MechanismRelationshipStage stage = new MechanismRelationshipStage();
+                stage.initOwner(primaryStage);
+                stage.show();
+            } catch (Exception e) {
+                log.error("打开机制关系图窗口失败", e);
+                showError("打开机制关系图窗口失败: " + e.getMessage());
             }
         });
 
@@ -699,7 +727,7 @@ public class Dbxmltool extends Application {
             newQueryBtn, sqlConverterBtn, syncTableBtn,
             new Separator(),
             // 分析工具模块
-            mechanismExplorerBtn, designInsightBtn,
+            mechanismExplorerBtn, designInsightBtn, mechanismRelationBtn,
             new Separator(),
             // 数据处理模块
             searchReplaceBtn, dataValidationBtn, batchRewriteBtn,

@@ -5,6 +5,7 @@ import java.util.List;
 
 import red.jiuzhou.ui.AionMechanismExplorerStage;
 import red.jiuzhou.ui.DesignerInsightStage;
+import red.jiuzhou.ui.MechanismRelationshipStage;
 import red.jiuzhou.ui.ThemeStudioStage;
 
 /**
@@ -35,6 +36,14 @@ public final class FeatureRegistry {
                 "专为Aion游戏设计的机制分类和本地化对比工具，支持27个游戏系统分类",
                 FeatureCategory.ANALYTICS,
                 new StageFeatureLauncher(AionMechanismExplorerStage::new)
+        ));
+
+        features.add(new FeatureDescriptor(
+                "mechanism-relationship",
+                "机制关系图",
+                "27个游戏机制之间的依赖关系可视化，支持力导向布局和交互式探索",
+                FeatureCategory.ANALYTICS,
+                new StageFeatureLauncher(MechanismRelationshipStage::new)
         ));
 
         features.add(new FeatureDescriptor(
