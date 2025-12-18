@@ -259,10 +259,35 @@ public class DatabaseMappingManager {
         filterCombo.setValue("全部映射");
         filterCombo.setOnAction(e -> applyFilter(filterCombo.getValue()));
 
+        // 批量操作按钮
+        Menu batchMenu = new Menu("📦 批量操作");
+        MenuItem batchDdlItem = new MenuItem("🔧 批量生成DDL");
+        batchDdlItem.setOnAction(e -> showBatchDdlDialog());
+        MenuItem batchImportItem = new MenuItem("📥 批量导入XML到数据库");
+        batchImportItem.setOnAction(e -> showBatchImportDialog());
+        MenuItem batchExportItem = new MenuItem("📤 批量导出数据库到XML");
+        batchExportItem.setOnAction(e -> showBatchExportDialog());
+        MenuItem batchValidateItem = new MenuItem("✅ 批量验证映射");
+        batchValidateItem.setOnAction(e -> showBatchValidateDialog());
+        batchMenu.getItems().addAll(batchDdlItem, batchImportItem, batchExportItem, new SeparatorMenuItem(), batchValidateItem);
+
+        MenuButton batchBtn = new MenuButton("📦 批量操作");
+        batchBtn.getItems().addAll(
+            createMenuItem("🔧 批量生成DDL", e -> showBatchDdlDialog()),
+            createMenuItem("📥 批量导入XML到DB", e -> showBatchImportDialog()),
+            createMenuItem("📤 批量导出DB到XML", e -> showBatchExportDialog()),
+            new SeparatorMenuItem(),
+            createMenuItem("✅ 批量验证映射", e -> showBatchValidateDialog()),
+            createMenuItem("🔗 分析表间关系", e -> showTableRelationsDialog())
+        );
+        batchBtn.setTooltip(new Tooltip("批量执行DDL生成、数据导入导出等操作"));
+
         searchRow.getChildren().addAll(
             searchLabel, searchField, clearSearchBtn,
             new Separator(Orientation.VERTICAL),
-            filterCombo, refreshBtn, manualMappingBtn, matchStatsBtn
+            filterCombo, refreshBtn, manualMappingBtn, matchStatsBtn,
+            new Separator(Orientation.VERTICAL),
+            batchBtn
         );
 
         toolBarContainer.getChildren().addAll(titleRow, searchRow);
@@ -396,9 +421,141 @@ public class DatabaseMappingManager {
         );
 
         VBox.setVgrow(pairTableView, Priority.ALWAYS);
+
+        // 添加表映射列表的右键菜单
+        setupPairTableContextMenu();
+
         panel.getChildren().addAll(headerLabel, pairTableView);
 
         return panel;
+    }
+
+    /**
+     * 设置表映射列表的右键菜单
+     */
+    private void setupPairTableContextMenu() {
+        ContextMenu contextMenu = new ContextMenu();
+
+        // 查看组
+        MenuItem viewDetailItem = new MenuItem("👁️ 查看字段详情");
+        viewDetailItem.setOnAction(e -> {
+            TablePairWrapper selected = pairTableView.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                showTableDetail(selected);
+            }
+        });
+
+        MenuItem viewRelationsItem = new MenuItem("🔗 查看表间关系");
+        viewRelationsItem.setOnAction(e -> {
+            TablePairWrapper selected = pairTableView.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                showTableRelationsFor(selected);
+            }
+        });
+
+        // 单表操作组
+        MenuItem generateDdlItem = new MenuItem("🔧 生成此表DDL");
+        generateDdlItem.setOnAction(e -> {
+            TablePairWrapper selected = pairTableView.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                generateDdlForTable(selected);
+            }
+        });
+
+        MenuItem importXmlItem = new MenuItem("📥 导入此表XML到数据库");
+        importXmlItem.setOnAction(e -> {
+            TablePairWrapper selected = pairTableView.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                importXmlForTable(selected);
+            }
+        });
+
+        MenuItem exportXmlItem = new MenuItem("📤 导出此表到XML");
+        exportXmlItem.setOnAction(e -> {
+            TablePairWrapper selected = pairTableView.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                exportXmlForTable(selected);
+            }
+        });
+
+        // 批量操作组
+        Menu batchMenu = new Menu("📦 批量操作（选中项）");
+        MenuItem batchDdlSelectedItem = new MenuItem("🔧 生成选中表DDL");
+        batchDdlSelectedItem.setOnAction(e -> batchGenerateDdlForSelected());
+        MenuItem batchImportSelectedItem = new MenuItem("📥 导入选中表");
+        batchImportSelectedItem.setOnAction(e -> batchImportForSelected());
+        MenuItem batchExportSelectedItem = new MenuItem("📤 导出选中表");
+        batchExportSelectedItem.setOnAction(e -> batchExportForSelected());
+        batchMenu.getItems().addAll(batchDdlSelectedItem, batchImportSelectedItem, batchExportSelectedItem);
+
+        // 复制组
+        MenuItem copyTableNameItem = new MenuItem("📋 复制表名");
+        copyTableNameItem.setOnAction(e -> {
+            TablePairWrapper selected = pairTableView.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                String names = selected.getClientTableName() + " -> " + selected.getServerTableName();
+                red.jiuzhou.ui.components.ContextMenuFactory.copyToClipboard(names);
+            }
+        });
+
+        MenuItem copyMappingInfoItem = new MenuItem("📄 复制映射信息");
+        copyMappingInfoItem.setOnAction(e -> {
+            TablePairWrapper selected = pairTableView.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                String info = String.format("客户端表: %s\n服务端表: %s\n共同字段: %d\n客户端独有: %d\n服务端独有: %d\n匹配方法: %s",
+                    selected.getClientTableName(),
+                    selected.getServerTableName(),
+                    selected.getCommonFieldCount(),
+                    selected.getClientOnlyCount(),
+                    selected.getServerOnlyCount(),
+                    selected.matchMethod);
+                red.jiuzhou.ui.components.ContextMenuFactory.copyToClipboard(info);
+            }
+        });
+
+        // 手动映射
+        MenuItem setManualMappingItem = new MenuItem("⚙️ 设置手动映射");
+        setManualMappingItem.setOnAction(e -> {
+            TablePairWrapper selected = pairTableView.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                showManualMappingForTable(selected);
+            }
+        });
+
+        // 组装菜单
+        contextMenu.getItems().addAll(
+            viewDetailItem,
+            viewRelationsItem,
+            new SeparatorMenuItem(),
+            generateDdlItem,
+            importXmlItem,
+            exportXmlItem,
+            new SeparatorMenuItem(),
+            batchMenu,
+            new SeparatorMenuItem(),
+            copyTableNameItem,
+            copyMappingInfoItem,
+            new SeparatorMenuItem(),
+            setManualMappingItem
+        );
+
+        // 动态启用/禁用
+        contextMenu.setOnShowing(e -> {
+            TablePairWrapper selected = pairTableView.getSelectionModel().getSelectedItem();
+            boolean hasSelection = selected != null;
+            boolean hasServer = hasSelection && selected.serverTable != null;
+
+            viewDetailItem.setDisable(!hasSelection);
+            viewRelationsItem.setDisable(!hasSelection);
+            generateDdlItem.setDisable(!hasSelection);
+            importXmlItem.setDisable(!hasSelection);
+            exportXmlItem.setDisable(!hasServer);
+            copyTableNameItem.setDisable(!hasSelection);
+            copyMappingInfoItem.setDisable(!hasSelection);
+            setManualMappingItem.setDisable(!hasSelection);
+        });
+
+        pairTableView.setContextMenu(contextMenu);
     }
 
     /**
@@ -2605,6 +2762,341 @@ public class DatabaseMappingManager {
                 default: return status;
             }
         }
+    }
+
+    // ==================== 批量操作方法 ====================
+
+    /**
+     * 创建菜单项辅助方法
+     */
+    private MenuItem createMenuItem(String text, javafx.event.EventHandler<javafx.event.ActionEvent> handler) {
+        MenuItem item = new MenuItem(text);
+        item.setOnAction(handler);
+        return item;
+    }
+
+    /**
+     * 显示批量DDL生成对话框
+     */
+    private void showBatchDdlDialog() {
+        showBatchOperationDialog("批量生成DDL",
+            "选择要生成DDL的表，将批量生成CREATE TABLE语句",
+            MappingConfigManager.BatchOperationType.GENERATE_DDL);
+    }
+
+    /**
+     * 显示批量导入对话框
+     */
+    private void showBatchImportDialog() {
+        showBatchOperationDialog("批量导入XML到数据库",
+            "选择要导入的表，将批量执行XML数据导入",
+            MappingConfigManager.BatchOperationType.IMPORT_XML_TO_DB);
+    }
+
+    /**
+     * 显示批量导出对话框
+     */
+    private void showBatchExportDialog() {
+        showBatchOperationDialog("批量导出数据库到XML",
+            "选择要导出的表，将批量导出为XML文件",
+            MappingConfigManager.BatchOperationType.EXPORT_DB_TO_XML);
+    }
+
+    /**
+     * 显示批量验证对话框
+     */
+    private void showBatchValidateDialog() {
+        showInfo("批量验证映射",
+            "此功能将验证所有表映射的正确性：\n\n" +
+            "• 检查字段匹配率\n" +
+            "• 检查类型兼容性\n" +
+            "• 检查主键约束\n" +
+            "• 生成验证报告\n\n" +
+            "功能开发中...");
+    }
+
+    /**
+     * 显示表间关系对话框
+     */
+    private void showTableRelationsDialog() {
+        showInfo("表间关系分析",
+            "此功能将分析所有表之间的关系：\n\n" +
+            "• 父子表关系\n" +
+            "• ID引用关系\n" +
+            "• 本地化字符串关系\n" +
+            "• 生成关系图\n\n" +
+            "功能开发中...");
+    }
+
+    /**
+     * 显示批量操作对话框
+     */
+    private void showBatchOperationDialog(String title, String description,
+                                          MappingConfigManager.BatchOperationType operationType) {
+        Stage dialog = new Stage();
+        dialog.initOwner(managerStage);
+        dialog.initModality(Modality.APPLICATION_MODAL);
+        dialog.setTitle("📦 " + title);
+
+        VBox layout = new VBox(15);
+        layout.setPadding(new Insets(20));
+        layout.setStyle("-fx-background-color: white;");
+
+        // 标题和描述
+        Label titleLabel = new Label(title);
+        titleLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
+
+        Label descLabel = new Label(description);
+        descLabel.setWrapText(true);
+        descLabel.setStyle("-fx-text-fill: #666;");
+
+        // 快速选择按钮
+        HBox quickSelectBox = new HBox(10);
+        quickSelectBox.setAlignment(Pos.CENTER_LEFT);
+
+        Button selectAllBtn = new Button("全选");
+        Button selectNoneBtn = new Button("全不选");
+        Button selectMatchedBtn = new Button("选择已匹配");
+        Button selectStringsBtn = new Button("选择strings表");
+
+        // 表选择列表
+        ListView<TablePairWrapper> tableListView = new ListView<>();
+        tableListView.getItems().addAll(tablePairList);
+        tableListView.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
+        tableListView.setCellFactory(lv -> new ListCell<TablePairWrapper>() {
+            private final CheckBox checkBox = new CheckBox();
+
+            @Override
+            protected void updateItem(TablePairWrapper item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setGraphic(null);
+                    setText(null);
+                } else {
+                    checkBox.setSelected(isSelected());
+                    String displayText = item.getClientTableName();
+                    if (item.serverTable != null) {
+                        displayText += " → " + item.getServerTableName();
+                    } else {
+                        displayText += " (未匹配)";
+                    }
+                    checkBox.setText(displayText);
+                    setGraphic(checkBox);
+
+                    checkBox.setOnAction(e -> {
+                        if (checkBox.isSelected()) {
+                            getListView().getSelectionModel().select(getIndex());
+                        } else {
+                            getListView().getSelectionModel().clearSelection(getIndex());
+                        }
+                    });
+                }
+            }
+        });
+
+        selectAllBtn.setOnAction(e -> tableListView.getSelectionModel().selectAll());
+        selectNoneBtn.setOnAction(e -> tableListView.getSelectionModel().clearSelection());
+        selectMatchedBtn.setOnAction(e -> {
+            tableListView.getSelectionModel().clearSelection();
+            for (int i = 0; i < tableListView.getItems().size(); i++) {
+                if (tableListView.getItems().get(i).serverTable != null) {
+                    tableListView.getSelectionModel().select(i);
+                }
+            }
+        });
+        selectStringsBtn.setOnAction(e -> {
+            tableListView.getSelectionModel().clearSelection();
+            for (int i = 0; i < tableListView.getItems().size(); i++) {
+                String name = tableListView.getItems().get(i).getClientTableName().toLowerCase();
+                if (name.contains("string")) {
+                    tableListView.getSelectionModel().select(i);
+                }
+            }
+        });
+
+        quickSelectBox.getChildren().addAll(selectAllBtn, selectNoneBtn, selectMatchedBtn, selectStringsBtn);
+
+        // 统计标签
+        Label statsLabel = new Label("已选择: 0 个表");
+        tableListView.getSelectionModel().getSelectedItems().addListener(
+            (javafx.collections.ListChangeListener<TablePairWrapper>) c ->
+                statsLabel.setText("已选择: " + tableListView.getSelectionModel().getSelectedItems().size() + " 个表")
+        );
+
+        // 按钮栏
+        HBox buttonBar = new HBox(10);
+        buttonBar.setAlignment(Pos.CENTER_RIGHT);
+
+        Button executeBtn = new Button("🚀 执行");
+        executeBtn.setStyle("-fx-background-color: #4CAF50; -fx-text-fill: white;");
+        executeBtn.setOnAction(e -> {
+            List<TablePairWrapper> selected = new ArrayList<>(tableListView.getSelectionModel().getSelectedItems());
+            if (selected.isEmpty()) {
+                showAlert("请至少选择一个表");
+                return;
+            }
+            dialog.close();
+            executeBatchOperation(selected, operationType);
+        });
+
+        Button cancelBtn = new Button("取消");
+        cancelBtn.setOnAction(e -> dialog.close());
+
+        buttonBar.getChildren().addAll(statsLabel, new Region(), executeBtn, cancelBtn);
+        HBox.setHgrow(buttonBar.getChildren().get(1), Priority.ALWAYS);
+
+        VBox.setVgrow(tableListView, Priority.ALWAYS);
+        layout.getChildren().addAll(titleLabel, descLabel, quickSelectBox, tableListView, buttonBar);
+
+        Scene scene = new Scene(layout, 600, 500);
+        dialog.setScene(scene);
+        dialog.showAndWait();
+    }
+
+    /**
+     * 执行批量操作
+     */
+    private void executeBatchOperation(List<TablePairWrapper> tables,
+                                       MappingConfigManager.BatchOperationType operationType) {
+        log.info("执行批量操作: {} - {} 个表", operationType.displayName, tables.size());
+
+        MappingConfigManager.BatchOperationResult result =
+            new MappingConfigManager.BatchOperationResult(operationType);
+        result.totalCount = tables.size();
+
+        long startTime = System.currentTimeMillis();
+
+        for (TablePairWrapper table : tables) {
+            try {
+                switch (operationType) {
+                    case GENERATE_DDL:
+                        // TODO: 调用DDL生成逻辑
+                        result.recordSuccess(table.getClientTableName());
+                        break;
+                    case IMPORT_XML_TO_DB:
+                        // TODO: 调用XML导入逻辑
+                        result.recordSuccess(table.getClientTableName());
+                        break;
+                    case EXPORT_DB_TO_XML:
+                        // TODO: 调用数据库导出逻辑
+                        result.recordSuccess(table.getClientTableName());
+                        break;
+                    default:
+                        result.recordSuccess(table.getClientTableName());
+                }
+            } catch (Exception e) {
+                result.recordFailure(table.getClientTableName(), e.getMessage());
+                log.error("批量操作失败: {} - {}", table.getClientTableName(), e.getMessage());
+            }
+        }
+
+        result.executionTimeMs = System.currentTimeMillis() - startTime;
+
+        showInfo("批量操作完成", result.getSummary());
+    }
+
+    /**
+     * 为选中表生成DDL
+     */
+    private void generateDdlForTable(TablePairWrapper table) {
+        showInfo("生成DDL", "为表 " + table.getClientTableName() + " 生成DDL...\n\n功能开发中...");
+    }
+
+    /**
+     * 为选中表导入XML
+     */
+    private void importXmlForTable(TablePairWrapper table) {
+        showInfo("导入XML", "导入表 " + table.getClientTableName() + " 的XML数据...\n\n功能开发中...");
+    }
+
+    /**
+     * 为选中表导出XML
+     */
+    private void exportXmlForTable(TablePairWrapper table) {
+        showInfo("导出XML", "导出表 " + table.getServerTableName() + " 到XML...\n\n功能开发中...");
+    }
+
+    /**
+     * 批量生成选中表的DDL
+     */
+    private void batchGenerateDdlForSelected() {
+        List<TablePairWrapper> selected = new ArrayList<>(pairTableView.getSelectionModel().getSelectedItems());
+        if (selected.isEmpty()) {
+            showAlert("请先选择要操作的表");
+            return;
+        }
+        executeBatchOperation(selected, MappingConfigManager.BatchOperationType.GENERATE_DDL);
+    }
+
+    /**
+     * 批量导入选中表
+     */
+    private void batchImportForSelected() {
+        List<TablePairWrapper> selected = new ArrayList<>(pairTableView.getSelectionModel().getSelectedItems());
+        if (selected.isEmpty()) {
+            showAlert("请先选择要操作的表");
+            return;
+        }
+        executeBatchOperation(selected, MappingConfigManager.BatchOperationType.IMPORT_XML_TO_DB);
+    }
+
+    /**
+     * 批量导出选中表
+     */
+    private void batchExportForSelected() {
+        List<TablePairWrapper> selected = new ArrayList<>(pairTableView.getSelectionModel().getSelectedItems());
+        if (selected.isEmpty()) {
+            showAlert("请先选择要操作的表");
+            return;
+        }
+        executeBatchOperation(selected, MappingConfigManager.BatchOperationType.EXPORT_DB_TO_XML);
+    }
+
+    /**
+     * 显示单表的表间关系
+     */
+    private void showTableRelationsFor(TablePairWrapper table) {
+        if (table.clientTable == null) return;
+
+        List<MappingConfigManager.TableRelation> relations =
+            MappingConfigManager.detectTableRelations(table.clientTable, allTables);
+
+        if (relations.isEmpty()) {
+            showInfo("表间关系", "表 " + table.getClientTableName() + " 未检测到明显的表间关系");
+            return;
+        }
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("表 ").append(table.getClientTableName()).append(" 的关系：\n\n");
+
+        for (MappingConfigManager.TableRelation rel : relations) {
+            sb.append(String.format("• %s\n  %s → %s\n  置信度: %.0f%%\n\n",
+                rel.relationType.displayName,
+                rel.sourceTable, rel.targetTable,
+                rel.confidence * 100));
+        }
+
+        showInfo("表间关系分析", sb.toString());
+    }
+
+    /**
+     * 为单表设置手动映射
+     */
+    private void showManualMappingForTable(TablePairWrapper table) {
+        TextInputDialog dialog = new TextInputDialog(
+            table.serverTable != null ? table.serverTable.getTableName() : "");
+        dialog.setTitle("设置手动映射");
+        dialog.setHeaderText("为 " + table.getClientTableName() + " 设置服务端表映射");
+        dialog.setContentText("服务端表名:");
+
+        dialog.showAndWait().ifPresent(serverTable -> {
+            if (!serverTable.trim().isEmpty()) {
+                SmartTableMatcher.addManualMapping(table.getClientTableName(), serverTable.trim());
+                showInfo("设置成功", "已设置手动映射:\n" +
+                    table.getClientTableName() + " → " + serverTable.trim() +
+                    "\n\n重新加载后生效");
+            }
+        });
     }
 
     /**

@@ -139,6 +139,16 @@ public class EnhancedMatchQualityCalculator {
             double tableNameSimilarity) {
 
         MatchQuality quality = new MatchQuality();
+
+        // 应用表名权重加成（如strings表的80%权重）
+        double weightBonus = MappingConfigManager.getTableWeightBonus(clientTable.getTableName());
+        if (weightBonus > 0) {
+            // 将权重加成应用到表名相似度
+            tableNameSimilarity = Math.min(1.0, tableNameSimilarity + weightBonus * (1.0 - tableNameSimilarity));
+            log.debug("表 {} 应用权重加成 {:.0f}%, 调整后相似度: {:.1f}%",
+                clientTable.getTableName(), weightBonus * 100, tableNameSimilarity * 100);
+        }
+
         quality.tableNameSimilarity = tableNameSimilarity;
 
         // 获取字段对比结果
