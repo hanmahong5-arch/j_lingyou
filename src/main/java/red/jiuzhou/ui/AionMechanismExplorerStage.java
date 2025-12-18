@@ -15,6 +15,7 @@ import javafx.stage.Stage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import red.jiuzhou.analysis.aion.*;
+import red.jiuzhou.ui.components.ContextMenuFactory;
 import red.jiuzhou.ui.components.DashboardPanel;
 import red.jiuzhou.ui.components.StatCard;
 import red.jiuzhou.util.YamlUtils;
@@ -321,6 +322,9 @@ public class AionMechanismExplorerStage extends Stage {
                 });
         VBox.setVgrow(fileListView, Priority.ALWAYS);
 
+        // 添加文件列表右键菜单
+        setupFileListContextMenu();
+
         box.getChildren().addAll(header, searchField, fileListView);
         return box;
     }
@@ -343,6 +347,9 @@ public class AionMechanismExplorerStage extends Stage {
 
         fieldTable = createFieldTable();
         VBox.setVgrow(fieldTable, Priority.ALWAYS);
+
+        // 添加字段表格右键菜单
+        setupFieldTableContextMenu();
 
         fieldListBox.getChildren().addAll(fieldHeader, fieldTable);
 
@@ -929,6 +936,298 @@ public class AionMechanismExplorerStage extends Stage {
         NavigationState(AionMechanismCategory category, AionMechanismView.FileEntry file) {
             this.category = category;
             this.file = file;
+        }
+    }
+
+    /**
+     * 设置文件列表右键菜单
+     */
+    private void setupFileListContextMenu() {
+        ContextMenu menu = new ContextMenu();
+
+        // 打开组
+        MenuItem openItem = new MenuItem("📄 打开（查看字段）");
+        openItem.setOnAction(e -> {
+            AionMechanismView.FileEntry selected = fileListView.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                selectFile(selected);
+            }
+        });
+
+        MenuItem openFolderItem = new MenuItem("📁 在资源管理器中显示");
+        openFolderItem.setOnAction(e -> {
+            AionMechanismView.FileEntry selected = fileListView.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                ContextMenuFactory.openInExplorer(selected.getFile().getAbsolutePath());
+            }
+        });
+
+        MenuItem openExternalItem = new MenuItem("🔗 使用外部程序打开");
+        openExternalItem.setOnAction(e -> {
+            AionMechanismView.FileEntry selected = fileListView.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                ContextMenuFactory.openWithDesktop(selected.getFile().getAbsolutePath());
+            }
+        });
+
+        // 复制组
+        MenuItem copyPathItem = new MenuItem("📋 复制完整路径");
+        copyPathItem.setOnAction(e -> {
+            AionMechanismView.FileEntry selected = fileListView.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                ContextMenuFactory.copyToClipboard(selected.getFile().getAbsolutePath());
+                statusLabel.setText("已复制路径: " + selected.getFile().getAbsolutePath());
+            }
+        });
+
+        MenuItem copyRelPathItem = new MenuItem("📝 复制相对路径");
+        copyRelPathItem.setOnAction(e -> {
+            AionMechanismView.FileEntry selected = fileListView.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                ContextMenuFactory.copyToClipboard(selected.getRelativePath());
+                statusLabel.setText("已复制: " + selected.getRelativePath());
+            }
+        });
+
+        MenuItem copyNameItem = new MenuItem("📝 复制文件名");
+        copyNameItem.setOnAction(e -> {
+            AionMechanismView.FileEntry selected = fileListView.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                ContextMenuFactory.copyToClipboard(selected.getFileName());
+                statusLabel.setText("已复制: " + selected.getFileName());
+            }
+        });
+
+        // 信息组
+        MenuItem fileInfoItem = new MenuItem("ℹ️ 文件信息");
+        fileInfoItem.setOnAction(e -> {
+            AionMechanismView.FileEntry selected = fileListView.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                showFileInfo(selected);
+            }
+        });
+
+        // 导出组
+        MenuItem exportXmlItem = new MenuItem("📤 导出文件内容");
+        exportXmlItem.setOnAction(e -> {
+            AionMechanismView.FileEntry selected = fileListView.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                exportFileContent(selected);
+            }
+        });
+
+        // 组装菜单
+        menu.getItems().addAll(
+            openItem,
+            openFolderItem,
+            openExternalItem,
+            new SeparatorMenuItem(),
+            copyPathItem,
+            copyRelPathItem,
+            copyNameItem,
+            new SeparatorMenuItem(),
+            fileInfoItem,
+            exportXmlItem
+        );
+
+        // 动态启用/禁用
+        menu.setOnShowing(e -> {
+            boolean hasSelection = fileListView.getSelectionModel().getSelectedItem() != null;
+            openItem.setDisable(!hasSelection);
+            openFolderItem.setDisable(!hasSelection);
+            openExternalItem.setDisable(!hasSelection);
+            copyPathItem.setDisable(!hasSelection);
+            copyRelPathItem.setDisable(!hasSelection);
+            copyNameItem.setDisable(!hasSelection);
+            fileInfoItem.setDisable(!hasSelection);
+            exportXmlItem.setDisable(!hasSelection);
+        });
+
+        fileListView.setContextMenu(menu);
+    }
+
+    /**
+     * 设置字段表格右键菜单
+     */
+    private void setupFieldTableContextMenu() {
+        ContextMenu menu = new ContextMenu();
+
+        // 跳转组
+        MenuItem jumpToRefItem = new MenuItem("🔗 跳转到引用系统");
+        jumpToRefItem.setOnAction(e -> {
+            XmlFieldParser.FieldInfo selected = fieldTable.getSelectionModel().getSelectedItem();
+            if (selected != null && selected.hasReference()) {
+                jumpToMechanism(selected.getReferenceTarget());
+            }
+        });
+
+        // 复制组
+        MenuItem copyFieldNameItem = new MenuItem("📋 复制字段名");
+        copyFieldNameItem.setOnAction(e -> {
+            XmlFieldParser.FieldInfo selected = fieldTable.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                ContextMenuFactory.copyToClipboard(selected.getName());
+                statusLabel.setText("已复制: " + selected.getName());
+            }
+        });
+
+        MenuItem copyValueItem = new MenuItem("📝 复制示例值");
+        copyValueItem.setOnAction(e -> {
+            XmlFieldParser.FieldInfo selected = fieldTable.getSelectionModel().getSelectedItem();
+            if (selected != null && selected.getSampleValue() != null) {
+                ContextMenuFactory.copyToClipboard(selected.getSampleValue());
+                statusLabel.setText("已复制: " + selected.getSampleValue());
+            }
+        });
+
+        MenuItem copyPathItem = new MenuItem("📝 复制字段路径");
+        copyPathItem.setOnAction(e -> {
+            XmlFieldParser.FieldInfo selected = fieldTable.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                ContextMenuFactory.copyToClipboard(selected.getPath());
+                statusLabel.setText("已复制: " + selected.getPath());
+            }
+        });
+
+        MenuItem copyRowItem = new MenuItem("📄 复制整行数据");
+        copyRowItem.setOnAction(e -> {
+            XmlFieldParser.FieldInfo selected = fieldTable.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                String row = String.format("%s\t%s\t%s\t%s",
+                    selected.getName(),
+                    selected.getSampleValue() != null ? selected.getSampleValue() : "",
+                    selected.getPath(),
+                    selected.hasReference() ? selected.getReferenceTarget() : "");
+                ContextMenuFactory.copyToClipboard(row);
+                statusLabel.setText("已复制行数据");
+            }
+        });
+
+        MenuItem copyAllItem = new MenuItem("📄 复制所有字段");
+        copyAllItem.setOnAction(e -> {
+            StringBuilder sb = new StringBuilder();
+            sb.append("字段名\t示例值\t路径\t引用\n");
+            for (XmlFieldParser.FieldInfo field : fieldTable.getItems()) {
+                sb.append(String.format("%s\t%s\t%s\t%s\n",
+                    field.getName(),
+                    field.getSampleValue() != null ? field.getSampleValue() : "",
+                    field.getPath(),
+                    field.hasReference() ? field.getReferenceTarget() : ""));
+            }
+            ContextMenuFactory.copyToClipboard(sb.toString());
+            statusLabel.setText("已复制 " + fieldTable.getItems().size() + " 个字段");
+        });
+
+        // 搜索/筛选组
+        MenuItem filterByRefItem = new MenuItem("🔍 只显示有引用的字段");
+        filterByRefItem.setOnAction(e -> {
+            if (currentParseResult != null) {
+                List<XmlFieldParser.FieldInfo> filtered = new ArrayList<>();
+                for (XmlFieldParser.FieldInfo field : currentParseResult.getFields()) {
+                    if (field.hasReference()) {
+                        filtered.add(field);
+                    }
+                }
+                fieldTable.setItems(FXCollections.observableArrayList(filtered));
+                statusLabel.setText("显示 " + filtered.size() + " 个有引用的字段");
+            }
+        });
+
+        MenuItem showAllFieldsItem = new MenuItem("📋 显示所有字段");
+        showAllFieldsItem.setOnAction(e -> {
+            if (currentParseResult != null) {
+                updateFieldTable(currentParseResult);
+                statusLabel.setText("显示所有 " + fieldTable.getItems().size() + " 个字段");
+            }
+        });
+
+        // 组装菜单
+        menu.getItems().addAll(
+            jumpToRefItem,
+            new SeparatorMenuItem(),
+            copyFieldNameItem,
+            copyValueItem,
+            copyPathItem,
+            copyRowItem,
+            new SeparatorMenuItem(),
+            copyAllItem,
+            new SeparatorMenuItem(),
+            filterByRefItem,
+            showAllFieldsItem
+        );
+
+        // 动态启用/禁用
+        menu.setOnShowing(e -> {
+            XmlFieldParser.FieldInfo selected = fieldTable.getSelectionModel().getSelectedItem();
+            boolean hasSelection = selected != null;
+            boolean hasRef = hasSelection && selected.hasReference();
+            boolean hasData = !fieldTable.getItems().isEmpty();
+
+            jumpToRefItem.setDisable(!hasRef);
+            copyFieldNameItem.setDisable(!hasSelection);
+            copyValueItem.setDisable(!hasSelection || selected.getSampleValue() == null);
+            copyPathItem.setDisable(!hasSelection);
+            copyRowItem.setDisable(!hasSelection);
+            copyAllItem.setDisable(!hasData);
+            filterByRefItem.setDisable(!hasData);
+            showAllFieldsItem.setDisable(!hasData);
+        });
+
+        fieldTable.setContextMenu(menu);
+    }
+
+    /**
+     * 显示文件信息对话框
+     */
+    private void showFileInfo(AionMechanismView.FileEntry entry) {
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle("文件信息");
+        alert.setHeaderText(entry.getFileName());
+
+        StringBuilder content = new StringBuilder();
+        content.append("文件名: ").append(entry.getFileName()).append("\n");
+        content.append("相对路径: ").append(entry.getRelativePath()).append("\n");
+        content.append("完整路径: ").append(entry.getFile().getAbsolutePath()).append("\n");
+        content.append("文件大小: ").append(entry.getFileSizeReadable()).append("\n");
+        content.append("本地化文件: ").append(entry.isLocalized() ? "是" : "否").append("\n");
+
+        if (selectedCategory != null) {
+            content.append("所属机制: ").append(selectedCategory.getDisplayName()).append("\n");
+        }
+
+        TextArea textArea = new TextArea(content.toString());
+        textArea.setEditable(false);
+        textArea.setWrapText(true);
+        textArea.setPrefRowCount(8);
+
+        alert.getDialogPane().setExpandableContent(textArea);
+        alert.getDialogPane().setExpanded(true);
+        alert.showAndWait();
+    }
+
+    /**
+     * 导出文件内容
+     */
+    private void exportFileContent(AionMechanismView.FileEntry entry) {
+        try {
+            java.nio.file.Path source = entry.getFile().toPath();
+            String content = new String(java.nio.file.Files.readAllBytes(source), "UTF-8");
+
+            javafx.stage.FileChooser fileChooser = new javafx.stage.FileChooser();
+            fileChooser.setTitle("导出文件");
+            fileChooser.setInitialFileName(entry.getFileName());
+            fileChooser.getExtensionFilters().add(
+                new javafx.stage.FileChooser.ExtensionFilter("XML 文件", "*.xml")
+            );
+
+            File file = fileChooser.showSaveDialog(this);
+            if (file != null) {
+                java.nio.file.Files.write(file.toPath(), content.getBytes("UTF-8"));
+                statusLabel.setText("已导出到: " + file.getName());
+            }
+        } catch (Exception e) {
+            log.error("导出文件失败", e);
+            statusLabel.setText("导出失败: " + e.getMessage());
         }
     }
 

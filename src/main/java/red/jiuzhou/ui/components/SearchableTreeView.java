@@ -13,11 +13,13 @@ import javafx.scene.layout.VBox;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.BiPredicate;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 /**
  * 可搜索树视图组件
@@ -66,6 +68,9 @@ public class SearchableTreeView<T> extends VBox {
     // 回调
     private Consumer<TreeItem<T>> onItemSelected;
     private Consumer<TreeItem<T>> onItemDoubleClicked;
+    private Consumer<TreeItem<T>> onItemOpen;
+    private Function<TreeItem<T>, String> pathResolver;
+    private Runnable onRefresh;
 
     public SearchableTreeView() {
         setSpacing(0);
@@ -91,6 +96,138 @@ public class SearchableTreeView<T> extends VBox {
         };
 
         setupTreeViewListeners();
+        setupContextMenu();
+    }
+
+    /**
+     * 设置右键菜单
+     */
+    private void setupContextMenu() {
+        ContextMenu contextMenu = new ContextMenu();
+
+        // 打开组
+        MenuItem openItem = new MenuItem("📄 打开");
+        openItem.setOnAction(e -> {
+            TreeItem<T> selected = treeView.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                if (onItemOpen != null) {
+                    onItemOpen.accept(selected);
+                } else if (onItemDoubleClicked != null) {
+                    onItemDoubleClicked.accept(selected);
+                }
+            }
+        });
+
+        MenuItem openFolderItem = new MenuItem("📁 在资源管理器中显示");
+        openFolderItem.setOnAction(e -> {
+            TreeItem<T> selected = treeView.getSelectionModel().getSelectedItem();
+            if (selected != null && pathResolver != null) {
+                String path = pathResolver.apply(selected);
+                ContextMenuFactory.openInExplorer(path);
+            }
+        });
+
+        MenuItem openExternalItem = new MenuItem("🔗 使用外部程序打开");
+        openExternalItem.setOnAction(e -> {
+            TreeItem<T> selected = treeView.getSelectionModel().getSelectedItem();
+            if (selected != null && pathResolver != null) {
+                String path = pathResolver.apply(selected);
+                ContextMenuFactory.openWithDesktop(path);
+            }
+        });
+
+        // 展开/折叠组
+        MenuItem expandItem = new MenuItem("📂 展开此项");
+        expandItem.setOnAction(e -> {
+            TreeItem<T> selected = treeView.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                expandRecursively(selected, true);
+            }
+        });
+
+        MenuItem collapseItem = new MenuItem("📁 折叠此项");
+        collapseItem.setOnAction(e -> {
+            TreeItem<T> selected = treeView.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                expandRecursively(selected, false);
+            }
+        });
+
+        MenuItem expandAllItem = new MenuItem("📂 全部展开");
+        expandAllItem.setOnAction(e -> expandAll());
+
+        MenuItem collapseAllItem = new MenuItem("📁 全部折叠");
+        collapseAllItem.setOnAction(e -> collapseAll());
+
+        // 复制组
+        MenuItem copyPathItem = new MenuItem("📋 复制路径");
+        copyPathItem.setOnAction(e -> {
+            TreeItem<T> selected = treeView.getSelectionModel().getSelectedItem();
+            if (selected != null && pathResolver != null) {
+                String path = pathResolver.apply(selected);
+                ContextMenuFactory.copyToClipboard(path);
+                log.info("已复制路径: {}", path);
+            }
+        });
+
+        MenuItem copyNameItem = new MenuItem("📝 复制名称");
+        copyNameItem.setOnAction(e -> {
+            TreeItem<T> selected = treeView.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                String name = selected.getValue().toString();
+                ContextMenuFactory.copyToClipboard(name);
+                log.info("已复制名称: {}", name);
+            }
+        });
+
+        // 搜索组
+        MenuItem searchItem = new MenuItem("🔍 搜索... (Ctrl+F)");
+        searchItem.setOnAction(e -> focusSearchField());
+
+        // 刷新
+        MenuItem refreshItem = new MenuItem("🔄 刷新");
+        refreshItem.setOnAction(e -> {
+            if (onRefresh != null) {
+                onRefresh.run();
+            }
+        });
+
+        // 组装菜单
+        contextMenu.getItems().addAll(
+            openItem,
+            openFolderItem,
+            openExternalItem,
+            new SeparatorMenuItem(),
+            expandItem,
+            collapseItem,
+            expandAllItem,
+            collapseAllItem,
+            new SeparatorMenuItem(),
+            copyPathItem,
+            copyNameItem,
+            new SeparatorMenuItem(),
+            searchItem,
+            refreshItem
+        );
+
+        // 动态启用/禁用菜单项
+        contextMenu.setOnShowing(e -> {
+            TreeItem<T> selected = treeView.getSelectionModel().getSelectedItem();
+            boolean hasSelection = selected != null;
+            boolean isLeaf = hasSelection && selected.isLeaf();
+            boolean hasPath = hasSelection && pathResolver != null;
+
+            openItem.setDisable(!hasSelection);
+            openFolderItem.setDisable(!hasPath);
+            openExternalItem.setDisable(!hasPath || !isLeaf);
+            expandItem.setDisable(!hasSelection || isLeaf);
+            collapseItem.setDisable(!hasSelection || isLeaf);
+            copyPathItem.setDisable(!hasPath);
+            copyNameItem.setDisable(!hasSelection);
+            refreshItem.setDisable(onRefresh == null);
+        });
+
+        treeView.setContextMenu(contextMenu);
     }
 
     /**
@@ -493,6 +630,27 @@ public class SearchableTreeView<T> extends VBox {
      */
     public void setOnItemDoubleClicked(Consumer<TreeItem<T>> handler) {
         this.onItemDoubleClicked = handler;
+    }
+
+    /**
+     * 设置打开监听器（右键菜单"打开"操作）
+     */
+    public void setOnItemOpen(Consumer<TreeItem<T>> handler) {
+        this.onItemOpen = handler;
+    }
+
+    /**
+     * 设置路径解析器（用于右键菜单的路径相关操作）
+     */
+    public void setPathResolver(Function<TreeItem<T>, String> resolver) {
+        this.pathResolver = resolver;
+    }
+
+    /**
+     * 设置刷新回调
+     */
+    public void setOnRefresh(Runnable handler) {
+        this.onRefresh = handler;
     }
 
     /**

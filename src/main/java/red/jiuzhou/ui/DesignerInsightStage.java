@@ -31,6 +31,7 @@ import red.jiuzhou.analysis.XmlDesignerInsight.ValueCount;
 import red.jiuzhou.analysis.XmlDesignerInsight.RelatedFileComparison;
 import red.jiuzhou.analysis.XmlDesignerInsight.XmlFileSummary;
 import red.jiuzhou.analysis.XmlDesignerInsightService;
+import red.jiuzhou.ui.components.ContextMenuFactory;
 import red.jiuzhou.ui.components.StatCard;
 import red.jiuzhou.ui.features.FeatureTaskExecutor;
 
@@ -154,6 +155,9 @@ public class DesignerInsightStage extends Stage {
             }
         });
 
+        // 设置右键菜单
+        setupExplorerTreeContextMenu();
+
         VBox wrapper = new VBox(10, title, explorerTree);
         VBox.setVgrow(explorerTree, Priority.ALWAYS);
         wrapper.setPadding(new Insets(8, 12, 8, 0));
@@ -267,6 +271,9 @@ public class DesignerInsightStage extends Stage {
         averageCol.setCellValueFactory(data -> data.getValue().averageProperty());
 
         attributeTable.getColumns().addAll(nameCol, coverageCol, uniqueCol, duplicateCol, blankCol, rangeCol, averageCol);
+
+        // 设置字段表格右键菜单
+        setupAttributeTableContextMenu();
 
         attributeTable.getSelectionModel().selectedItemProperty().addListener((obs, oldSel, newSel) -> {
             if (newSel != null) {
@@ -1121,6 +1128,235 @@ public class DesignerInsightStage extends Stage {
             unitIndex++;
         }
         return String.format(Locale.CHINA, "%.2f %s", value, units[unitIndex]);
+    }
+
+    /**
+     * 设置目录树右键菜单
+     */
+    private void setupExplorerTreeContextMenu() {
+        ContextMenu menu = new ContextMenu();
+
+        // 打开组
+        MenuItem openItem = new MenuItem("📄 分析此文件");
+        openItem.setOnAction(e -> {
+            TreeItem<FsNode> selected = explorerTree.getSelectionModel().getSelectedItem();
+            if (selected != null && selected.getValue() != null && !selected.getValue().isDirectory()) {
+                loadInsightFor(selected.getValue().getPath());
+            }
+        });
+
+        MenuItem openFolderItem = new MenuItem("📁 在资源管理器中显示");
+        openFolderItem.setOnAction(e -> {
+            TreeItem<FsNode> selected = explorerTree.getSelectionModel().getSelectedItem();
+            if (selected != null && selected.getValue() != null && selected.getValue().getPath() != null) {
+                ContextMenuFactory.openInExplorer(selected.getValue().getPath().toString());
+            }
+        });
+
+        MenuItem openExternalItem = new MenuItem("🔗 使用外部程序打开");
+        openExternalItem.setOnAction(e -> {
+            TreeItem<FsNode> selected = explorerTree.getSelectionModel().getSelectedItem();
+            if (selected != null && selected.getValue() != null && selected.getValue().getPath() != null) {
+                ContextMenuFactory.openWithDesktop(selected.getValue().getPath().toString());
+            }
+        });
+
+        // 复制组
+        MenuItem copyPathItem = new MenuItem("📋 复制路径");
+        copyPathItem.setOnAction(e -> {
+            TreeItem<FsNode> selected = explorerTree.getSelectionModel().getSelectedItem();
+            if (selected != null && selected.getValue() != null && selected.getValue().getPath() != null) {
+                ContextMenuFactory.copyToClipboard(selected.getValue().getPath().toString());
+            }
+        });
+
+        MenuItem copyNameItem = new MenuItem("📝 复制名称");
+        copyNameItem.setOnAction(e -> {
+            TreeItem<FsNode> selected = explorerTree.getSelectionModel().getSelectedItem();
+            if (selected != null && selected.getValue() != null) {
+                ContextMenuFactory.copyToClipboard(selected.getValue().getDisplayName());
+            }
+        });
+
+        // 展开/折叠组
+        MenuItem expandItem = new MenuItem("📂 展开此目录");
+        expandItem.setOnAction(e -> {
+            TreeItem<FsNode> selected = explorerTree.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                ContextMenuFactory.expandRecursively(selected, true);
+            }
+        });
+
+        MenuItem collapseItem = new MenuItem("📁 折叠此目录");
+        collapseItem.setOnAction(e -> {
+            TreeItem<FsNode> selected = explorerTree.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                ContextMenuFactory.expandRecursively(selected, false);
+            }
+        });
+
+        // 刷新
+        MenuItem refreshItem = new MenuItem("🔄 刷新目录树");
+        refreshItem.setOnAction(e -> populateTreeRoots());
+
+        // 组装菜单
+        menu.getItems().addAll(
+            openItem,
+            openFolderItem,
+            openExternalItem,
+            new SeparatorMenuItem(),
+            copyPathItem,
+            copyNameItem,
+            new SeparatorMenuItem(),
+            expandItem,
+            collapseItem,
+            new SeparatorMenuItem(),
+            refreshItem
+        );
+
+        // 动态启用/禁用
+        menu.setOnShowing(e -> {
+            TreeItem<FsNode> selected = explorerTree.getSelectionModel().getSelectedItem();
+            boolean hasSelection = selected != null && selected.getValue() != null;
+            boolean isFile = hasSelection && !selected.getValue().isDirectory();
+            boolean isDir = hasSelection && selected.getValue().isDirectory();
+            boolean hasPath = hasSelection && selected.getValue().getPath() != null;
+
+            openItem.setDisable(!isFile);
+            openFolderItem.setDisable(!hasPath);
+            openExternalItem.setDisable(!isFile);
+            copyPathItem.setDisable(!hasPath);
+            copyNameItem.setDisable(!hasSelection);
+            expandItem.setDisable(!isDir);
+            collapseItem.setDisable(!isDir);
+        });
+
+        explorerTree.setContextMenu(menu);
+    }
+
+    /**
+     * 设置字段表格右键菜单
+     */
+    private void setupAttributeTableContextMenu() {
+        ContextMenu menu = new ContextMenu();
+
+        // 复制组
+        MenuItem copyFieldItem = new MenuItem("📋 复制字段名");
+        copyFieldItem.setOnAction(e -> {
+            AttributeRow selected = attributeTable.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                ContextMenuFactory.copyToClipboard(selected.getName());
+            }
+        });
+
+        MenuItem copyRowItem = new MenuItem("📄 复制行数据");
+        copyRowItem.setOnAction(e -> {
+            AttributeRow selected = attributeTable.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                String row = String.format("%s\t%s\t%s\t%s\t%s\t%s\t%s",
+                    selected.getName(),
+                    selected.coverageProperty().get(),
+                    selected.uniqueProperty().get(),
+                    selected.duplicateProperty().get(),
+                    selected.blankProperty().get(),
+                    selected.rangeProperty().get(),
+                    selected.averageProperty().get());
+                ContextMenuFactory.copyToClipboard(row);
+            }
+        });
+
+        MenuItem copyAllItem = new MenuItem("📄 复制所有字段");
+        copyAllItem.setOnAction(e -> {
+            StringBuilder sb = new StringBuilder();
+            sb.append("字段\t覆盖率\t唯一值\t重复\t空白\t范围\t均值\n");
+            for (AttributeRow row : attributeTable.getItems()) {
+                sb.append(String.format("%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+                    row.getName(),
+                    row.coverageProperty().get(),
+                    row.uniqueProperty().get(),
+                    row.duplicateProperty().get(),
+                    row.blankProperty().get(),
+                    row.rangeProperty().get(),
+                    row.averageProperty().get()));
+            }
+            ContextMenuFactory.copyToClipboard(sb.toString());
+        });
+
+        // 筛选组
+        MenuItem filterLowCoverageItem = new MenuItem("🔍 只显示低覆盖率字段 (<60%)");
+        filterLowCoverageItem.setOnAction(e -> {
+            List<AttributeRow> filtered = new ArrayList<>();
+            for (AttributeRow row : attributeTable.getItems()) {
+                if (row.getCoverageValue() < 60) {
+                    filtered.add(row);
+                }
+            }
+            if (!filtered.isEmpty()) {
+                attributeTable.setItems(FXCollections.observableArrayList(filtered));
+            }
+        });
+
+        MenuItem filterDuplicatesItem = new MenuItem("🔍 只显示有重复的字段");
+        filterDuplicatesItem.setOnAction(e -> {
+            List<AttributeRow> filtered = new ArrayList<>();
+            for (AttributeRow row : attributeTable.getItems()) {
+                if (row.getDuplicateCount() > 0) {
+                    filtered.add(row);
+                }
+            }
+            if (!filtered.isEmpty()) {
+                attributeTable.setItems(FXCollections.observableArrayList(filtered));
+            }
+        });
+
+        MenuItem showAllItem = new MenuItem("📋 显示所有字段");
+        showAllItem.setOnAction(e -> {
+            if (currentInsight != null) {
+                ObservableList<AttributeRow> rows = FXCollections.observableArrayList();
+                for (AttributeInsight ai : currentInsight.getAttributeInsights()) {
+                    rows.add(AttributeRow.from(ai, currentInsight.getEntryCount()));
+                }
+                attributeTable.setItems(rows);
+            }
+        });
+
+        // 查看组
+        MenuItem viewDistributionItem = new MenuItem("📊 查看值分布");
+        viewDistributionItem.setOnAction(e -> {
+            AttributeRow selected = attributeTable.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                showDistributionForAttribute(selected.getName());
+            }
+        });
+
+        // 组装菜单
+        menu.getItems().addAll(
+            copyFieldItem,
+            copyRowItem,
+            copyAllItem,
+            new SeparatorMenuItem(),
+            viewDistributionItem,
+            new SeparatorMenuItem(),
+            filterLowCoverageItem,
+            filterDuplicatesItem,
+            showAllItem
+        );
+
+        // 动态启用/禁用
+        menu.setOnShowing(e -> {
+            boolean hasSelection = attributeTable.getSelectionModel().getSelectedItem() != null;
+            boolean hasData = !attributeTable.getItems().isEmpty();
+
+            copyFieldItem.setDisable(!hasSelection);
+            copyRowItem.setDisable(!hasSelection);
+            copyAllItem.setDisable(!hasData);
+            viewDistributionItem.setDisable(!hasSelection);
+            filterLowCoverageItem.setDisable(!hasData);
+            filterDuplicatesItem.setDisable(!hasData);
+            showAllItem.setDisable(currentInsight == null);
+        });
+
+        attributeTable.setContextMenu(menu);
     }
 
     private static class FsNode {
