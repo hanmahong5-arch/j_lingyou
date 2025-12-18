@@ -39,6 +39,8 @@ import red.jiuzhou.util.DatabaseUtil;
 import red.jiuzhou.util.IncrementalMenuJsonGenerator;
 import red.jiuzhou.util.YamlUtils;
 import red.jiuzhou.util.YmlConfigUtil;
+import red.jiuzhou.ui.components.EnhancedStatusBar;
+import red.jiuzhou.ui.components.HotkeyManager;
 
 import java.io.File;
 import java.nio.file.Path;
@@ -65,6 +67,10 @@ public class Dbxmltool extends Application {
 
     private static final Logger log = LoggerFactory.getLogger(Dbxmltool.class);
     private final FeatureRegistry featureRegistry = FeatureRegistry.defaultRegistry();
+
+    // 增强组件
+    private EnhancedStatusBar statusBar;
+    private HotkeyManager hotkeyManager;
     @Override
     public void init() {
         // 初始化 Spring 上下文
@@ -77,6 +83,10 @@ public class Dbxmltool extends Application {
             springContext.close();
         }
         FeatureTaskExecutor.shutdown();
+        // 清理状态栏资源
+        if (statusBar != null) {
+            statusBar.dispose();
+        }
     }
     public static void main(String[] args) {
         launch(args);
@@ -250,12 +260,118 @@ public class Dbxmltool extends Application {
             }
         });
 
+        // ==================== 添加增强状态栏 ====================
+        statusBar = new EnhancedStatusBar();
+        statusBar.setConnectionStatus(true, DatabaseUtil.getDbName());
+        statusBar.info("应用程序已启动");
+        root.getChildren().add(statusBar);
+
         // ==================== 创建主场景并显示窗口 ====================
-        Scene scene = new Scene(root, 1360, 660);
+        Scene scene = new Scene(root, 1400, 720);
         primaryStage.setScene(scene);
-        primaryStage.setTitle("DB_XML_TOOL - 数据库与XML转换工具");
+        primaryStage.setTitle("DB_XML_TOOL - 数据库与XML转换工具 v2.0");
+
+        // ==================== 初始化快捷键系统 ====================
+        initializeHotkeys(primaryStage, scene);
+
         primaryStage.show();
         log.info("应用程序界面初始化完成");
+    }
+
+    /**
+     * 初始化快捷键系统
+     */
+    private void initializeHotkeys(Stage primaryStage, Scene scene) {
+        hotkeyManager = HotkeyManager.getInstance();
+
+        // 注册默认快捷键
+        hotkeyManager.registerDefaults(new HotkeyManager.DefaultHotkeyHandler() {
+            @Override
+            public void onSearch() {
+                statusBar.info("搜索功能 (Ctrl+F)");
+            }
+
+            @Override
+            public void onRefresh() {
+                statusBar.info("刷新中...");
+                IncrementalMenuJsonGenerator.createJsonIncrementally();
+                statusBar.success("刷新完成");
+            }
+
+            @Override
+            public void onMechanismExplorer() {
+                try {
+                    AionMechanismExplorerStage stage = new AionMechanismExplorerStage();
+                    stage.initOwner(primaryStage);
+                    stage.show();
+                    statusBar.info("已打开机制浏览器");
+                } catch (Exception e) {
+                    log.error("打开机制浏览器失败", e);
+                    statusBar.error("打开机制浏览器失败");
+                }
+            }
+
+            @Override
+            public void onDesignerInsight() {
+                try {
+                    DesignerInsightStage stage = new DesignerInsightStage();
+                    stage.initOwner(primaryStage);
+                    stage.show();
+                    statusBar.info("已打开设计洞察");
+                } catch (Exception e) {
+                    log.error("打开设计洞察失败", e);
+                    statusBar.error("打开设计洞察失败");
+                }
+            }
+
+            @Override
+            public void onDataOperation() {
+                try {
+                    IdNameResolver.getInstance().preloadAllSystems();
+                    DataOperationCenterStage stage = new DataOperationCenterStage(primaryStage);
+                    stage.show();
+                    statusBar.info("已打开数据操作中心");
+                } catch (Exception e) {
+                    log.error("打开数据操作中心失败", e);
+                    statusBar.error("打开数据操作中心失败");
+                }
+            }
+
+            @Override
+            public void onShowHotkeys() {
+                showHotkeyHelp();
+            }
+
+            @Override
+            public void onHelp() {
+                showHotkeyHelp();
+            }
+        });
+
+        // 绑定快捷键到场景
+        hotkeyManager.bindToScene(scene);
+        log.info("快捷键系统初始化完成");
+    }
+
+    /**
+     * 显示快捷键帮助
+     */
+    private void showHotkeyHelp() {
+        String helpText = hotkeyManager.getHelpText();
+
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle("快捷键帮助");
+        alert.setHeaderText("可用的快捷键列表");
+
+        TextArea textArea = new TextArea(helpText);
+        textArea.setEditable(false);
+        textArea.setWrapText(true);
+        textArea.setStyle("-fx-font-family: 'Consolas', 'Microsoft YaHei'; -fx-font-size: 12px;");
+        textArea.setPrefRowCount(20);
+        textArea.setPrefColumnCount(50);
+
+        alert.getDialogPane().setContent(textArea);
+        alert.showAndWait();
     }
 
     /**
