@@ -1,0 +1,17 @@
+{
+	"file_path":"D:\\AionReal58\\AionMap\\客户端XML\\data\\China\\items\\items\\client_assembly_items.xml",
+	"xml_root_tag":"client_assembly_items",
+	"list":[
+		{
+			"addDataNode":"assemble_parts",
+			"associatedFiled":"id",
+			"xml_tag":"data",
+			"db_column":"data",
+			"table_name":"client_assembly_items__assemble_parts__data",
+			"sql":"select * from client_assembly_items__assemble_parts__data where id = '#associated_filed' order by CAST(id AS UNSIGNED) ASC"
+		}
+	],
+	"xml_item_tag":"client_assembly_item",
+	"table_name":"client_assembly_items",
+	"sql":"select * from client_assembly_items order by CAST(id AS UNSIGNED) ASC"
+}

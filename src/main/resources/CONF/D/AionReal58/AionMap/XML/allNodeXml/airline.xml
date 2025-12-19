@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<airlines>
+  <airline>
+    <id/>
+    <name/>
+    <type/>
+    <need_confirm/>
+    <airline_world/>
+    <cur_airport_name/>
+    <airline_list>
+      <data>
+        <airport_name/>
+        <fee/>
+        <pvpon_fee/>
+        <required_quest/>
+        <teleport_type/>
+        <flight_path_group_id/>
+      </data>
+    </airline_list>
+  </airline>
+</airlines>

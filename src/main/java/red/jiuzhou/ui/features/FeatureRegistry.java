@@ -3,6 +3,7 @@ package red.jiuzhou.ui.features;
 import java.util.ArrayList;
 import java.util.List;
 
+import red.jiuzhou.agent.ui.AgentChatStage;
 import red.jiuzhou.ui.AionMechanismExplorerStage;
 import red.jiuzhou.ui.DesignerInsightStage;
 import red.jiuzhou.ui.MechanismRelationshipStage;
@@ -54,8 +55,15 @@ public final class FeatureRegistry {
                 new StageFeatureLauncher(ThemeStudioStage::new)
         ));
 
+        features.add(new FeatureDescriptor(
+                "agent-chat",
+                "AI数据助手",
+                "通过自然语言查询和修改游戏数据，支持智能SQL生成、安全审核和操作回滚",
+                FeatureCategory.ANALYTICS,
+                new StageFeatureLauncher(AgentChatStage::new)
+        ));
+
         // TODO: 以下特性暂未实现，待添加对应的Stage类
-        // - agent-chat: AgentChatStage
         // - quest-editor: QuestEditorStage
         // - item-editor: ItemEditorStage
         // - skill-editor: SkillEditorStage

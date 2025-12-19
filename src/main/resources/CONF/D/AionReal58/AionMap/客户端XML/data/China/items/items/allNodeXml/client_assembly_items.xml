@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<client_assembly_items>
+  <client_assembly_item>
+    <id/>
+    <name/>
+    <part_critical_prob/>
+    <part_critical_name/>
+    <assemble_parts>
+      <data>
+        <part_item/>
+        <part_item_num/>
+      </data>
+    </assemble_parts>
+  </client_assembly_item>
+</client_assembly_items>

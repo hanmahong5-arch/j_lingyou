@@ -1,0 +1,67 @@
+{
+	"file_path":"D:\\AionReal58\\AionMap\\客户端XML\\data\\China\\Npcs\\npcs\\client_npcs_abyss_monster.xml",
+	"xml_root_tag":"npc_clients",
+	"list":[
+		{
+			"addDataNode":"",
+			"associatedFiled":"id",
+			"xml_tag":"bound_radius",
+			"db_column":"bound_radius",
+			"table_name":"client_npcs_abyss_monster__bound_radius",
+			"sql":"select * from client_npcs_abyss_monster__bound_radius where id = '#associated_filed' order by CAST(id AS UNSIGNED) ASC"
+		},
+		{
+			"addDataNode":"",
+			"associatedFiled":"id",
+			"xml_tag":"appearance",
+			"db_column":"appearance",
+			"table_name":"client_npcs_abyss_monster__appearance",
+			"sql":"select * from client_npcs_abyss_monster__appearance where id = '#associated_filed' order by CAST(id AS UNSIGNED) ASC"
+		},
+		{
+			"addDataNode":"",
+			"associatedFiled":"id",
+			"xml_tag":"visible_equipments",
+			"db_column":"visible_equipments",
+			"table_name":"client_npcs_abyss_monster__visible_equipments",
+			"sql":"select * from client_npcs_abyss_monster__visible_equipments where id = '#associated_filed' order by CAST(id AS UNSIGNED) ASC"
+		},
+		{
+			"addDataNode":"extra_currency_trade_info:tab_list",
+			"associatedFiled":"id",
+			"xml_tag":"data",
+			"db_column":"data",
+			"table_name":"client_npcs_abyss_monster__extra_currency_trade_info__t_l__d",
+			"sql":"select * from client_npcs_abyss_monster__extra_currency_trade_info__t_l__d where id = '#associated_filed' order by CAST(id AS UNSIGNED) ASC"
+		},
+		{
+			"addDataNode":"abyss_trade_info:tab_list",
+			"associatedFiled":"id",
+			"xml_tag":"data",
+			"db_column":"data",
+			"table_name":"client_npcs_abyss_monster__abyss_trade_info__tab_list__data",
+			"sql":"select * from client_npcs_abyss_monster__abyss_trade_info__tab_list__data where id = '#associated_filed' order by CAST(id AS UNSIGNED) ASC"
+		},
+		{
+			"addDataNode":"",
+			"associatedFiled":"id",
+			"xml_tag":"abyss_trade_buy_info",
+			"db_column":"abyss_trade_buy_info",
+			"list":[
+				{
+					"addDataNode":"tab_list",
+					"associatedFiled":"id",
+					"xml_tag":"data",
+					"db_column":"data",
+					"table_name":"client_npcs_abyss_monster__abyss_trade_buy_info__tab_list__d",
+					"sql":"select * from client_npcs_abyss_monster__abyss_trade_buy_info__tab_list__d where id = '#associated_filed' order by CAST(id AS UNSIGNED) ASC"
+				}
+			],
+			"table_name":"client_npcs_abyss_monster__abyss_trade_buy_info",
+			"sql":"select * from client_npcs_abyss_monster__abyss_trade_buy_info where id = '#associated_filed' order by CAST(id AS UNSIGNED) ASC"
+		}
+	],
+	"xml_item_tag":"npc_client",
+	"table_name":"client_npcs_abyss_monster",
+	"sql":"select * from client_npcs_abyss_monster order by CAST(id AS UNSIGNED) ASC"
+}

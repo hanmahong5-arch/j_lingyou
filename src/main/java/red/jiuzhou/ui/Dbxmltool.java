@@ -42,6 +42,7 @@ import red.jiuzhou.util.YmlConfigUtil;
 import red.jiuzhou.ui.components.EnhancedStatusBar;
 import red.jiuzhou.ui.components.HotkeyManager;
 import red.jiuzhou.ui.components.SearchableTreeView;
+import red.jiuzhou.agent.ui.AgentChatStage;
 
 import java.io.File;
 import java.nio.file.Path;
@@ -584,6 +585,22 @@ public class Dbxmltool extends Application {
             "→ 验证数据完整性"
         ));
 
+        // AI数据助手按钮 - 自然语言操作游戏数据
+        Button aiAgentBtn = new Button("🤖 AI助手");
+        aiAgentBtn.setTooltip(new Tooltip(
+            "AI游戏数据助手\n\n" +
+            "🎯 核心功能:\n" +
+            "• 自然语言查询数据\n" +
+            "• 智能SQL生成\n" +
+            "• 安全审核与预览\n" +
+            "• 操作历史与回滚\n\n" +
+            "💡 使用示例:\n" +
+            "→ \"查询所有50级以上的紫色武器\"\n" +
+            "→ \"把火属性技能伤害提高10%\"\n" +
+            "→ \"分析技能伤害分布\""
+        ));
+        aiAgentBtn.setStyle("-fx-background-color: #E8F5E9; -fx-font-weight: bold;");
+
         // 机制关系图按钮 - 27个机制间的依赖关系可视化
         Button mechanismRelationBtn = new Button("🔗 关系图");
         mechanismRelationBtn.setTooltip(new Tooltip(
@@ -698,6 +715,19 @@ public class Dbxmltool extends Application {
             } catch (Exception e) {
                 log.error("打开设计洞察窗口失败", e);
                 showError("打开设计洞察窗口失败: " + e.getMessage());
+            }
+        });
+
+        // AI数据助手 - 打开AI对话窗口
+        aiAgentBtn.setOnAction(event -> {
+            try {
+                log.info("打开AI数据助手");
+                AgentChatStage stage = new AgentChatStage();
+                stage.initOwner(primaryStage);
+                stage.show();
+            } catch (Exception e) {
+                log.error("打开AI数据助手失败", e);
+                showError("打开AI数据助手失败: " + e.getMessage());
             }
         });
 
@@ -830,7 +860,7 @@ public class Dbxmltool extends Application {
             relationButton, mechanismRelationBtn,
             new Separator(),
             // 设计洞察模块 - AI分析和可视化
-            mechanismExplorerBtn, designInsightBtn,
+            mechanismExplorerBtn, designInsightBtn, aiAgentBtn,
             new Separator(),
             // 数据处理模块 - 搜索和备份
             searchReplaceBtn, backupManagerBtn,
