@@ -108,10 +108,12 @@ public class MechanismTagBar extends VBox {
         Map<AionMechanismCategory, Integer> stats = mapper.getMechanismStats();
 
         int displayCount = expanded ? mechanisms.size() : Math.min(COLLAPSED_COUNT, mechanisms.size());
+        int totalFiles = 0;
 
         for (int i = 0; i < displayCount && i < mechanisms.size(); i++) {
             AionMechanismCategory category = mechanisms.get(i);
             int count = stats.getOrDefault(category, 0);
+            totalFiles += count;
 
             ToggleButton btn = createTagButton(category, category.getDisplayName(), category.getColor(), count);
             btn.setOnAction(e -> {
@@ -126,10 +128,23 @@ public class MechanismTagBar extends VBox {
             tagPane.getChildren().add(btn);
         }
 
+        // 更新全部按钮的文件计数
+        int allFilesCount = 0;
+        for (Integer count : stats.values()) {
+            allFilesCount += count;
+        }
+        allButton.setText("全部 (" + allFilesCount + ")");
+
         // 更新更多按钮
         if (mechanisms.size() > COLLAPSED_COUNT) {
             moreButton.setVisible(true);
-            moreButton.setText(expanded ? "收起 ▲" : "更多 ▼ (" + (mechanisms.size() - COLLAPSED_COUNT) + ")");
+            int hiddenCount = 0;
+            for (int i = COLLAPSED_COUNT; i < mechanisms.size(); i++) {
+                hiddenCount += stats.getOrDefault(mechanisms.get(i), 0);
+            }
+            moreButton.setText(expanded ?
+                "收起 ▲" :
+                "更多 ▼ (" + (mechanisms.size() - COLLAPSED_COUNT) + "类/" + hiddenCount + "文件)");
         } else {
             moreButton.setVisible(false);
         }

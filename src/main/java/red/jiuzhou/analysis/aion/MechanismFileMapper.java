@@ -125,12 +125,28 @@ public class MechanismFileMapper {
      * 扫描目录并建立映射
      */
     public void scanDirectory(String rootPath) {
-        if (rootPath == null || rootPath.isEmpty()) return;
+        if (rootPath == null || rootPath.isEmpty()) {
+            log.warn("扫描路径为空，跳过");
+            return;
+        }
 
         File root = new File(rootPath);
-        if (!root.exists() || !root.isDirectory()) return;
+        if (!root.exists()) {
+            log.warn("目录不存在: {}", rootPath);
+            return;
+        }
+        if (!root.isDirectory()) {
+            log.warn("路径不是目录: {}", rootPath);
+            return;
+        }
 
-        String normalizedPath = root.getAbsolutePath().toLowerCase();
+        String normalizedPath;
+        try {
+            normalizedPath = root.getCanonicalPath().toLowerCase();
+        } catch (Exception e) {
+            normalizedPath = root.getAbsolutePath().toLowerCase();
+        }
+
         if (scannedRoots.contains(normalizedPath)) {
             log.debug("目录已扫描过: {}", rootPath);
             return;
@@ -138,12 +154,36 @@ public class MechanismFileMapper {
 
         log.info("开始扫描目录建立机制映射: {}", rootPath);
         long start = System.currentTimeMillis();
+        int initialCount = fileToMechanism.size();
 
-        scanRecursively(root, null);
+        try {
+            scanRecursively(root, null);
+            scannedRoots.add(normalizedPath);
 
-        scannedRoots.add(normalizedPath);
-        log.info("目录扫描完成: {} 个文件, 耗时 {}ms",
-            fileToMechanism.size(), System.currentTimeMillis() - start);
+            int newFiles = fileToMechanism.size() - initialCount;
+            log.info("目录扫描完成: 新增 {} 个文件, 总计 {} 个文件, 耗时 {}ms",
+                newFiles, fileToMechanism.size(), System.currentTimeMillis() - start);
+
+            // 输出机制统计
+            if (log.isDebugEnabled()) {
+                Map<AionMechanismCategory, Integer> stats = getMechanismStats();
+                log.debug("机制分布: {}", stats);
+            }
+        } catch (Exception e) {
+            log.error("扫描目录失败: {}", e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 异步扫描目录（不阻塞UI）
+     */
+    public void scanDirectoryAsync(String rootPath, Runnable onComplete) {
+        new Thread(() -> {
+            scanDirectory(rootPath);
+            if (onComplete != null) {
+                javafx.application.Platform.runLater(onComplete);
+            }
+        }, "MechanismScanner").start();
     }
 
     /**

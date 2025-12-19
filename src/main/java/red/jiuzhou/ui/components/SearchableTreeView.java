@@ -853,6 +853,8 @@ public class SearchableTreeView<T> extends VBox {
         if (enable) {
             // 刷新标签统计
             mechanismTagBar.refreshTags();
+            // 设置机制感知的单元格工厂
+            setupMechanismAwareCellFactory();
         } else {
             // 清除机制过滤
             currentMechanismFilter = null;
@@ -860,6 +862,21 @@ public class SearchableTreeView<T> extends VBox {
                 treeView.setRoot(originalRoot);
             }
         }
+    }
+
+    /**
+     * 设置机制感知的单元格工厂
+     */
+    private void setupMechanismAwareCellFactory() {
+        if (pathResolver == null) return;
+
+        treeView.setCellFactory(MechanismAwareTreeCell.createFactory(
+            pathResolver,
+            // 过滤回调
+            mechanism -> setMechanismFilter(mechanism),
+            // 打开机制浏览器回调（可由外部设置）
+            null
+        ));
     }
 
     /**
