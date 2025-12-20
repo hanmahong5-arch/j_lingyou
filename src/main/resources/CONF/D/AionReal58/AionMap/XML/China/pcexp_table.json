@@ -1,0 +1,8 @@
+{
+	"file_path":"D:\\AionReal58\\AionMap\\XML\\China\\pcexp_table.xml",
+	"xml_root_tag":"pcexps",
+	"list":[],
+	"xml_item_tag":"level",
+	"table_name":"pcexp_table",
+	"sql":"select * from pcexp_table order by CAST(exp_light AS UNSIGNED) ASC"
+}

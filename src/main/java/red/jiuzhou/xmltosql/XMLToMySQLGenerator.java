@@ -191,11 +191,14 @@ public class XMLToMySQLGenerator {
         }
 
         // 根据字段数量选择行格式和字段类型策略
-        // - 超过100个字段: 使用COMPRESSED格式 + MEDIUMTEXT
+        // - 超过150个字段: 使用DYNAMIC格式 + TEXT
         // - 超过50个字段: 使用DYNAMIC格式 + TEXT
         // - 其他: 使用DYNAMIC格式 + VARCHAR
-        String rowFormat = totalFieldCount > 100 ? "COMPRESSED" : "DYNAMIC";
-        int fieldTypeLevel = totalFieldCount > 100 ? 2 : (totalFieldCount > 50 ? 1 : 0);
+        // 注意: COMPRESSED + MEDIUMTEXT 会导致 "Row size too large" 错误
+        // MySQL InnoDB限制: COMPRESSED行格式单行最大约8KB，大量TEXT列会超限
+        // 解决方案: 统一使用DYNAMIC行格式，TEXT列会自动off-page存储
+        String rowFormat = "DYNAMIC";
+        int fieldTypeLevel = totalFieldCount > 50 ? 1 : 0;
 
         StringBuilder sql = new StringBuilder("DROP TABLE IF EXISTS " + dbName + "." + tableName + ";\n" +
                 "CREATE TABLE "  + dbName + "." + tableName + " (\n");
@@ -259,13 +262,13 @@ public class XMLToMySQLGenerator {
      * 根据字段名和表字段数量动态调整字段类型
      *
      * @param fieldName      字段名
-     * @param fieldTypeLevel 字段类型级别: 0=VARCHAR, 1=TEXT, 2=MEDIUMTEXT
+     * @param fieldTypeLevel 字段类型级别: 0=VARCHAR, 1=TEXT
      * @param context        生成上下文
      * @return SQL字段类型
      */
     private static String getColumnType(String fieldName, int fieldTypeLevel, GenerationContext context) {
         if (context.getFieldLenJson() == null) {
-            // 字段数量过多时使用TEXT/MEDIUMTEXT避免行大小超限
+            // 字段数量过多时使用TEXT避免行大小超限
             return getTextTypeByLevel(fieldTypeLevel, 64);
         }
         int len = context.getFieldLenJson().containsKey(fieldName)
@@ -275,12 +278,10 @@ public class XMLToMySQLGenerator {
         }
 
         // 策略: 根据字段级别和长度选择类型
-        // - fieldTypeLevel=2 (超过100字段): 统一使用MEDIUMTEXT
-        // - fieldTypeLevel=1 (超过50字段): 使用TEXT
+        // - fieldTypeLevel=1 (超过50字段): 使用TEXT (off-page存储，不占用行空间)
         // - fieldTypeLevel=0: 使用VARCHAR，超过255时使用TEXT
-        if (fieldTypeLevel >= 2) {
-            return "MEDIUMTEXT";
-        } else if (fieldTypeLevel == 1 || len > 255) {
+        // 注意: 不再使用MEDIUMTEXT，TEXT已足够且更节省行空间
+        if (fieldTypeLevel == 1 || len > 255) {
             return "TEXT";
         }
 
@@ -291,9 +292,8 @@ public class XMLToMySQLGenerator {
      * 根据级别获取文本类型
      */
     private static String getTextTypeByLevel(int level, int defaultVarcharLen) {
-        if (level >= 2) {
-            return "MEDIUMTEXT";
-        } else if (level == 1) {
+        // 只使用TEXT和VARCHAR，不再使用MEDIUMTEXT避免行大小超限
+        if (level >= 1) {
             return "TEXT";
         }
         return "VARCHAR(" + defaultVarcharLen + ")";

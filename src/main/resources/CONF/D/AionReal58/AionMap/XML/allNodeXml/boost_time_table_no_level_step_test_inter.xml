@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<boost_time_no_level_steps>
+  <boost_time_no_level_step>
+    <id/>
+    <name/>
+    <weekday/>
+    <time/>
+    <craft_bonus/>
+    <abyss_point_bonus/>
+    <cash_bonus/>
+    <drop_bonus/>
+  </boost_time_no_level_step>
+</boost_time_no_level_steps>

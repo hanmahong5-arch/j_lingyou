@@ -1,0 +1,8 @@
+{
+	"file_path":"D:\\AionReal58\\AionMap\\XML\\boost_time_table.xml",
+	"xml_root_tag":"boost_times",
+	"list":[],
+	"xml_item_tag":"boost_time",
+	"table_name":"boost_time_table",
+	"sql":"select * from boost_time_table order by CAST(id AS UNSIGNED) ASC"
+}
