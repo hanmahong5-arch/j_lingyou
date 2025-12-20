@@ -1,0 +1,8 @@
+{
+	"file_path":"D:\\AionReal58\\AionMap\\XML\\airports.xml",
+	"xml_root_tag":"airports",
+	"list":[],
+	"xml_item_tag":"airport",
+	"table_name":"airports",
+	"sql":"select * from airports order by CAST(id AS UNSIGNED) ASC"
+}

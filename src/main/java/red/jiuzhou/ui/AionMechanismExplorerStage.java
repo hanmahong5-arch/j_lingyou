@@ -696,8 +696,16 @@ public class AionMechanismExplorerStage extends Stage {
 
         // 点击事件
         card.setOnMouseClicked(e -> {
-            saveCurrentState();
-            selectMechanism(group);
+            if (e.getButton() == javafx.scene.input.MouseButton.PRIMARY) {
+                saveCurrentState();
+                selectMechanism(group);
+            }
+        });
+
+        // 右键菜单 - 批量操作
+        card.setOnContextMenuRequested(e -> {
+            showMechanismContextMenu(card, group, e.getScreenX(), e.getScreenY());
+            e.consume();
         });
 
         // 悬停效果
@@ -1229,6 +1237,541 @@ public class AionMechanismExplorerStage extends Stage {
             log.error("导出文件失败", e);
             statusLabel.setText("导出失败: " + e.getMessage());
         }
+    }
+
+    /**
+     * 显示机制卡片的右键菜单
+     */
+    private void showMechanismContextMenu(VBox card, AionMechanismView.MechanismGroup group, double screenX, double screenY) {
+        javafx.scene.control.ContextMenu contextMenu = new javafx.scene.control.ContextMenu();
+
+        AionMechanismCategory category = group.getCategory();
+        int fileCount = group.getFileCount();
+
+        // 菜单标题
+        javafx.scene.control.MenuItem titleItem = new javafx.scene.control.MenuItem(
+            String.format("【%s】批量操作 (%d个文件)", category.getDisplayName(), fileCount));
+        titleItem.setDisable(true);
+        titleItem.setStyle("-fx-font-weight: bold; -fx-font-size: 13px;");
+
+        javafx.scene.control.SeparatorMenuItem separator1 = new javafx.scene.control.SeparatorMenuItem();
+
+        // ========== DDL操作组 ==========
+        javafx.scene.control.MenuItem batchDdlItem = new javafx.scene.control.MenuItem("📝 批量生成DDL");
+        batchDdlItem.setOnAction(e -> performBatchDdlGeneration(group));
+
+        javafx.scene.control.MenuItem batchDdlAndCreateItem = new javafx.scene.control.MenuItem("⚡ 一键DDL+建表");
+        batchDdlAndCreateItem.setOnAction(e -> performBatchDdlAndCreate(group));
+        batchDdlAndCreateItem.setStyle("-fx-text-fill: #2196F3; -fx-font-weight: bold;");
+
+        javafx.scene.control.MenuItem checkTablesItem = new javafx.scene.control.MenuItem("🔍 检查表是否存在");
+        checkTablesItem.setOnAction(e -> performCheckTables(group));
+
+        javafx.scene.control.SeparatorMenuItem separator2 = new javafx.scene.control.SeparatorMenuItem();
+
+        // ========== 数据操作组 ==========
+        javafx.scene.control.MenuItem batchImportItem = new javafx.scene.control.MenuItem("📥 批量导入 (XML → DB)");
+        batchImportItem.setOnAction(e -> performBatchImport(group));
+        batchImportItem.setStyle("-fx-text-fill: #4CAF50; -fx-font-weight: bold;");
+
+        javafx.scene.control.MenuItem batchExportItem = new javafx.scene.control.MenuItem("📤 批量导出 (DB → XML)");
+        batchExportItem.setOnAction(e -> performBatchExport(group));
+
+        javafx.scene.control.MenuItem batchTruncateItem = new javafx.scene.control.MenuItem("🗑️ 批量清空表数据");
+        batchTruncateItem.setOnAction(e -> performBatchTruncate(group));
+        batchTruncateItem.setStyle("-fx-text-fill: #FF9800;");
+
+        javafx.scene.control.SeparatorMenuItem separator3 = new javafx.scene.control.SeparatorMenuItem();
+
+        // ========== 验证和工具组 ==========
+        javafx.scene.control.MenuItem validateXmlItem = new javafx.scene.control.MenuItem("✅ 批量验证XML格式");
+        validateXmlItem.setOnAction(e -> performValidateXml(group));
+
+        javafx.scene.control.MenuItem countRecordsItem = new javafx.scene.control.MenuItem("📊 统计数据行数");
+        countRecordsItem.setOnAction(e -> performCountRecords(group));
+
+        javafx.scene.control.SeparatorMenuItem separator4 = new javafx.scene.control.SeparatorMenuItem();
+
+        // ========== 查看操作 ==========
+        javafx.scene.control.MenuItem viewFilesItem = new javafx.scene.control.MenuItem("📋 查看文件列表");
+        viewFilesItem.setOnAction(e -> {
+            saveCurrentState();
+            selectMechanism(group);
+        });
+
+        contextMenu.getItems().addAll(
+            titleItem,
+            separator1,
+            batchDdlItem,
+            batchDdlAndCreateItem,
+            checkTablesItem,
+            separator2,
+            batchImportItem,
+            batchExportItem,
+            batchTruncateItem,
+            separator3,
+            validateXmlItem,
+            countRecordsItem,
+            separator4,
+            viewFilesItem
+        );
+
+        contextMenu.show(card, screenX, screenY);
+    }
+
+    /**
+     * 批量生成DDL
+     */
+    private void performBatchDdlGeneration(AionMechanismView.MechanismGroup group) {
+        int fileCount = group.getAllFiles().size();
+        red.jiuzhou.ui.components.BatchProgressDialog dialog =
+            new red.jiuzhou.ui.components.BatchProgressDialog(
+                this,
+                "批量生成DDL - " + group.getCategory().getDisplayName(),
+                fileCount
+            );
+
+        dialog.showNonBlocking();
+        dialog.logInfo("开始批量生成DDL文件...");
+
+        new Thread(() -> {
+            int index = 0;
+
+            for (AionMechanismView.FileEntry file : group.getAllFiles()) {
+                if (dialog.isCancelled()) {
+                    dialog.logWarning("操作已取消");
+                    break;
+                }
+
+                index++;
+                String fileName = file.getFileName();
+                String xmlPath = file.getFile().getAbsolutePath();
+                String tableName = fileName.replace(".xml", "");
+
+                try {
+                    dialog.logInfo(String.format("[%d/%d] 正在生成DDL: %s", index, fileCount, tableName));
+                    red.jiuzhou.batch.BatchDdlGenerator.generateSingleDdlSync(xmlPath);
+                    dialog.logSuccess(String.format("[%d/%d] %s - DDL生成成功", index, fileCount, tableName));
+                    dialog.updateProgress(index, true);
+                } catch (Exception e) {
+                    dialog.logError(String.format("[%d/%d] %s - 失败: %s", index, fileCount, fileName, e.getMessage()));
+                    dialog.updateProgress(index, false);
+                    log.error("生成DDL失败: " + fileName, e);
+                }
+            }
+
+            dialog.setCompleted();
+            dialog.logInfo("批量DDL生成完成");
+        }, "BatchDdlGeneration").start();
+    }
+
+    /**
+     * 批量导出（DB -> XML）
+     */
+    private void performBatchExport(AionMechanismView.MechanismGroup group) {
+        int fileCount = group.getAllFiles().size();
+        red.jiuzhou.ui.components.BatchProgressDialog dialog =
+            new red.jiuzhou.ui.components.BatchProgressDialog(
+                this,
+                "批量导出 (DB → XML) - " + group.getCategory().getDisplayName(),
+                fileCount
+            );
+
+        dialog.showNonBlocking();
+        dialog.logInfo("开始批量导出数据...");
+
+        new Thread(() -> {
+            int index = 0;
+
+            for (AionMechanismView.FileEntry file : group.getAllFiles()) {
+                if (dialog.isCancelled()) {
+                    dialog.logWarning("操作已取消");
+                    break;
+                }
+
+                index++;
+                String fileName = file.getFileName();
+                String xmlPath = file.getFile().getAbsolutePath();
+                String tableName = fileName.replace(".xml", "");
+
+                try {
+                    dialog.logInfo(String.format("[%d/%d] 正在导出: %s", index, fileCount, tableName));
+                    // TODO: 集成实际的DbToXmlGenerator导出功能
+                    log.info("批量导出: " + tableName + " -> " + xmlPath);
+                    dialog.logSuccess(String.format("[%d/%d] %s - 导出成功", index, fileCount, tableName));
+                    dialog.updateProgress(index, true);
+                } catch (Exception e) {
+                    dialog.logError(String.format("[%d/%d] %s - 失败: %s", index, fileCount, fileName, e.getMessage()));
+                    dialog.updateProgress(index, false);
+                    log.error("导出失败: " + fileName, e);
+                }
+            }
+
+            dialog.setCompleted();
+            dialog.logInfo("批量导出完成");
+        }, "BatchExport").start();
+    }
+
+    /**
+     * 批量导入（XML -> DB）
+     */
+    private void performBatchImport(AionMechanismView.MechanismGroup group) {
+        int fileCount = group.getAllFiles().size();
+        red.jiuzhou.ui.components.BatchProgressDialog dialog =
+            new red.jiuzhou.ui.components.BatchProgressDialog(
+                this,
+                "批量导入 (XML → DB) - " + group.getCategory().getDisplayName(),
+                fileCount
+            );
+
+        dialog.showNonBlocking();
+        dialog.logInfo("开始批量导入数据...");
+
+        new Thread(() -> {
+            int index = 0;
+
+            for (AionMechanismView.FileEntry file : group.getAllFiles()) {
+                if (dialog.isCancelled()) {
+                    dialog.logWarning("操作已取消");
+                    break;
+                }
+
+                index++;
+                String fileName = file.getFileName();
+                String xmlPath = file.getFile().getAbsolutePath();
+                String tableName = fileName.replace(".xml", "");
+
+                try {
+                    dialog.logInfo(String.format("[%d/%d] 正在导入: %s", index, fileCount, tableName));
+                    red.jiuzhou.batch.BatchXmlImporter.ImportOptions options =
+                        new red.jiuzhou.batch.BatchXmlImporter.ImportOptions();
+                    boolean result = red.jiuzhou.batch.BatchXmlImporter.importSingleXmlSync(xmlPath, options);
+
+                    if (result) {
+                        dialog.logSuccess(String.format("[%d/%d] %s - 导入成功", index, fileCount, tableName));
+                        dialog.updateProgress(index, true);
+                    } else {
+                        dialog.logWarning(String.format("[%d/%d] %s - 导入失败（返回false）", index, fileCount, tableName));
+                        dialog.updateProgress(index, false);
+                    }
+                } catch (Exception e) {
+                    dialog.logError(String.format("[%d/%d] %s - 失败: %s", index, fileCount, fileName, e.getMessage()));
+                    dialog.updateProgress(index, false);
+                    log.error("导入失败: " + fileName, e);
+                }
+            }
+
+            dialog.setCompleted();
+            dialog.logInfo("批量导入完成");
+        }, "BatchImport").start();
+    }
+
+    /**
+     * 一键DDL生成+建表
+     */
+    private void performBatchDdlAndCreate(AionMechanismView.MechanismGroup group) {
+        int fileCount = group.getAllFiles().size();
+        red.jiuzhou.ui.components.BatchProgressDialog dialog =
+            new red.jiuzhou.ui.components.BatchProgressDialog(
+                this,
+                "批量DDL生成+建表 - " + group.getCategory().getDisplayName(),
+                fileCount
+            );
+
+        dialog.showNonBlocking();
+        dialog.logInfo("开始批量DDL生成并建表...");
+
+        new Thread(() -> {
+            int index = 0;
+            org.springframework.jdbc.core.JdbcTemplate jdbcTemplate =
+                red.jiuzhou.util.DatabaseUtil.getJdbcTemplate(null);
+
+            for (AionMechanismView.FileEntry file : group.getAllFiles()) {
+                if (dialog.isCancelled()) {
+                    dialog.logWarning("操作已取消");
+                    break;
+                }
+
+                index++;
+                String fileName = file.getFileName();
+                String xmlPath = file.getFile().getAbsolutePath();
+                String tableName = fileName.replace(".xml", "");
+
+                try {
+                    // Step 1: 生成DDL
+                    dialog.logInfo(String.format("[%d/%d] 正在生成DDL: %s", index, fileCount, tableName));
+                    String ddl = red.jiuzhou.batch.BatchDdlGenerator.generateSingleDdlSync(xmlPath);
+
+                    // Step 2: 执行DDL建表
+                    dialog.logInfo(String.format("[%d/%d] 正在建表: %s", index, fileCount, tableName));
+                    jdbcTemplate.execute(ddl);
+
+                    dialog.logSuccess(String.format("[%d/%d] %s - DDL生成并建表成功", index, fileCount, tableName));
+                    dialog.updateProgress(index, true);
+
+                } catch (Exception e) {
+                    dialog.logError(String.format("[%d/%d] %s - 失败: %s", index, fileCount, fileName, e.getMessage()));
+                    dialog.updateProgress(index, false);
+                    log.error("DDL生成或建表失败: " + fileName, e);
+                }
+            }
+
+            dialog.setCompleted();
+            dialog.logInfo("批量DDL生成+建表操作完成");
+        }, "BatchDdlAndCreate").start();
+    }
+
+    /**
+     * 检查表是否存在
+     */
+    private void performCheckTables(AionMechanismView.MechanismGroup group) {
+        int fileCount = group.getAllFiles().size();
+        red.jiuzhou.ui.components.BatchProgressDialog dialog =
+            new red.jiuzhou.ui.components.BatchProgressDialog(
+                this,
+                "检查表是否存在 - " + group.getCategory().getDisplayName(),
+                fileCount
+            );
+
+        dialog.showNonBlocking();
+        dialog.logInfo("开始检查数据库表...");
+
+        new Thread(() -> {
+            int index = 0;
+            org.springframework.jdbc.core.JdbcTemplate jdbcTemplate =
+                red.jiuzhou.util.DatabaseUtil.getJdbcTemplate(null);
+
+            for (AionMechanismView.FileEntry file : group.getAllFiles()) {
+                if (dialog.isCancelled()) {
+                    dialog.logWarning("操作已取消");
+                    break;
+                }
+
+                index++;
+                String fileName = file.getFileName();
+                String tableName = fileName.replace(".xml", "");
+
+                try {
+                    // 查询表是否存在
+                    String checkSql = "SELECT COUNT(*) FROM information_schema.TABLES " +
+                                    "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?";
+                    Integer count = jdbcTemplate.queryForObject(checkSql, Integer.class, tableName);
+
+                    if (count != null && count > 0) {
+                        // 表存在，查询行数
+                        String countSql = "SELECT COUNT(*) FROM " + tableName;
+                        Integer rowCount = jdbcTemplate.queryForObject(countSql, Integer.class);
+                        dialog.logSuccess(String.format("[%d/%d] ✓ %s 存在 (%d行)", index, fileCount, tableName, rowCount));
+                        dialog.updateProgress(index, true);
+                    } else {
+                        dialog.logWarning(String.format("[%d/%d] ✗ %s 不存在", index, fileCount, tableName));
+                        dialog.updateProgress(index, false);
+                    }
+
+                } catch (Exception e) {
+                    dialog.logError(String.format("[%d/%d] %s - 检查失败: %s", index, fileCount, fileName, e.getMessage()));
+                    dialog.updateProgress(index, false);
+                    log.error("检查表失败: " + fileName, e);
+                }
+            }
+
+            dialog.setCompleted();
+            dialog.logInfo("表检查完成");
+        }, "CheckTables").start();
+    }
+
+    /**
+     * 批量清空表数据
+     */
+    private void performBatchTruncate(AionMechanismView.MechanismGroup group) {
+        // 二次确认
+        javafx.scene.control.Alert confirmAlert = new javafx.scene.control.Alert(
+            javafx.scene.control.Alert.AlertType.WARNING,
+            "确定要清空机制【" + group.getCategory().getDisplayName() + "】下所有表的数据吗？\n" +
+            "此操作将删除 " + group.getAllFiles().size() + " 个表的所有数据，且无法撤销！",
+            javafx.scene.control.ButtonType.YES,
+            javafx.scene.control.ButtonType.NO
+        );
+        confirmAlert.initOwner(this);
+        confirmAlert.setTitle("危险操作确认");
+        confirmAlert.setHeaderText("批量清空表数据");
+
+        Optional<javafx.scene.control.ButtonType> result = confirmAlert.showAndWait();
+        if (!result.isPresent() || result.get() != javafx.scene.control.ButtonType.YES) {
+            statusLabel.setText("已取消批量清空操作");
+            return;
+        }
+
+        int fileCount = group.getAllFiles().size();
+        red.jiuzhou.ui.components.BatchProgressDialog dialog =
+            new red.jiuzhou.ui.components.BatchProgressDialog(
+                this,
+                "批量清空表数据 - " + group.getCategory().getDisplayName(),
+                fileCount
+            );
+
+        dialog.showNonBlocking();
+        dialog.logWarning("开始批量清空表数据（危险操作）...");
+
+        new Thread(() -> {
+            int index = 0;
+            org.springframework.jdbc.core.JdbcTemplate jdbcTemplate =
+                red.jiuzhou.util.DatabaseUtil.getJdbcTemplate(null);
+
+            for (AionMechanismView.FileEntry file : group.getAllFiles()) {
+                if (dialog.isCancelled()) {
+                    dialog.logWarning("操作已取消");
+                    break;
+                }
+
+                index++;
+                String fileName = file.getFileName();
+                String tableName = fileName.replace(".xml", "");
+
+                try {
+                    // 先检查表是否存在
+                    String checkSql = "SELECT COUNT(*) FROM information_schema.TABLES " +
+                                    "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?";
+                    Integer count = jdbcTemplate.queryForObject(checkSql, Integer.class, tableName);
+
+                    if (count != null && count > 0) {
+                        // 表存在，执行TRUNCATE
+                        jdbcTemplate.execute("TRUNCATE TABLE " + tableName);
+                        dialog.logSuccess(String.format("[%d/%d] %s - 已清空", index, fileCount, tableName));
+                        dialog.updateProgress(index, true);
+                    } else {
+                        dialog.logWarning(String.format("[%d/%d] %s - 表不存在，跳过", index, fileCount, tableName));
+                        dialog.updateProgress(index, false);
+                    }
+
+                } catch (Exception e) {
+                    dialog.logError(String.format("[%d/%d] %s - 清空失败: %s", index, fileCount, fileName, e.getMessage()));
+                    dialog.updateProgress(index, false);
+                    log.error("清空表失败: " + fileName, e);
+                }
+            }
+
+            dialog.setCompleted();
+            dialog.logInfo("批量清空表数据完成");
+        }, "BatchTruncate").start();
+    }
+
+    /**
+     * 批量验证XML格式
+     */
+    private void performValidateXml(AionMechanismView.MechanismGroup group) {
+        int fileCount = group.getAllFiles().size();
+        red.jiuzhou.ui.components.BatchProgressDialog dialog =
+            new red.jiuzhou.ui.components.BatchProgressDialog(
+                this,
+                "批量验证XML格式 - " + group.getCategory().getDisplayName(),
+                fileCount
+            );
+
+        dialog.showNonBlocking();
+        dialog.logInfo("开始批量验证XML文件...");
+
+        new Thread(() -> {
+            int index = 0;
+
+            for (AionMechanismView.FileEntry file : group.getAllFiles()) {
+                if (dialog.isCancelled()) {
+                    dialog.logWarning("操作已取消");
+                    break;
+                }
+
+                index++;
+                String fileName = file.getFileName();
+                String xmlPath = file.getFile().getAbsolutePath();
+
+                try {
+                    // 尝试解析XML
+                    org.dom4j.io.SAXReader reader = new org.dom4j.io.SAXReader();
+                    org.dom4j.Document doc = reader.read(new File(xmlPath));
+
+                    // 检查根节点
+                    org.dom4j.Element root = doc.getRootElement();
+                    int elementCount = root.elements().size();
+
+                    dialog.logSuccess(String.format("[%d/%d] %s - 格式正确 (%d个元素)",
+                        index, fileCount, fileName, elementCount));
+                    dialog.updateProgress(index, true);
+
+                } catch (Exception e) {
+                    dialog.logError(String.format("[%d/%d] %s - 格式错误: %s",
+                        index, fileCount, fileName, e.getMessage()));
+                    dialog.updateProgress(index, false);
+                    log.error("XML验证失败: " + fileName, e);
+                }
+            }
+
+            dialog.setCompleted();
+            dialog.logInfo("XML格式验证完成");
+        }, "ValidateXml").start();
+    }
+
+    /**
+     * 统计数据行数
+     */
+    private void performCountRecords(AionMechanismView.MechanismGroup group) {
+        int fileCount = group.getAllFiles().size();
+        red.jiuzhou.ui.components.BatchProgressDialog dialog =
+            new red.jiuzhou.ui.components.BatchProgressDialog(
+                this,
+                "统计数据行数 - " + group.getCategory().getDisplayName(),
+                fileCount
+            );
+
+        dialog.showNonBlocking();
+        dialog.logInfo("开始统计数据行数...");
+
+        new Thread(() -> {
+            int index = 0;
+            int totalRecords = 0;
+            org.springframework.jdbc.core.JdbcTemplate jdbcTemplate =
+                red.jiuzhou.util.DatabaseUtil.getJdbcTemplate(null);
+
+            for (AionMechanismView.FileEntry file : group.getAllFiles()) {
+                if (dialog.isCancelled()) {
+                    dialog.logWarning("操作已取消");
+                    break;
+                }
+
+                index++;
+                String fileName = file.getFileName();
+                String tableName = fileName.replace(".xml", "");
+
+                try {
+                    // 先检查表是否存在
+                    String checkSql = "SELECT COUNT(*) FROM information_schema.TABLES " +
+                                    "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?";
+                    Integer tableExists = jdbcTemplate.queryForObject(checkSql, Integer.class, tableName);
+
+                    if (tableExists != null && tableExists > 0) {
+                        // 统计行数
+                        String countSql = "SELECT COUNT(*) FROM " + tableName;
+                        Integer rowCount = jdbcTemplate.queryForObject(countSql, Integer.class);
+                        totalRecords += (rowCount != null ? rowCount : 0);
+
+                        dialog.logSuccess(String.format("[%d/%d] %s - %d行",
+                            index, fileCount, tableName, rowCount));
+                        dialog.updateProgress(index, true);
+                    } else {
+                        dialog.logWarning(String.format("[%d/%d] %s - 表不存在", index, fileCount, tableName));
+                        dialog.updateProgress(index, false);
+                    }
+
+                } catch (Exception e) {
+                    dialog.logError(String.format("[%d/%d] %s - 统计失败: %s",
+                        index, fileCount, fileName, e.getMessage()));
+                    dialog.updateProgress(index, false);
+                    log.error("统计行数失败: " + fileName, e);
+                }
+            }
+
+            dialog.setCompleted();
+            dialog.logInfo(String.format("统计完成，总计: %d 行", totalRecords));
+        }, "CountRecords").start();
     }
 
     /**

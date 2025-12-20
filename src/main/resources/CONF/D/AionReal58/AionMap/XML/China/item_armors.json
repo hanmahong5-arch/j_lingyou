@@ -1,0 +1,17 @@
+{
+	"file_path":"D:\\AionReal58\\AionMap\\XML\\China\\item_armors.xml",
+	"xml_root_tag":"items",
+	"list":[
+		{
+			"addDataNode":"trade_in_item_list",
+			"associatedFiled":"id",
+			"xml_tag":"data",
+			"db_column":"data",
+			"table_name":"item_armors__trade_in_item_list__data",
+			"sql":"select * from item_armors__trade_in_item_list__data where id = '#associated_filed' order by CAST(id AS UNSIGNED) ASC"
+		}
+	],
+	"xml_item_tag":"item",
+	"table_name":"item_armors",
+	"sql":"select * from item_armors order by CAST(id AS UNSIGNED) ASC"
+}

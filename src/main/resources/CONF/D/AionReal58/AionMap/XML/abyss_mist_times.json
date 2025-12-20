@@ -1,0 +1,8 @@
+{
+	"file_path":"D:\\AionReal58\\AionMap\\XML\\abyss_mist_times.xml",
+	"xml_root_tag":"abyss_mist_times",
+	"list":[],
+	"xml_item_tag":"abyss_mist_time",
+	"table_name":"abyss_mist_times",
+	"sql":"select * from abyss_mist_times order by CAST(id AS UNSIGNED) ASC"
+}

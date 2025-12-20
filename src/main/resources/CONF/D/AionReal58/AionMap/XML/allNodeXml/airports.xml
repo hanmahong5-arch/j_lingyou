@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<airports>
+  <airport>
+    <id/>
+    <name/>
+    <desc/>
+    <world/>
+    <race/>
+    <location_alias/>
+    <ui_map_pos_x/>
+    <ui_map_pos_y/>
+    <abyss_id/>
+    <npcname/>
+  </airport>
+</airports>

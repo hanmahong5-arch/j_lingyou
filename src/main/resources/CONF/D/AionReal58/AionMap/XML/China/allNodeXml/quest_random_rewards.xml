@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<quest_random_rewards>
+  <quest_random_reward>
+    <id/>
+    <name/>
+    <__comment__/>
+    <items>
+      <data>
+        <item/>
+        <item_count/>
+        <prob/>
+      </data>
+    </items>
+  </quest_random_reward>
+</quest_random_rewards>
