@@ -8,6 +8,7 @@ import red.jiuzhou.xmltosql.XmlProcess;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -197,7 +198,7 @@ public class BatchDdlGenerator {
                     .collect(Collectors.toList());
             } else {
                 File[] files = dir.listFiles((d, name) -> name.toLowerCase().endsWith(".xml"));
-                xmlFiles = files != null ? List.of(files) : new ArrayList<>();
+                xmlFiles = files != null ? Arrays.asList(files) : new ArrayList<>();
             }
 
             log.info("扫描目录 {}, 找到 {} 个XML文件", directory, xmlFiles.size());
@@ -241,7 +242,7 @@ public class BatchDdlGenerator {
                     } else {
                         File[] files = file.listFiles((d, name) -> name.toLowerCase().endsWith(".xml"));
                         if (files != null) {
-                            allXmlFiles.addAll(List.of(files));
+                            allXmlFiles.addAll(Arrays.asList(files));
                         }
                     }
                 } else if (file.getName().toLowerCase().endsWith(".xml")) {

@@ -7,6 +7,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import red.jiuzhou.agent.execution.OperationExecutor;
 import red.jiuzhou.agent.history.OperationLogger;
 import red.jiuzhou.agent.security.SqlSecurityFilter;
+import red.jiuzhou.agent.texttosql.QuerySelfCorrection;
+import red.jiuzhou.agent.texttosql.SqlExampleLibrary;
 import red.jiuzhou.agent.tools.*;
 import red.jiuzhou.ai.AiModelClient;
 import red.jiuzhou.ai.AiModelFactory;
@@ -39,6 +41,10 @@ public class GameDataAgent {
     private OperationLogger operationLogger;
     private SqlSecurityFilter securityFilter;
 
+    // ========== TEXT-TO-SQL增强组件 ==========
+    private QuerySelfCorrection querySelfCorrection;
+    private SqlExampleLibrary exampleLibrary;
+
     // ========== AI模型 ==========
     private String currentModel = "qwen";  // 默认使用qwen
     private AiModelClient aiClient;
@@ -58,25 +64,30 @@ public class GameDataAgent {
     }
 
     /**
-     * 初始化Agent
+     * 初始化Agent（增强版）
      *
      * @param jdbcTemplate 数据库连接
      */
     public void initialize(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
 
-        // 初始化组件
+        // 初始化核心组件
         this.securityFilter = new SqlSecurityFilter(jdbcTemplate);
         this.operationLogger.setJdbcTemplate(jdbcTemplate);
         this.operationExecutor = new OperationExecutor(jdbcTemplate, operationLogger);
         this.metadataService = new SchemaMetadataService(jdbcTemplate);
         this.metadataService.initialize();
 
+        // 初始化TEXT-TO-SQL增强组件
+        this.querySelfCorrection = new QuerySelfCorrection(jdbcTemplate);
+        this.exampleLibrary = SqlExampleLibrary.getInstance();
+
         // 注册工具
         registerTools();
 
-        // 初始化Prompt构建器
+        // 初始化Prompt构建器（增强版）
         this.promptBuilder = new PromptBuilder(metadataService, toolRegistry);
+        this.promptBuilder.setJdbcTemplate(jdbcTemplate);
 
         // 初始化AI客户端
         switchModel(currentModel);
@@ -84,7 +95,7 @@ public class GameDataAgent {
         // 创建新会话
         startNewSession();
 
-        log.info("GameDataAgent 初始化完成，当前模型: {}", currentModel);
+        log.info("GameDataAgent 初始化完成（TEXT-TO-SQL增强版），当前模型: {}", currentModel);
     }
 
     /**

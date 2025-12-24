@@ -149,11 +149,12 @@ public class BatchXmlImporter {
                     generator.xmlTodb();
                 } else {
                     // 普通文件
+                    // 传入xmlFilePath作为tabFielPath参数，让TabConfLoad.getTale()可以计算配置文件路径
                     XmlToDbGenerator generator = new XmlToDbGenerator(
                         tableName,
                         mapType,
                         xmlFilePath,
-                        null
+                        xmlFilePath  // 修复：传入XML文件路径而不是null
                     );
 
                     String aiModule = options != null ? options.getAiModule() : null;
@@ -203,7 +204,7 @@ public class BatchXmlImporter {
 
                     // 检查是否有对应的表配置
                     String tableName = fileName.substring(0, fileName.lastIndexOf('.'));
-                    TableConf tableConf = TabConfLoad.getTale(tableName, null);
+                    TableConf tableConf = TabConfLoad.getTale(tableName, filePath);
                     if (tableConf == null) {
                         log.warn("跳过（无表配置）: {}", fileName);
                         result.setSkipped(result.getSkipped() + 1);
@@ -273,7 +274,7 @@ public class BatchXmlImporter {
                     .collect(Collectors.toList());
             } else {
                 File[] files = dir.listFiles((d, name) -> name.toLowerCase().endsWith(".xml"));
-                xmlFiles = files != null ? List.of(files) : new ArrayList<>();
+                xmlFiles = files != null ? Arrays.asList(files) : new ArrayList<>();
             }
 
             log.info("扫描目录 {}, 找到 {} 个XML文件", directory, xmlFiles.size());
@@ -319,7 +320,7 @@ public class BatchXmlImporter {
                     } else {
                         File[] files = file.listFiles((d, name) -> name.toLowerCase().endsWith(".xml"));
                         if (files != null) {
-                            allXmlFiles.addAll(List.of(files));
+                            allXmlFiles.addAll(Arrays.asList(files));
                         }
                     }
                 } else if (file.getName().toLowerCase().endsWith(".xml")) {

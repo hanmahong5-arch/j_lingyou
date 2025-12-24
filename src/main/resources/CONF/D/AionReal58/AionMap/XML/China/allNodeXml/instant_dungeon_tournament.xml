@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<instant_dungeon_tournaments>
+  <instant_dungeon_tournament>
+    <id/>
+    <name/>
+    <type/>
+    <lobby_insname/>
+    <match_insname/>
+    <door_id/>
+    <wait_time/>
+    <limit_time/>
+    <over_time/>
+    <round_list>
+      <data>
+        <round/>
+        <win_kill_point/>
+        <item1_name/>
+        <item1_cnt/>
+        <item2_name/>
+        <item2_cnt/>
+        <exp/>
+        <ap/>
+        <item3_name/>
+        <item3_cnt/>
+        <gold/>
+      </data>
+    </round_list>
+    <door_reopen_time/>
+    <relay_time/>
+    <start_condition/>
+    <over_condition/>
+  </instant_dungeon_tournament>
+</instant_dungeon_tournaments>

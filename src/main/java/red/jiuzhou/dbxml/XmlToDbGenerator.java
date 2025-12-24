@@ -40,7 +40,31 @@ public class XmlToDbGenerator {
             Comparator.comparingInt(String::length).thenComparing(String::compareTo)
     );
 
-    static List<String> worldSpecialTabNames = Arrays.asList(YamlUtils.getProperty("world.specialTabName").split(","));
+    private static List<String> worldSpecialTabNames;
+
+    /**
+     * 延迟初始化world特殊表名列表
+     */
+    private static List<String> getWorldSpecialTabNames() {
+        if (worldSpecialTabNames == null) {
+            synchronized (XmlToDbGenerator.class) {
+                if (worldSpecialTabNames == null) {
+                    try {
+                        String prop = YamlUtils.getProperty("world.specialTabName");
+                        if (prop != null && !prop.isEmpty()) {
+                            worldSpecialTabNames = Arrays.asList(prop.split(","));
+                        } else {
+                            worldSpecialTabNames = Collections.emptyList();
+                        }
+                    } catch (Exception e) {
+                        log.warn("无法加载world.specialTabName配置，使用空列表", e);
+                        worldSpecialTabNames = Collections.emptyList();
+                    }
+                }
+            }
+        }
+        return worldSpecialTabNames;
+    }
 
     public XmlToDbGenerator(String tabName, String mapType, String filePath, String tabFielPath) {
         this.mapType = mapType;
@@ -230,7 +254,7 @@ public class XmlToDbGenerator {
                     }
                 }
                 //特殊处理，表加id
-                if(worldSpecialTabNames.contains(columnMaping.getTableName())){
+                if(getWorldSpecialTabNames().contains(columnMaping.getTableName())){
                     subMap.put("world__id",UUID.randomUUID().toString());
                 }
                 if("world".equals(table.getTableName())){
@@ -281,7 +305,7 @@ public class XmlToDbGenerator {
                 }
             }
             //特殊处理，表加id
-            if(worldSpecialTabNames.contains(columnMaping.getTableName())){
+            if(getWorldSpecialTabNames().contains(columnMaping.getTableName())){
                 subMap.put("world__id",UUID.randomUUID().toString());
             }
             if("world".equals(table.getTableName())){

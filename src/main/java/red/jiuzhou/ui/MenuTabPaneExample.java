@@ -184,6 +184,10 @@ public class MenuTabPaneExample {
         // 启用机制过滤功能（显示机制颜色标记和增强右键菜单）
         searchableTree.enableMechanismFilter(true);
 
+        // 设置批量操作回调
+        searchableTree.setOnBatchGenerateDdl(this::handleBatchGenerateDdl);
+        searchableTree.setOnBatchImportXml(this::handleBatchImportXml);
+
         return searchableTree;
     }
 
@@ -193,7 +197,25 @@ public class MenuTabPaneExample {
     private void createMenuItemsForSearchable(JSONArray children, TreeItem<String> parentItem) {
         for (int i = 0; i < children.size(); i++) {
             JSONObject childNode = children.getJSONObject(i);
-            TreeItem<String> item = new TreeItem<>(childNode.getString("name"));
+
+            // 获取节点名称：优先使用name字段，否则从path中提取
+            String name = childNode.getString("name");
+            if (name == null || name.isEmpty()) {
+                String path = childNode.getString("path");
+                if (path != null && !path.isEmpty()) {
+                    // 从路径中提取文件/目录名
+                    File file = new File(path);
+                    name = file.getName();
+                    // 如果是XML文件，移除扩展名
+                    if (name.toLowerCase().endsWith(".xml")) {
+                        name = name.substring(0, name.length() - 4);
+                    }
+                } else {
+                    name = "未命名";
+                }
+            }
+
+            TreeItem<String> item = new TreeItem<>(name);
 
             // 保存完整路径到 Map（用于右键菜单和文件操作）
             if (childNode.containsKey("path")) {
@@ -252,11 +274,35 @@ public class MenuTabPaneExample {
         // 优先从 Map 获取完整路径（含扩展名）
         String path = treeItemPathMap.get(treeItem);
         if (path != null && !path.isEmpty()) {
+            log.debug("从Map获取路径: {} -> {}", treeItem.getValue(), path);
             return path;
         }
 
         // 回退：递归构建路径（用于兼容旧代码或未设置 path 的情况）
-        return getParetnPath(treeItem, treeItem.getValue());
+        log.warn("Map中未找到路径，使用回退逻辑: {}", treeItem.getValue());
+        String constructedPath = getParetnPath(treeItem, treeItem.getValue());
+
+        // 只对XML文件添加.xml扩展名（设计原则：只处理XML文件，忽略其他文件）
+        if (treeItem.isLeaf()) {
+            // 检查路径是否已有扩展名
+            int lastDot = constructedPath.lastIndexOf('.');
+            int lastSep = Math.max(constructedPath.lastIndexOf('/'), constructedPath.lastIndexOf('\\'));
+
+            // 如果没有扩展名（或扩展名在路径分隔符之前，说明是目录名的一部分）
+            if (lastDot == -1 || lastDot < lastSep) {
+                // 没有扩展名，假定是XML文件（因为LeftMenu.json应该只包含XML文件）
+                constructedPath = constructedPath + ".xml";
+                log.debug("叶子节点无扩展名，添加.xml: {}", constructedPath);
+            } else {
+                // 已有扩展名，保留原样（非XML文件被忽略，不处理）
+                String extension = constructedPath.substring(lastDot);
+                if (!extension.equalsIgnoreCase(".xml")) {
+                    log.warn("检测到非XML文件，将被忽略: {}", constructedPath);
+                }
+            }
+        }
+
+        return constructedPath;
     }
 
     private String getParetnPath(TreeItem<String> treeItem, String cpath){
@@ -353,5 +399,45 @@ public class MenuTabPaneExample {
      */
     private String getFullPath(TreeItem<String> treeItem) {
         return getParetnPath(treeItem, treeItem.getValue());
+    }
+
+    /**
+     * 处理批量生成DDL请求
+     *
+     * @param path 文件或目录路径
+     */
+    private void handleBatchGenerateDdl(String path) {
+        log.info("批量生成DDL: {}", path);
+
+        try {
+            BatchOperationDialog dialog = new BatchOperationDialog(
+                path,
+                BatchOperationDialog.OperationType.GENERATE_DDL
+            );
+            dialog.showAndWait();
+        } catch (Exception e) {
+            log.error("打开批量DDL生成对话框失败", e);
+            showError("打开批量DDL生成对话框失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 处理批量导入XML请求
+     *
+     * @param path 文件或目录路径
+     */
+    private void handleBatchImportXml(String path) {
+        log.info("批量导入XML: {}", path);
+
+        try {
+            BatchOperationDialog dialog = new BatchOperationDialog(
+                path,
+                BatchOperationDialog.OperationType.IMPORT_XML
+            );
+            dialog.showAndWait();
+        } catch (Exception e) {
+            log.error("打开批量XML导入对话框失败", e);
+            showError("打开批量XML导入对话框失败: " + e.getMessage());
+        }
     }
 }

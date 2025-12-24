@@ -49,27 +49,88 @@ public class AionMechanismDetector {
         EXACT_FILE_MAPPINGS.put("abyss_rank_points.xml", AionMechanismCategory.ABYSS);
         EXACT_FILE_MAPPINGS.put("siege_locations.xml", AionMechanismCategory.ABYSS);
 
+        // NPC系统
         EXACT_FILE_MAPPINGS.put("npcs.xml", AionMechanismCategory.NPC);
         EXACT_FILE_MAPPINGS.put("npc_shouts.xml", AionMechanismCategory.NPC);
         EXACT_FILE_MAPPINGS.put("npc_walkers.xml", AionMechanismCategory.NPC);
+        EXACT_FILE_MAPPINGS.put("npc_scores.xml", AionMechanismCategory.NPC);
+        EXACT_FILE_MAPPINGS.put("npc_tribe_relation.xml", AionMechanismCategory.NPC);
+        EXACT_FILE_MAPPINGS.put("npcfactions.xml", AionMechanismCategory.NPC);
 
+        // 客户端NPC/怪物相关文件
+        EXACT_FILE_MAPPINGS.put("client_strings_npc.xml", AionMechanismCategory.NPC);
+        EXACT_FILE_MAPPINGS.put("client_strings_monster.xml", AionMechanismCategory.NPC);
+        EXACT_FILE_MAPPINGS.put("client_strings_dic_monster.xml", AionMechanismCategory.NPC);
+
+        // 物品系统
         EXACT_FILE_MAPPINGS.put("items.xml", AionMechanismCategory.ITEM);
         EXACT_FILE_MAPPINGS.put("item_sets.xml", AionMechanismCategory.ITEM);
 
+        // 客户端物品相关文件
+        EXACT_FILE_MAPPINGS.put("client_strings_item.xml", AionMechanismCategory.ITEM);
+        EXACT_FILE_MAPPINGS.put("client_strings_item2.xml", AionMechanismCategory.ITEM);
+        EXACT_FILE_MAPPINGS.put("client_strings_item3.xml", AionMechanismCategory.ITEM);
+        EXACT_FILE_MAPPINGS.put("client_strings_dic_item.xml", AionMechanismCategory.ITEM);
+
+        // 技能系统核心文件
         EXACT_FILE_MAPPINGS.put("skills.xml", AionMechanismCategory.SKILL);
         EXACT_FILE_MAPPINGS.put("skill_trees.xml", AionMechanismCategory.SKILL);
+        EXACT_FILE_MAPPINGS.put("skill_base.xml", AionMechanismCategory.SKILL);
+        EXACT_FILE_MAPPINGS.put("skill_charge.xml", AionMechanismCategory.SKILL);
+        EXACT_FILE_MAPPINGS.put("skill_learns.xml", AionMechanismCategory.SKILL);
+        EXACT_FILE_MAPPINGS.put("skill_conflictcounts.xml", AionMechanismCategory.SKILL);
+        EXACT_FILE_MAPPINGS.put("skill_damageattenuation.xml", AionMechanismCategory.SKILL);
+        EXACT_FILE_MAPPINGS.put("skill_prohibit.xml", AionMechanismCategory.SKILL);
+        EXACT_FILE_MAPPINGS.put("skill_qualification.xml", AionMechanismCategory.SKILL);
+        EXACT_FILE_MAPPINGS.put("skill_randomdamage.xml", AionMechanismCategory.SKILL);
+        EXACT_FILE_MAPPINGS.put("skill_signetdata.xml", AionMechanismCategory.SKILL);
 
+        // 特殊技能文件（不是skill_开头但属于技能系统）
+        EXACT_FILE_MAPPINGS.put("abyss_leader_skill.xml", AionMechanismCategory.SKILL);
+        EXACT_FILE_MAPPINGS.put("devanion_skill_enchant.xml", AionMechanismCategory.SKILL);
+        EXACT_FILE_MAPPINGS.put("exceed_skillset.xml", AionMechanismCategory.SKILL);
+        EXACT_FILE_MAPPINGS.put("pc_skill_skin.xml", AionMechanismCategory.SKILL);
+        EXACT_FILE_MAPPINGS.put("polymorph_temp_skill.xml", AionMechanismCategory.SKILL);
+        EXACT_FILE_MAPPINGS.put("stigma_hiddenskill.xml", AionMechanismCategory.SKILL);
+
+        // 客户端技能相关文件
+        EXACT_FILE_MAPPINGS.put("client_strings_skill.xml", AionMechanismCategory.SKILL);
+
+        // 任务系统核心文件
         EXACT_FILE_MAPPINGS.put("quests.xml", AionMechanismCategory.QUEST);
         EXACT_FILE_MAPPINGS.put("quest_data.xml", AionMechanismCategory.QUEST);
+        EXACT_FILE_MAPPINGS.put("quest.xml", AionMechanismCategory.QUEST);
+        EXACT_FILE_MAPPINGS.put("quest_random_rewards.xml", AionMechanismCategory.QUEST);
 
+        // 特殊任务文件（不是quest开头但属于任务系统）
+        EXACT_FILE_MAPPINGS.put("data_driven_quest.xml", AionMechanismCategory.QUEST);
+        EXACT_FILE_MAPPINGS.put("jumping_addquest.xml", AionMechanismCategory.QUEST);
+        EXACT_FILE_MAPPINGS.put("jumping_endquest.xml", AionMechanismCategory.QUEST);
+        EXACT_FILE_MAPPINGS.put("npcfactions_quest.xml", AionMechanismCategory.QUEST);
+
+        // 客户端任务相关文件
+        EXACT_FILE_MAPPINGS.put("client_strings_quest.xml", AionMechanismCategory.QUEST);
+
+        // 商店系统
         EXACT_FILE_MAPPINGS.put("goodslists.xml", AionMechanismCategory.SHOP);
+        EXACT_FILE_MAPPINGS.put("goodslist.xml", AionMechanismCategory.SHOP);
+        EXACT_FILE_MAPPINGS.put("abgoodslist.xml", AionMechanismCategory.SHOP);
         EXACT_FILE_MAPPINGS.put("merchants.xml", AionMechanismCategory.SHOP);
+        EXACT_FILE_MAPPINGS.put("toypet_merchant.xml", AionMechanismCategory.SHOP);
 
+        // 宠物系统
         EXACT_FILE_MAPPINGS.put("toypets.xml", AionMechanismCategory.PET);
         EXACT_FILE_MAPPINGS.put("familiars.xml", AionMechanismCategory.PET);
 
+        // 客户端宠物相关文件
+        EXACT_FILE_MAPPINGS.put("client_strings_funcpet.xml", AionMechanismCategory.PET);
+
+        // 制作系统
         EXACT_FILE_MAPPINGS.put("recipes.xml", AionMechanismCategory.CRAFT);
         EXACT_FILE_MAPPINGS.put("assembly.xml", AionMechanismCategory.CRAFT);
+        EXACT_FILE_MAPPINGS.put("combine_recipe.xml", AionMechanismCategory.CRAFT);
+        EXACT_FILE_MAPPINGS.put("luna_combine_recipe.xml", AionMechanismCategory.CRAFT);
+        EXACT_FILE_MAPPINGS.put("luna_combine_recipes_settings.xml", AionMechanismCategory.CRAFT);
 
         EXACT_FILE_MAPPINGS.put("titles.xml", AionMechanismCategory.TITLE);
 
@@ -201,6 +262,34 @@ public class AionMechanismDetector {
         String fileNameLower = fileName.toLowerCase();
         String parentFolder = file.getParentFile() != null ? file.getParentFile().getName() : "";
 
+        // 加载手动覆盖配置
+        MechanismOverrideConfig overrideConfig = MechanismOverrideConfig.getInstance();
+
+        // 0. 手动覆盖检查（最高优先级）
+        if (overrideConfig.hasOverride(fileName)) {
+            AionMechanismCategory overrideCategory = overrideConfig.getOverride(fileName);
+            log.debug("手动覆盖匹配: {} -> {}", fileName, overrideCategory.getDisplayName());
+            return DetectionResult.builder()
+                    .category(overrideCategory)
+                    .confidence(0.99)
+                    .reasoning("手动覆盖配置: " + fileName)
+                    .localized(isLocalized)
+                    .relativePath(relativePath)
+                    .build();
+        }
+
+        // 0.5. 排除列表检查
+        if (overrideConfig.isExcluded(fileName)) {
+            log.debug("文件在排除列表中: {}", fileName);
+            return DetectionResult.builder()
+                    .category(AionMechanismCategory.OTHER)
+                    .confidence(0.95)
+                    .reasoning("手动排除: " + fileName)
+                    .localized(isLocalized)
+                    .relativePath(relativePath)
+                    .build();
+        }
+
         // 1. 文件夹级别匹配（最高优先级）
         AionMechanismCategory folderCategory = FOLDER_MAPPINGS.get(parentFolder);
         if (folderCategory != null) {
@@ -216,6 +305,7 @@ public class AionMechanismDetector {
         // 2. 精确文件名匹配
         AionMechanismCategory exactCategory = EXACT_FILE_MAPPINGS.get(fileNameLower);
         if (exactCategory != null) {
+            log.debug("精确匹配成功: {} -> {}", fileName, exactCategory.getDisplayName());
             return DetectionResult.builder()
                     .category(exactCategory)
                     .confidence(0.98)
@@ -223,6 +313,9 @@ public class AionMechanismDetector {
                     .localized(isLocalized)
                     .relativePath(relativePath)
                     .build();
+        } else if (fileNameLower.contains("client_strings")) {
+            // 调试日志：client_strings 文件未匹配
+            log.warn("client_strings文件未精确匹配: {}, 将使用正则匹配", fileName);
         }
 
         // 3. 正则模式匹配（按优先级排序）

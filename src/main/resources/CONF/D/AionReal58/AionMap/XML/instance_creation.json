@@ -1,0 +1,8 @@
+{
+	"file_path":"D:\\AionReal58\\AionMap\\XML\\instance_creation.xml",
+	"xml_root_tag":"instance_creations",
+	"list":[],
+	"xml_item_tag":"instance_creation",
+	"table_name":"instance_creation",
+	"sql":"select * from instance_creation order by CAST(id AS UNSIGNED) ASC"
+}

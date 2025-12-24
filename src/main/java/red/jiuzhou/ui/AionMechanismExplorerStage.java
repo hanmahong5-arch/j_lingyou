@@ -14,9 +14,11 @@ import javafx.scene.text.FontWeight;
 import javafx.stage.Stage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import cn.hutool.core.io.FileUtil;
 import red.jiuzhou.analysis.aion.*;
 import red.jiuzhou.ui.components.ContextMenuFactory;
 import red.jiuzhou.ui.components.DashboardPanel;
+import red.jiuzhou.ui.components.OperationLogPanel;
 import red.jiuzhou.ui.components.StatCard;
 import red.jiuzhou.util.YamlUtils;
 
@@ -70,11 +72,17 @@ public class AionMechanismExplorerStage extends Stage {
     private StatCard publicFileCard;
     private StatCard localizedFileCard;
 
+    // 操作日志面板
+    private OperationLogPanel logPanel;
+
     // 数据
     private AionMechanismView mechanismView;
     private AionMechanismCategory selectedCategory;
     private AionMechanismView.FileEntry selectedFile;
     private XmlFieldParser.ParseResult currentParseResult;
+
+    // 显示选项
+    private boolean showAllCategories = false; // 是否显示所有分类（包括空的）
 
     // 机制名称到分类的映射
     private final Map<String, AionMechanismCategory> mechanismNameMap = new HashMap<>();
@@ -131,8 +139,8 @@ public class AionMechanismExplorerStage extends Stage {
         HBox mainContent = createMainContent();
         root.setCenter(mainContent);
 
-        // 底部：状态栏
-        HBox bottomBar = createBottomBar();
+        // 底部：操作日志面板 + 状态栏
+        VBox bottomBar = createBottomBar();
         root.setBottom(bottomBar);
 
         Scene scene = new Scene(root);
@@ -166,10 +174,27 @@ public class AionMechanismExplorerStage extends Stage {
         backBtn.setStyle("-fx-background-color: #95a5a6; -fx-text-fill: white; -fx-cursor: hand;");
         backBtn.setOnAction(e -> navigateBack());
 
+        Button manageBtn = new Button("⚙️ 管理分类");
+        manageBtn.setStyle("-fx-background-color: #2ea44f; -fx-text-fill: white; -fx-cursor: hand;");
+        manageBtn.setOnAction(e -> openMechanismManager());
+
+        // 显示选项切换按钮
+        Button toggleBtn = new Button("显示全部(30)");
+        toggleBtn.setStyle("-fx-background-color: #8e44ad; -fx-text-fill: white; -fx-cursor: hand;");
+        toggleBtn.setOnAction(e -> {
+            showAllCategories = !showAllCategories;
+            if (showAllCategories) {
+                toggleBtn.setText("显示非空");
+            } else {
+                toggleBtn.setText("显示全部(30)");
+            }
+            updateMechanismCards();
+        });
+
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        titleBox.getChildren().addAll(titleLabel, progressIndicator, backBtn, refreshBtn, spacer);
+        titleBox.getChildren().addAll(titleLabel, progressIndicator, backBtn, refreshBtn, manageBtn, toggleBtn, spacer);
 
         // 统计卡片区域
         HBox statsBox = createStatsPanel();
@@ -469,12 +494,21 @@ public class AionMechanismExplorerStage extends Stage {
     }
 
     /**
-     * 创建底部状态栏
+     * 创建底部区域（操作日志面板 + 状态栏）
      */
-    private HBox createBottomBar() {
-        HBox bar = new HBox(15);
-        bar.setPadding(new Insets(10, 5, 5, 5));
-        bar.setAlignment(Pos.CENTER_LEFT);
+    private VBox createBottomBar() {
+        VBox bottomBox = new VBox(5);
+
+        // 操作日志面板
+        logPanel = new OperationLogPanel();
+        logPanel.setLogAreaHeight(120);  // 设置较小的初始高度
+        logPanel.setExpanded(false);     // 默认折叠
+
+        // 状态栏
+        HBox statusBar = new HBox(15);
+        statusBar.setPadding(new Insets(8, 10, 8, 10));
+        statusBar.setAlignment(Pos.CENTER_LEFT);
+        statusBar.setStyle("-fx-background-color: #f8f9fa; -fx-border-color: #e0e0e0; -fx-border-width: 1 0 0 0;");
 
         statusLabel = new Label("就绪");
         statusLabel.setStyle("-fx-text-fill: #7f8c8d;");
@@ -482,11 +516,19 @@ public class AionMechanismExplorerStage extends Stage {
         Label pathLabel = new Label("路径: " + aionXmlPath);
         pathLabel.setStyle("-fx-text-fill: #95a5a6; -fx-font-size: 11px;");
 
+        // 日志面板切换按钮
+        Button toggleLogBtn = new Button("📋 日志");
+        toggleLogBtn.setStyle("-fx-background-color: #e8ecf1; -fx-cursor: hand; -fx-font-size: 11px;");
+        toggleLogBtn.setOnAction(e -> logPanel.setExpanded(!logPanel.isVisible() || !((VBox)logPanel.getChildren().get(1)).isVisible()));
+        Tooltip.install(toggleLogBtn, new Tooltip("展开/折叠操作日志面板"));
+
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        bar.getChildren().addAll(statusLabel, spacer, pathLabel);
-        return bar;
+        statusBar.getChildren().addAll(statusLabel, spacer, toggleLogBtn, pathLabel);
+
+        bottomBox.getChildren().addAll(logPanel, statusBar);
+        return bottomBox;
     }
 
     /**
@@ -608,6 +650,7 @@ public class AionMechanismExplorerStage extends Stage {
     private void loadData() {
         progressIndicator.setVisible(true);
         statusLabel.setText("正在扫描...");
+        logPanel.info("开始扫描Aion XML目录: " + aionXmlPath);
 
         CompletableFuture.runAsync(() -> {
             try {
@@ -621,13 +664,18 @@ public class AionMechanismExplorerStage extends Stage {
                     updateMechanismCards();
                     updateStatsCards();  // 更新统计卡片
                     progressIndicator.setVisible(false);
-                    statusLabel.setText(mechanismView.getStatistics().getSummary());
+
+                    String summary = mechanismView.getStatistics().getSummary();
+                    statusLabel.setText(summary);
+                    logPanel.success("扫描完成: " + summary);
+                    logPanel.info("检测到 " + mechanismView.getNonEmptyGroups().size() + " 个非空机制分类");
                 });
             } catch (Exception e) {
                 log.error("加载数据失败", e);
                 Platform.runLater(() -> {
                     progressIndicator.setVisible(false);
                     statusLabel.setText("加载失败: " + e.getMessage());
+                    logPanel.error("扫描失败: " + e.getMessage());
                 });
             }
         });
@@ -641,7 +689,10 @@ public class AionMechanismExplorerStage extends Stage {
 
         if (mechanismView == null) return;
 
-        List<AionMechanismView.MechanismGroup> groups = mechanismView.getNonEmptyGroups();
+        // 根据显示选项获取机制分组
+        List<AionMechanismView.MechanismGroup> groups = showAllCategories
+                ? mechanismView.getAllGroups()
+                : mechanismView.getNonEmptyGroups();
 
         // 按文件数量排序
         Collections.sort(groups, new Comparator<AionMechanismView.MechanismGroup>() {
@@ -670,66 +721,91 @@ public class AionMechanismExplorerStage extends Stage {
         card.setAlignment(Pos.CENTER);
         card.setUserData(category);
 
-        String normalStyle = String.format(
-                "-fx-background-color: white; " +
-                "-fx-border-color: %s; " +
-                "-fx-border-width: 2; " +
-                "-fx-border-radius: 6; " +
-                "-fx-background-radius: 6; " +
-                "-fx-cursor: hand;",
-                category.getColor());
+        boolean isEmpty = group.getFileCount() == 0;
+
+        // 空分类使用灰色边框和半透明效果
+        String normalStyle;
+        if (isEmpty) {
+            normalStyle = String.format(
+                    "-fx-background-color: #f8f9fa; " +
+                    "-fx-border-color: #dee2e6; " +
+                    "-fx-border-width: 2; " +
+                    "-fx-border-radius: 6; " +
+                    "-fx-background-radius: 6; " +
+                    "-fx-cursor: default; " +
+                    "-fx-opacity: 0.6;");
+        } else {
+            normalStyle = String.format(
+                    "-fx-background-color: white; " +
+                    "-fx-border-color: %s; " +
+                    "-fx-border-width: 2; " +
+                    "-fx-border-radius: 6; " +
+                    "-fx-background-radius: 6; " +
+                    "-fx-cursor: hand;",
+                    category.getColor());
+        }
         card.setStyle(normalStyle);
 
         Label iconLabel = new Label(category.getIcon());
-        iconLabel.setFont(Font.font("Consolas", FontWeight.BOLD, 18));
-        iconLabel.setStyle("-fx-text-fill: " + category.getColor() + ";");
+        iconLabel.setFont(Font.font("Segoe UI Emoji", 22));  // 使用Emoji字体，增大尺寸
+        iconLabel.setStyle("-fx-text-fill: " + (isEmpty ? "#adb5bd" : category.getColor()) + ";");
 
         Label nameLabel = new Label(category.getDisplayName());
         nameLabel.setFont(Font.font("Microsoft YaHei", FontWeight.BOLD, 11));
         nameLabel.setWrapText(true);
         nameLabel.setAlignment(Pos.CENTER);
+        if (isEmpty) {
+            nameLabel.setStyle("-fx-text-fill: #6c757d;");
+        }
 
-        Label countLabel = new Label(group.getFileCount() + " 个");
-        countLabel.setStyle("-fx-text-fill: #7f8c8d; -fx-font-size: 10px;");
+        Label countLabel = new Label(isEmpty ? "空" : group.getFileCount() + " 个");
+        countLabel.setStyle("-fx-text-fill: " + (isEmpty ? "#adb5bd" : "#7f8c8d") + "; -fx-font-size: 10px;");
 
         card.getChildren().addAll(iconLabel, nameLabel, countLabel);
 
-        // 点击事件
-        card.setOnMouseClicked(e -> {
-            if (e.getButton() == javafx.scene.input.MouseButton.PRIMARY) {
-                saveCurrentState();
-                selectMechanism(group);
-            }
-        });
+        // 点击事件（空分类不可点击）
+        if (!isEmpty) {
+            card.setOnMouseClicked(e -> {
+                if (e.getButton() == javafx.scene.input.MouseButton.PRIMARY) {
+                    saveCurrentState();
+                    selectMechanism(group);
+                }
+            });
 
-        // 右键菜单 - 批量操作
-        card.setOnContextMenuRequested(e -> {
-            showMechanismContextMenu(card, group, e.getScreenX(), e.getScreenY());
-            e.consume();
-        });
+            // 右键菜单 - 批量操作
+            card.setOnContextMenuRequested(e -> {
+                showMechanismContextMenu(card, group, e.getScreenX(), e.getScreenY());
+                e.consume();
+            });
+        }
 
-        // 悬停效果
-        String hoverStyle = String.format(
-                "-fx-background-color: %s22; " +
-                "-fx-border-color: %s; " +
-                "-fx-border-width: 2; " +
-                "-fx-border-radius: 6; " +
-                "-fx-background-radius: 6; " +
-                "-fx-cursor: hand;",
-                category.getColor(), category.getColor());
+        // 悬停效果（空分类没有悬停效果）
+        if (!isEmpty) {
+            String hoverStyle = String.format(
+                    "-fx-background-color: %s22; " +
+                    "-fx-border-color: %s; " +
+                    "-fx-border-width: 2; " +
+                    "-fx-border-radius: 6; " +
+                    "-fx-background-radius: 6; " +
+                    "-fx-cursor: hand;",
+                    category.getColor(), category.getColor());
 
-        card.setOnMouseEntered(e -> {
-            if (selectedCategory != category) {
-                card.setStyle(hoverStyle);
-            }
-        });
-        card.setOnMouseExited(e -> {
-            if (selectedCategory != category) {
-                card.setStyle(normalStyle);
-            }
-        });
+            card.setOnMouseEntered(e -> {
+                if (selectedCategory != category) {
+                    card.setStyle(hoverStyle);
+                }
+            });
+            card.setOnMouseExited(e -> {
+                if (selectedCategory != category) {
+                    card.setStyle(normalStyle);
+                }
+            });
+        }
 
-        Tooltip tooltip = new Tooltip(category.getDescription() + "\n文件数: " + group.getFileCount());
+        String tooltipText = isEmpty
+                ? category.getDescription() + "\n暂无文件"
+                : category.getDescription() + "\n文件数: " + group.getFileCount();
+        Tooltip tooltip = new Tooltip(tooltipText);
         Tooltip.install(card, tooltip);
 
         return card;
@@ -811,6 +887,7 @@ public class AionMechanismExplorerStage extends Stage {
         // 异步解析文件
         progressIndicator.setVisible(true);
         statusLabel.setText("正在解析: " + entry.getFileName());
+        logPanel.info("解析文件: " + entry.getFileName());
 
         CompletableFuture.runAsync(() -> {
             XmlFieldParser.ParseResult result = XmlFieldParser.parse(entry.getFile());
@@ -821,7 +898,19 @@ public class AionMechanismExplorerStage extends Stage {
                 updateReferenceBox(result);
                 updateDetailArea(entry, result);
                 progressIndicator.setVisible(false);
-                statusLabel.setText("已加载: " + entry.getFileName() + " (" + result.getFields().size() + " 个字段)");
+
+                if (result.hasError()) {
+                    statusLabel.setText("解析错误: " + entry.getFileName());
+                    logPanel.error("解析失败: " + result.getError());
+                } else {
+                    String msg = "已加载: " + entry.getFileName() + " (" + result.getFields().size() + " 个字段)";
+                    statusLabel.setText(msg);
+                    logPanel.success(msg);
+
+                    if (!result.getReferences().isEmpty()) {
+                        logPanel.info("发现关联系统: " + String.join(", ", result.getReferences()));
+                    }
+                }
             });
         });
     }
@@ -1024,6 +1113,34 @@ public class AionMechanismExplorerStage extends Stage {
             }
         });
 
+        // 机制分类管理组
+        MenuItem changeMechanismItem = new MenuItem("🎮 修改机制分类...");
+        changeMechanismItem.setOnAction(e -> {
+            AionMechanismView.FileEntry selected = fileListView.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                changeMechanismClassification(selected);
+            }
+        });
+
+        MenuItem excludeFileItem = new MenuItem("🚫 从机制中排除");
+        excludeFileItem.setOnAction(e -> {
+            AionMechanismView.FileEntry selected = fileListView.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                excludeFile(selected);
+            }
+        });
+
+        MenuItem resetAutoItem = new MenuItem("🔄 重置为自动检测");
+        resetAutoItem.setOnAction(e -> {
+            AionMechanismView.FileEntry selected = fileListView.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                resetToAutoDetection(selected);
+            }
+        });
+
+        MenuItem manageAllItem = new MenuItem("⚙️ 管理所有机制分类...");
+        manageAllItem.setOnAction(e -> openMechanismManager());
+
         // 组装菜单
         menu.getItems().addAll(
             openItem,
@@ -1035,7 +1152,13 @@ public class AionMechanismExplorerStage extends Stage {
             copyNameItem,
             new SeparatorMenuItem(),
             fileInfoItem,
-            exportXmlItem
+            exportXmlItem,
+            new SeparatorMenuItem(),
+            changeMechanismItem,
+            excludeFileItem,
+            resetAutoItem,
+            new SeparatorMenuItem(),
+            manageAllItem
         );
 
         // 动态启用/禁用
@@ -1500,11 +1623,14 @@ public class AionMechanismExplorerStage extends Stage {
                 try {
                     // Step 1: 生成DDL
                     dialog.logInfo(String.format("[%d/%d] 正在生成DDL: %s", index, fileCount, tableName));
-                    String ddl = red.jiuzhou.batch.BatchDdlGenerator.generateSingleDdlSync(xmlPath);
+                    String sqlFilePath = red.jiuzhou.batch.BatchDdlGenerator.generateSingleDdlSync(xmlPath);
 
-                    // Step 2: 执行DDL建表
+                    // Step 2: 读取SQL文件内容
+                    String ddl = FileUtil.readUtf8String(sqlFilePath);
+
+                    // Step 3: 执行DDL建表（拆分多条SQL语句逐条执行）
                     dialog.logInfo(String.format("[%d/%d] 正在建表: %s", index, fileCount, tableName));
-                    jdbcTemplate.execute(ddl);
+                    executeSqlScript(jdbcTemplate, ddl);
 
                     dialog.logSuccess(String.format("[%d/%d] %s - DDL生成并建表成功", index, fileCount, tableName));
                     dialog.updateProgress(index, true);
@@ -1775,6 +1901,37 @@ public class AionMechanismExplorerStage extends Stage {
     }
 
     /**
+     * 执行SQL脚本（支持多条语句）
+     *
+     * 将SQL脚本按分号拆分成多条语句，逐条执行。
+     * 这样可以正确处理包含多个DDL语句的SQL文件。
+     *
+     * @param jdbcTemplate JDBC模板
+     * @param sqlScript SQL脚本内容
+     * @throws Exception 如果执行过程中出现错误
+     */
+    private void executeSqlScript(org.springframework.jdbc.core.JdbcTemplate jdbcTemplate, String sqlScript) throws Exception {
+        if (sqlScript == null || sqlScript.trim().isEmpty()) {
+            return;
+        }
+
+        // 按分号拆分SQL语句
+        String[] statements = sqlScript.split(";");
+
+        for (String statement : statements) {
+            String trimmedStatement = statement.trim();
+
+            // 跳过空语句和注释
+            if (trimmedStatement.isEmpty() || trimmedStatement.startsWith("--") || trimmedStatement.startsWith("#")) {
+                continue;
+            }
+
+            // 执行单条SQL语句
+            jdbcTemplate.execute(trimmedStatement);
+        }
+    }
+
+    /**
      * 文件条目单元格
      */
     private class FileEntryCell extends ListCell<AionMechanismView.FileEntry> {
@@ -1808,5 +1965,190 @@ public class AionMechanismExplorerStage extends Stage {
                 setText(null);
             }
         }
+    }
+
+    /**
+     * 修改文件的机制分类
+     */
+    private void changeMechanismClassification(AionMechanismView.FileEntry fileEntry) {
+        ChoiceDialog<AionMechanismCategory> dialog = new ChoiceDialog<>();
+        dialog.setTitle("修改机制分类");
+        dialog.setHeaderText("文件: " + fileEntry.getFileName());
+        dialog.setContentText("选择新的机制分类:");
+
+        // 添加所有机制选项（排除OTHER）
+        for (AionMechanismCategory category : AionMechanismCategory.values()) {
+            if (category != AionMechanismCategory.OTHER) {
+                dialog.getItems().add(category);
+            }
+        }
+
+        // 设置当前分类为默认值
+        dialog.setSelectedItem(fileEntry.getDetectionResult().getCategory());
+
+        Optional<AionMechanismCategory> result = dialog.showAndWait();
+        result.ifPresent(category -> {
+            try {
+                MechanismOverrideConfig config = MechanismOverrideConfig.getInstance();
+                config.addOverride(fileEntry.getFileName(), category);
+                config.save();
+
+                Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                alert.setTitle("分类已更新");
+                alert.setHeaderText("机制分类已修改");
+                alert.setContentText(String.format(
+                        "文件: %s\n" +
+                        "新分类: %s\n\n" +
+                        "⚠️ 请重启应用以使更改生效",
+                        fileEntry.getFileName(),
+                        category.getDisplayName()
+                ));
+                alert.showAndWait();
+
+                statusLabel.setText(String.format("已将 %s 移动到 %s",
+                        fileEntry.getFileName(), category.getDisplayName()));
+
+            } catch (Exception e) {
+                log.error("修改分类失败", e);
+                Alert alert = new Alert(Alert.AlertType.ERROR);
+                alert.setTitle("修改失败");
+                alert.setHeaderText("无法修改机制分类");
+                alert.setContentText(e.getMessage());
+                alert.showAndWait();
+            }
+        });
+    }
+
+    /**
+     * 将文件从机制中排除
+     */
+    private void excludeFile(AionMechanismView.FileEntry fileEntry) {
+        Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
+        confirm.setTitle("确认排除");
+        confirm.setHeaderText("确定要从机制中排除此文件吗？");
+        confirm.setContentText(String.format(
+                "文件: %s\n" +
+                "当前分类: %s\n\n" +
+                "排除后，此文件将被标记为 OTHER（其他）分类",
+                fileEntry.getFileName(),
+                fileEntry.getDetectionResult().getCategory().getDisplayName()
+        ));
+
+        Optional<ButtonType> result = confirm.showAndWait();
+        if (result.isPresent() && result.get() == ButtonType.OK) {
+            try {
+                MechanismOverrideConfig config = MechanismOverrideConfig.getInstance();
+
+                // 如果已有手动覆盖，先删除
+                if (config.hasOverride(fileEntry.getFileName())) {
+                    config.removeOverride(fileEntry.getFileName());
+                }
+
+                // 添加到排除列表
+                config.addExcluded(fileEntry.getFileName());
+                config.save();
+
+                Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                alert.setTitle("已排除");
+                alert.setHeaderText("文件已从机制中排除");
+                alert.setContentText(String.format(
+                        "文件: %s\n\n" +
+                        "⚠️ 请重启应用以使更改生效",
+                        fileEntry.getFileName()
+                ));
+                alert.showAndWait();
+
+                statusLabel.setText(String.format("已排除文件: %s", fileEntry.getFileName()));
+
+            } catch (Exception e) {
+                log.error("排除文件失败", e);
+                Alert alert = new Alert(Alert.AlertType.ERROR);
+                alert.setTitle("排除失败");
+                alert.setHeaderText("无法排除文件");
+                alert.setContentText(e.getMessage());
+                alert.showAndWait();
+            }
+        }
+    }
+
+    /**
+     * 重置为自动检测
+     */
+    private void resetToAutoDetection(AionMechanismView.FileEntry fileEntry) {
+        MechanismOverrideConfig config = MechanismOverrideConfig.getInstance();
+
+        // 检查是否有手动配置
+        boolean hasOverride = config.hasOverride(fileEntry.getFileName());
+        boolean isExcluded = config.isExcluded(fileEntry.getFileName());
+
+        if (!hasOverride && !isExcluded) {
+            Alert alert = new Alert(Alert.AlertType.INFORMATION);
+            alert.setTitle("无需重置");
+            alert.setHeaderText("此文件当前使用自动检测");
+            alert.setContentText("没有找到手动覆盖配置");
+            alert.showAndWait();
+            return;
+        }
+
+        Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
+        confirm.setTitle("确认重置");
+        confirm.setHeaderText("确定要重置为自动检测吗？");
+
+        String configInfo = "";
+        if (hasOverride) {
+            configInfo += "手动覆盖: " + config.getOverride(fileEntry.getFileName()).getDisplayName() + "\n";
+        }
+        if (isExcluded) {
+            configInfo += "已排除\n";
+        }
+
+        confirm.setContentText(String.format(
+                "文件: %s\n" +
+                "当前配置:\n%s\n" +
+                "重置后将使用自动检测逻辑",
+                fileEntry.getFileName(),
+                configInfo
+        ));
+
+        Optional<ButtonType> result = confirm.showAndWait();
+        if (result.isPresent() && result.get() == ButtonType.OK) {
+            try {
+                if (hasOverride) {
+                    config.removeOverride(fileEntry.getFileName());
+                }
+                if (isExcluded) {
+                    config.removeExcluded(fileEntry.getFileName());
+                }
+                config.save();
+
+                Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                alert.setTitle("已重置");
+                alert.setHeaderText("已恢复自动检测");
+                alert.setContentText(String.format(
+                        "文件: %s\n\n" +
+                        "⚠️ 请重启应用以使更改生效",
+                        fileEntry.getFileName()
+                ));
+                alert.showAndWait();
+
+                statusLabel.setText(String.format("已重置: %s", fileEntry.getFileName()));
+
+            } catch (Exception e) {
+                log.error("重置失败", e);
+                Alert alert = new Alert(Alert.AlertType.ERROR);
+                alert.setTitle("重置失败");
+                alert.setHeaderText("无法重置配置");
+                alert.setContentText(e.getMessage());
+                alert.showAndWait();
+            }
+        }
+    }
+
+    /**
+     * 打开机制分类管理器
+     */
+    private void openMechanismManager() {
+        MechanismOverrideEditorDialog dialog = new MechanismOverrideEditorDialog();
+        dialog.show();
     }
 }

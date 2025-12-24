@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<toypet_warehouses>
+  <toypet_warehouse>
+    <id/>
+    <name/>
+    <warehouse_slot_type/>
+    <warehouse_slot_count/>
+  </toypet_warehouse>
+</toypet_warehouses>

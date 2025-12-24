@@ -1,0 +1,8 @@
+{
+	"file_path":"D:\\AionReal58\\AionMap\\XML\\instant_dungeon_define.xml",
+	"xml_root_tag":"instant_dungeon_defines",
+	"list":[],
+	"xml_item_tag":"instant_dungeon_define",
+	"table_name":"instant_dungeon_define",
+	"sql":"select * from instant_dungeon_define order by CAST(id AS UNSIGNED) ASC"
+}

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<devanion_skill_enchants>
+  <devanion_skill_enchant>
+    <id/>
+    <name/>
+    <material_grade/>
+    <material_special_grade/>
+    <reinforce_level_list>
+      <data>
+        <reinforce_level/>
+        <reinforce_rate/>
+        <reinforce_rate_bonus/>
+        <reinforce_penalty_type/>
+        <reinforce_fee/>
+      </data>
+    </reinforce_level_list>
+  </devanion_skill_enchant>
+</devanion_skill_enchants>

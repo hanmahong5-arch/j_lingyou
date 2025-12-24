@@ -21,20 +21,28 @@ import java.util.stream.Collectors;
 public class TabConfLoad {
     private static final Logger log = LoggerFactory.getLogger(TabConfLoad.class);
 
-    // 配置文件路径
-    public static String CONFIG_FILE_PATH;
+    // 配置文件路径（延迟初始化）
+    private static String CONFIG_FILE_PATH;
 
-    static {
-        ClassPathResource classPathResource = new ClassPathResource("application.yml");
-        try (InputStream inputStream = classPathResource.getInputStream()) {
-            CONFIG_FILE_PATH = classPathResource.getFile().getParent();
-            log.info("配置文件路径：{}",CONFIG_FILE_PATH);
-        } catch (IOException e) {
-            log.error("加载配置文件路径失败", e);
-            throw new RuntimeException("加载配置文件路径失败", e);
+    /**
+     * 获取配置文件路径（延迟初始化）
+     */
+    private static synchronized String getConfigFilePath() {
+        if (CONFIG_FILE_PATH == null) {
+            try {
+                ClassPathResource classPathResource = new ClassPathResource("application.yml");
+                try (InputStream inputStream = classPathResource.getInputStream()) {
+                    CONFIG_FILE_PATH = classPathResource.getFile().getParent();
+                    log.info("配置文件路径：{}", CONFIG_FILE_PATH);
+                }
+            } catch (IOException e) {
+                log.warn("无法加载配置文件路径，使用默认值", e);
+                // 使用默认路径
+                CONFIG_FILE_PATH = System.getProperty("user.dir") + File.separator + "target" + File.separator + "classes";
+            }
         }
+        return CONFIG_FILE_PATH;
     }
-
 
     /**
      * 根据表名获取表配置
@@ -48,7 +56,7 @@ public class TabConfLoad {
             throw new IllegalArgumentException("表名不能为空");
         }
         if (tabFilePath == null || tabFilePath.isEmpty()) {
-            throw new IllegalArgumentException("表名不能为空");
+            throw new IllegalArgumentException("配置文件路径不能为空");
         }
         log.info("tabFilePath: {}", tabFilePath);
         String fPath = PathUtil.getConfPath(FileUtil.getParent(tabFilePath, 1));

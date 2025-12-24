@@ -17,6 +17,8 @@ import org.slf4j.LoggerFactory;
 
 import red.jiuzhou.analysis.aion.AionMechanismCategory;
 import red.jiuzhou.analysis.aion.MechanismFileMapper;
+import red.jiuzhou.analysis.aion.MechanismOverrideConfig;
+import red.jiuzhou.ui.MechanismOverrideEditorDialog;
 
 import java.io.File;
 import java.util.*;
@@ -76,6 +78,8 @@ public class SearchableTreeView<T> extends VBox {
     private Consumer<TreeItem<T>> onItemOpen;
     private Function<TreeItem<T>, String> pathResolver;
     private Runnable onRefresh;
+    private Consumer<String> onBatchGenerateDdl;  // 批量生成DDL回调
+    private Consumer<String> onBatchImportXml;    // 批量导入XML回调
 
     // 机制过滤
     private MechanismTagBar mechanismTagBar;
@@ -364,6 +368,25 @@ public class SearchableTreeView<T> extends VBox {
             }
         });
 
+        // 数据操作组
+        MenuItem generateDdlItem = new MenuItem("⚙️ 生成DDL");
+        generateDdlItem.setOnAction(e -> {
+            TreeItem<T> selected = treeView.getSelectionModel().getSelectedItem();
+            if (selected != null && pathResolver != null && onBatchGenerateDdl != null) {
+                String path = pathResolver.apply(selected);
+                onBatchGenerateDdl.accept(path);
+            }
+        });
+
+        MenuItem importXmlItem = new MenuItem("📥 导入到数据库");
+        importXmlItem.setOnAction(e -> {
+            TreeItem<T> selected = treeView.getSelectionModel().getSelectedItem();
+            if (selected != null && pathResolver != null && onBatchImportXml != null) {
+                String path = pathResolver.apply(selected);
+                onBatchImportXml.accept(path);
+            }
+        });
+
         // 搜索组
         MenuItem searchItem = new MenuItem("🔍 搜索... (Ctrl+F)");
         searchItem.setOnAction(e -> focusSearchField());
@@ -376,30 +399,97 @@ public class SearchableTreeView<T> extends VBox {
             }
         });
 
-        // 组装菜单
+        // 机制分类管理组
+        MenuItem changeMechanismItem = new MenuItem("🎮 修改机制分类...");
+        changeMechanismItem.setOnAction(e -> {
+            TreeItem<T> selected = treeView.getSelectionModel().getSelectedItem();
+            if (selected != null && pathResolver != null) {
+                String path = pathResolver.apply(selected);
+                File file = new File(path);
+                if (file.isFile() && file.getName().toLowerCase().endsWith(".xml")) {
+                    changeMechanismClassification(file.getName());
+                }
+            }
+        });
+
+        MenuItem excludeFileItem = new MenuItem("🚫 从机制中排除");
+        excludeFileItem.setOnAction(e -> {
+            TreeItem<T> selected = treeView.getSelectionModel().getSelectedItem();
+            if (selected != null && pathResolver != null) {
+                String path = pathResolver.apply(selected);
+                File file = new File(path);
+                if (file.isFile() && file.getName().toLowerCase().endsWith(".xml")) {
+                    excludeXmlFile(file.getName());
+                }
+            }
+        });
+
+        MenuItem resetAutoItem = new MenuItem("🔄 重置为自动检测");
+        resetAutoItem.setOnAction(e -> {
+            TreeItem<T> selected = treeView.getSelectionModel().getSelectedItem();
+            if (selected != null && pathResolver != null) {
+                String path = pathResolver.apply(selected);
+                File file = new File(path);
+                if (file.isFile() && file.getName().toLowerCase().endsWith(".xml")) {
+                    resetToAutoDetection(file.getName());
+                }
+            }
+        });
+
+        MenuItem manageAllItem = new MenuItem("⚙️ 管理所有机制分类...");
+        manageAllItem.setOnAction(e -> openMechanismManager());
+
+        // 组装菜单（优化结构：核心数据操作前置）
         contextMenu.getItems().addAll(
             openItem,
             openFolderItem,
             openExternalItem,
             new SeparatorMenuItem(),
+            generateDdlItem,     // 数据操作前置
+            importXmlItem,
+            new SeparatorMenuItem(),
             expandItem,
             collapseItem,
-            expandAllItem,
-            collapseAllItem,
             new SeparatorMenuItem(),
             copyPathItem,
             copyNameItem,
             new SeparatorMenuItem(),
+            changeMechanismItem,
+            excludeFileItem,
+            resetAutoItem,
+            new SeparatorMenuItem(),
             searchItem,
-            refreshItem
+            refreshItem,
+            new SeparatorMenuItem(),
+            manageAllItem
         );
 
-        // 动态启用/禁用菜单项
+        // 动态启用/禁用菜单项并调整文案
         contextMenu.setOnShowing(e -> {
             TreeItem<T> selected = treeView.getSelectionModel().getSelectedItem();
             boolean hasSelection = selected != null;
             boolean isLeaf = hasSelection && selected.isLeaf();
             boolean hasPath = hasSelection && pathResolver != null;
+
+            // 判断是文件还是目录
+            boolean isDirectory = false;
+            if (hasPath) {
+                String path = pathResolver.apply(selected);
+                File file = new File(path);
+                isDirectory = file.isDirectory();
+            }
+
+            // 根据文件/目录类型动态调整菜单文本
+            if (isDirectory) {
+                generateDdlItem.setText("⚙️ 生成目录DDL...");
+                importXmlItem.setText("📥 批量导入到数据库...");
+            } else if (isLeaf) {
+                generateDdlItem.setText("⚙️ 生成DDL");
+                importXmlItem.setText("📥 导入到数据库");
+            } else {
+                generateDdlItem.setText("⚙️ 生成DDL");
+                importXmlItem.setText("📥 导入到数据库");
+            }
 
             openItem.setDisable(!hasSelection);
             openFolderItem.setDisable(!hasPath);
@@ -408,6 +498,8 @@ public class SearchableTreeView<T> extends VBox {
             collapseItem.setDisable(!hasSelection || isLeaf);
             copyPathItem.setDisable(!hasPath);
             copyNameItem.setDisable(!hasSelection);
+            generateDdlItem.setDisable(!hasPath || onBatchGenerateDdl == null);
+            importXmlItem.setDisable(!hasPath || onBatchImportXml == null);
             refreshItem.setDisable(onRefresh == null);
         });
 
@@ -870,6 +962,20 @@ public class SearchableTreeView<T> extends VBox {
     }
 
     /**
+     * 设置批量生成DDL回调
+     */
+    public void setOnBatchGenerateDdl(Consumer<String> handler) {
+        this.onBatchGenerateDdl = handler;
+    }
+
+    /**
+     * 设置批量导入XML回调
+     */
+    public void setOnBatchImportXml(Consumer<String> handler) {
+        this.onBatchImportXml = handler;
+    }
+
+    /**
      * 获取搜索历史
      */
     public ObservableList<String> getSearchHistory() {
@@ -1043,6 +1149,151 @@ public class SearchableTreeView<T> extends VBox {
         MechanismFileMapper.getInstance().scanDirectory(rootPath);
         if (mechanismTagBar != null && mechanismFilterEnabled) {
             mechanismTagBar.refreshTags();
+        }
+    }
+
+    // ==================== 机制分类管理方法 ====================
+
+    /**
+     * 修改文件的机制分类
+     */
+    private void changeMechanismClassification(String fileName) {
+        ChoiceDialog<AionMechanismCategory> dialog = new ChoiceDialog<AionMechanismCategory>();
+        dialog.setTitle("修改机制分类");
+        dialog.setHeaderText("文件: " + fileName);
+        dialog.setContentText("选择新的机制分类:");
+
+        // 添加所有机制分类（除了OTHER）
+        for (AionMechanismCategory category : AionMechanismCategory.values()) {
+            if (category != AionMechanismCategory.OTHER) {
+                dialog.getItems().add(category);
+            }
+        }
+
+        // 获取当前分类并设置为默认选项
+        AionMechanismCategory currentCategory = MechanismFileMapper.detectMechanismStatic(fileName);
+        if (currentCategory != null && currentCategory != AionMechanismCategory.OTHER) {
+            dialog.setSelectedItem(currentCategory);
+        }
+
+        Optional<AionMechanismCategory> result = dialog.showAndWait();
+        result.ifPresent(category -> {
+            try {
+                MechanismOverrideConfig config = MechanismOverrideConfig.getInstance();
+                config.addOverride(fileName, category);
+                config.save();
+
+                Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                alert.setTitle("分类已更新");
+                alert.setHeaderText("机制分类已修改");
+                alert.setContentText(String.format(
+                        "文件: %s\n新分类: %s\n\n⚠️ 请重启应用以使更改生效",
+                        fileName, category.getDisplayName()));
+                alert.showAndWait();
+
+                log.info("已修改文件分类: {} -> {}", fileName, category.getDisplayName());
+            } catch (Exception e) {
+                log.error("修改分类失败", e);
+                Alert alert = new Alert(Alert.AlertType.ERROR);
+                alert.setTitle("修改失败");
+                alert.setHeaderText("无法修改机制分类");
+                alert.setContentText(e.getMessage());
+                alert.showAndWait();
+            }
+        });
+    }
+
+    /**
+     * 从机制中排除文件
+     */
+    private void excludeXmlFile(String fileName) {
+        Alert confirmAlert = new Alert(Alert.AlertType.CONFIRMATION);
+        confirmAlert.setTitle("确认排除");
+        confirmAlert.setHeaderText("文件: " + fileName);
+        confirmAlert.setContentText("确定要从所有机制分类中排除此文件吗？\n排除后，该文件将不再出现在任何机制分类中。");
+
+        Optional<ButtonType> confirmation = confirmAlert.showAndWait();
+        if (confirmation.isPresent() && confirmation.get() == ButtonType.OK) {
+            try {
+                MechanismOverrideConfig config = MechanismOverrideConfig.getInstance();
+                config.addExcluded(fileName);
+                config.save();
+
+                Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                alert.setTitle("已排除文件");
+                alert.setHeaderText("文件已从机制分类中排除");
+                alert.setContentText(String.format(
+                        "文件: %s\n\n⚠️ 请重启应用以使更改生效",
+                        fileName));
+                alert.showAndWait();
+
+                log.info("已排除文件: {}", fileName);
+            } catch (Exception e) {
+                log.error("排除文件失败", e);
+                Alert alert = new Alert(Alert.AlertType.ERROR);
+                alert.setTitle("排除失败");
+                alert.setHeaderText("无法排除文件");
+                alert.setContentText(e.getMessage());
+                alert.showAndWait();
+            }
+        }
+    }
+
+    /**
+     * 重置为自动检测
+     */
+    private void resetToAutoDetection(String fileName) {
+        Alert confirmAlert = new Alert(Alert.AlertType.CONFIRMATION);
+        confirmAlert.setTitle("确认重置");
+        confirmAlert.setHeaderText("文件: " + fileName);
+        confirmAlert.setContentText("确定要移除此文件的手动分类设置吗？\n重置后，系统将使用自动检测来确定文件的机制分类。");
+
+        Optional<ButtonType> confirmation = confirmAlert.showAndWait();
+        if (confirmation.isPresent() && confirmation.get() == ButtonType.OK) {
+            try {
+                MechanismOverrideConfig config = MechanismOverrideConfig.getInstance();
+                config.removeOverride(fileName);
+                config.removeExcluded(fileName);
+                config.save();
+
+                // 检测自动分类
+                AionMechanismCategory autoCategory = MechanismFileMapper.detectMechanismStatic(fileName);
+
+                Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                alert.setTitle("已重置分类");
+                alert.setHeaderText("文件已重置为自动检测");
+                alert.setContentText(String.format(
+                        "文件: %s\n自动检测分类: %s\n\n⚠️ 请重启应用以使更改生效",
+                        fileName, autoCategory.getDisplayName()));
+                alert.showAndWait();
+
+                log.info("已重置文件分类: {} -> 自动检测({})", fileName, autoCategory.getDisplayName());
+            } catch (Exception e) {
+                log.error("重置分类失败", e);
+                Alert alert = new Alert(Alert.AlertType.ERROR);
+                alert.setTitle("重置失败");
+                alert.setHeaderText("无法重置分类");
+                alert.setContentText(e.getMessage());
+                alert.showAndWait();
+            }
+        }
+    }
+
+    /**
+     * 打开机制管理器
+     */
+    private void openMechanismManager() {
+        try {
+            MechanismOverrideEditorDialog dialog = new MechanismOverrideEditorDialog();
+            dialog.show();
+            log.info("打开机制分类管理器");
+        } catch (Exception e) {
+            log.error("打开管理器失败", e);
+            Alert alert = new Alert(Alert.AlertType.ERROR);
+            alert.setTitle("打开失败");
+            alert.setHeaderText("无法打开机制分类管理器");
+            alert.setContentText(e.getMessage());
+            alert.showAndWait();
         }
     }
 }

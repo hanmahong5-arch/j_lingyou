@@ -28,6 +28,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.util.StringUtils;
 import red.jiuzhou.analysis.aion.IdNameResolver;
 import red.jiuzhou.dbxml.*;
+import red.jiuzhou.ui.components.OperationLogPanel;
 import red.jiuzhou.util.DatabaseUtil;
 import red.jiuzhou.util.JSONRecord;
 import red.jiuzhou.util.YamlUtils;
@@ -73,6 +74,9 @@ public class PaginatedTable{
 
     private List<String> filterList;
 
+    // 操作日志面板
+    private OperationLogPanel logPanel;
+
     public VBox createVbox(TabPane tabPane, Tab tab) {
         long startTime = System.currentTimeMillis();
         log.info("start time {}", startTime);
@@ -91,6 +95,7 @@ public class PaginatedTable{
                 totalRows = DatabaseUtil.getTotalRowCount(tabName  + buildWhereClause());
             }catch (Exception e) {
                 log.error("获取总行数失败: {}", e.getMessage());
+                // 延迟初始化logPanel时不能在这里调用，因为此时logPanel还未创建
             }
 
             // 创建 TableView
@@ -138,7 +143,10 @@ public class PaginatedTable{
             // --- 新增：带有字段选择的 XML 导入按钮 ---
             Button xmlToDbWithField = new Button("xmlToDbWithField");
             // 点击时调用
-            xmlToDbWithField.setOnAction(e -> showColumnSelectionForXmlToDb(tab.getUserData() + ".xml"));
+            xmlToDbWithField.setOnAction(e -> {
+                String filePath = ensureXmlExtension((String) tab.getUserData());
+                showColumnSelectionForXmlToDb(filePath);
+            });
 
             //Button choosexmlToDb = new Button("chooseXmlToDb");
             Button dbToXml = new Button("dbToXml");
@@ -147,18 +155,27 @@ public class PaginatedTable{
                 ddlBun.setDisable(true);
             }
             ddlBun.setOnAction(e -> {
-                String selectedFile = tab.getUserData() + ".xml";
+                // 获取文件路径，确保有.xml扩展名（但不重复添加）
+                String userData = (String) tab.getUserData();
+                String selectedFile = userData;
+                if (selectedFile != null && !selectedFile.toLowerCase().endsWith(".xml")) {
+                    selectedFile = selectedFile + ".xml";
+                }
 
                 log.info("选择文件：{}", selectedFile);
-                String sqlDdlFilePath = XmlProcess.parseXmlFile(selectedFile);
-                //执行sql文件
-                log.info("执行sql文件：{}", sqlDdlFilePath);
+                logPanel.info("开始生成DDL，文件: " + selectedFile);
                 try {
+                    String sqlDdlFilePath = XmlProcess.parseXmlFile(selectedFile);
+                    //执行sql文件
+                    log.info("执行sql文件：{}", sqlDdlFilePath);
+                    logPanel.info("执行SQL脚本: " + sqlDdlFilePath);
                     DatabaseUtil.executeSqlScript(sqlDdlFilePath);
+                    log.info("生成DDL成功");
+                    logPanel.success("DDL生成并建表成功");
                 } catch (SQLException ex) {
+                    logPanel.error("DDL生成失败", ex);
                     throw new RuntimeException(ex);
                 }
-                log.info("生成DDL成功");
             });
             // 绑定查询功能
             searchButton.setOnAction(e -> searchById());
@@ -169,9 +186,17 @@ public class PaginatedTable{
                 pagination.setPageCount(pageCount);
                 pagination.setCurrentPageIndex(0);
                 pagination.setPageFactory(this::createPage);
+                logPanel.info("已清除所有筛选条件，总行数: " + totalRows);
             });
-            xmlToDb.setOnAction(e -> xmlToDb(tab.getUserData() + ".xml", null, null));
-            dbToXml.setOnAction(e -> dbToXml());
+            xmlToDb.setOnAction(e -> {
+                String filePath = ensureXmlExtension((String) tab.getUserData());
+                logPanel.info("开始导入XML到数据库: " + filePath);
+                xmlToDb(filePath, null, null);
+            });
+            dbToXml.setOnAction(e -> {
+                logPanel.info("开始导出数据库到XML");
+                dbToXml();
+            });
             progressLabel = new Label("");
 
             // 按钮区域
@@ -191,13 +216,35 @@ public class PaginatedTable{
             pagination = new Pagination(pageCount, 0);
             pagination.setMaxPageIndicatorCount(10);
             pagination.setPageFactory(this::createPage);
+
+            // 创建操作日志面板
+            logPanel = new OperationLogPanel();
+            logPanel.setLogAreaHeight(250); // 设置初始高度，能显示至少10条日志
+
             VBox rightControl = new VBox();
             rightControl.getChildren().add(tabPane);
             // 添加到右侧面板
             rightControl.getChildren().addAll(searchBox, progressBox);
             rightControl.getChildren().add(pagination);
+            rightControl.getChildren().add(logPanel); // 添加日志面板
             //VBox vBox = new VBox(searchBox, progressBox, pagination);
             log.info("time {}", System.currentTimeMillis() - startTime);
+
+            // 添加初始化日志
+            logPanel.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            logPanel.success("数据页签已加载完成");
+            logPanel.info("表名: " + tabName);
+            logPanel.info("总行数: " + totalRows);
+            logPanel.info("文件路径: " + tabFilePath);
+            if ("world".equals(tabName) && mapType != null) {
+                logPanel.info("地图类型: " + mapType);
+            }
+            logPanel.info("页面大小: " + DatabaseUtil.ROWS_PER_PAGE + " 行/页");
+            logPanel.info("总页数: " + pageCount);
+            logPanel.info("加载耗时: " + (System.currentTimeMillis() - startTime) + " ms");
+            logPanel.success("系统就绪，可以开始操作");
+            logPanel.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
             return rightControl;
         } catch (Exception e) {
             showError(e.getMessage());
@@ -214,6 +261,9 @@ public class PaginatedTable{
                     .queryForList("SELECT * FROM " + tabName + " limit 15");
         } catch (Exception e) {
             log.error("获取数据失败:{}", e.getMessage());
+            if (logPanel != null) {
+                logPanel.error("获取表数据失败: " + e.getMessage());
+            }
             //showError(e.getMessage());
             //throw new RuntimeException(e);
         }
@@ -390,18 +440,24 @@ public class PaginatedTable{
         String id = searchField.getText().trim();
         if (id.isEmpty()) {
             showError("请输入有效的 ID 进行查询！");
+            logPanel.warning("搜索失败: 请输入有效的ID");
             return;
         }
 
         String sql = "SELECT * FROM " + tabName + " WHERE id = ?";
         List<Map<String, Object>> result;
         try {
+            logPanel.info("正在搜索ID: " + id);
             result = DatabaseUtil.getJdbcTemplate().queryForList(sql, id);
             if (result.isEmpty()) {
                 showError("未找到对应 ID 的数据！");
+                logPanel.warning("未找到ID为 " + id + " 的数据");
+            } else {
+                logPanel.success("找到 " + result.size() + " 条记录，ID: " + id);
             }
         } catch (Exception e) {
             showError("查询失败: " + e.getMessage());
+            logPanel.error("查询失败: " + e.getMessage());
             return;
         }
 
@@ -417,6 +473,7 @@ public class PaginatedTable{
         tabIsExist();
         if ("world".equals(tabName)) {
             if (mapType == null || mapType.trim().isEmpty()) {
+                logPanel.error("请选择地图类型");
                 throw new RuntimeException("请选择地图类型");
             }
         }
@@ -424,6 +481,7 @@ public class PaginatedTable{
 
         executor.execute(() -> {
             updateProgress(0, "导入数据中...");
+            logPanel.info("XML导入任务开始，文件: " + filePath);
             XmlToDbGenerator xmlToDbGenerator = new XmlToDbGenerator(tabName, mapType, filePath, tabFilePath);
 
             AtomicReference<Throwable> threadException = new AtomicReference<>();
@@ -455,6 +513,7 @@ public class PaginatedTable{
                 String msg = threadException.get().getMessage();
 
                 log.error("导入失败: " + JSONRecord.getErrorMsg(threadException.get()));
+                logPanel.error("XML导入失败: " + threadException.get().getMessage());
                 Pattern colPattern = Pattern.compile("Data too long for column '(.+?)'");
                 Pattern tablePattern = Pattern.compile("(?i)insert\\s+into\\s+[`]?([a-zA-Z0-9_]+)[`]?");
 
@@ -476,6 +535,7 @@ public class PaginatedTable{
 
                     String alterSql = String.format("ALTER TABLE `%s` MODIFY COLUMN `%s` VARCHAR(%d)", realTableName, columnName, newLength);
                     System.out.println("字段过长，尝试修改字段长度并重试：" + alterSql);
+                    logPanel.warning("字段过长，自动扩展字段: " + columnName + " -> " + newLength);
                     DatabaseUtil.getJdbcTemplate().execute(alterSql);
                     // 不跳过当前记录，重试
                 }
@@ -484,6 +544,7 @@ public class PaginatedTable{
             }
 
             updateProgress(1, "导入完成");
+            logPanel.success("XML导入完成: " + filePath);
             Platform.runLater(progressStage::close);
         });
     }
@@ -505,12 +566,14 @@ public class PaginatedTable{
         tabIsExist();
         if("world".equals(tabName)){
             if(mapType == null || mapType.trim().isEmpty()){
+                logPanel.error("请选择地图类型");
                 throw new RuntimeException("请选择地图类型");
             }
         }
         Stage progressStage = createProgressDialog("正在导出数据至XML...");
         executor.execute(() -> {
             updateProgress(0, "导出数据中...");
+            logPanel.info("数据库导出任务开始，表: " + tabName);
             Thread importThread = null;
             if("world".equals(tabName)){
                 WorldDbToXmlGenerator dbToXmlGenerator = new WorldDbToXmlGenerator(tabName, mapType, tabFilePath);
@@ -526,6 +589,7 @@ public class PaginatedTable{
                             break;
                         }
                     } catch (InterruptedException e) {
+                        logPanel.error("导出任务被中断", e);
                         throw new RuntimeException(e);
                     }
                 }
@@ -542,6 +606,7 @@ public class PaginatedTable{
                             break;
                         }
                     } catch (InterruptedException e) {
+                        logPanel.error("导出任务被中断", e);
                         throw new RuntimeException(e);
                     }
                 }
@@ -549,6 +614,7 @@ public class PaginatedTable{
 
 
             updateProgress(1, "导出完成");
+            logPanel.success("数据库导出完成，表: " + tabName);
             Platform.runLater(progressStage::close);
         });
     }
@@ -603,11 +669,30 @@ public class PaginatedTable{
         } catch (Exception e) {
             String message = e.getMessage();
             if(message.contains("表配置文件不存在")){
-                message = "该表配置不存在，请先执行“DDL生成”";
+                message = "该表配置不存在，请先执行\"DDL生成\"";
             }
             showError(message);
             throw new RuntimeException(message);
         }
+    }
+
+    /**
+     * 确保文件路径有.xml扩展名（但不会重复添加）
+     * 遵循XML-Only设计原则：只处理XML文件，其他文件被忽略
+     *
+     * @param filePath 文件路径
+     * @return 带有.xml扩展名的文件路径
+     */
+    private String ensureXmlExtension(String filePath) {
+        if (filePath == null || filePath.isEmpty()) {
+            return filePath;
+        }
+        // 如果已经有.xml扩展名，直接返回
+        if (filePath.toLowerCase().endsWith(".xml")) {
+            return filePath;
+        }
+        // 添加.xml扩展名
+        return filePath + ".xml";
     }
 
     /**

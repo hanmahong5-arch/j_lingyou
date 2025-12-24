@@ -48,6 +48,9 @@ public class MechanismTagBar extends VBox {
     /** 展开/折叠状态 */
     private boolean expanded = false;
 
+    /** 显示所有机制（30种）还是只显示常用机制（12种） */
+    private boolean showAllMechanisms = false;
+
     /** 常用机制数量（折叠时显示） */
     private static final int COLLAPSED_COUNT = 8;
 
@@ -174,6 +177,26 @@ public class MechanismTagBar extends VBox {
         // 全部按钮
         allButton = createAllButton();
 
+        // 显示所有机制切换按钮
+        Button toggleAllBtn = new Button("常用(12)");
+        toggleAllBtn.setStyle(
+            "-fx-background-color: #8e44ad;" +
+            "-fx-text-fill: white;" +
+            "-fx-font-size: 10px;" +
+            "-fx-cursor: hand;" +
+            "-fx-padding: 4 8;" +
+            "-fx-background-radius: 4;"
+        );
+        toggleAllBtn.setOnAction(e -> {
+            showAllMechanisms = !showAllMechanisms;
+            if (showAllMechanisms) {
+                toggleAllBtn.setText("全部(30)");
+            } else {
+                toggleAllBtn.setText("常用(12)");
+            }
+            refreshTags();
+        });
+
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
@@ -187,7 +210,7 @@ public class MechanismTagBar extends VBox {
         );
         moreButton.setOnAction(e -> toggleExpand());
 
-        titleRow.getChildren().addAll(titleLabel, allButton, spacer, moreButton);
+        titleRow.getChildren().addAll(titleLabel, allButton, toggleAllBtn, spacer, moreButton);
 
         return titleRow;
     }
@@ -245,7 +268,10 @@ public class MechanismTagBar extends VBox {
         tagButtons.clear();
 
         MechanismFileMapper mapper = MechanismFileMapper.getInstance();
-        List<AionMechanismCategory> mechanisms = mapper.getCommonMechanisms();
+        // 根据显示选项获取机制列表
+        List<AionMechanismCategory> mechanisms = showAllMechanisms
+                ? mapper.getAllMechanisms()
+                : mapper.getCommonMechanisms();
         Map<AionMechanismCategory, Integer> stats = mapper.getMechanismStats();
 
         int displayCount = expanded ? mechanisms.size() : Math.min(COLLAPSED_COUNT, mechanisms.size());

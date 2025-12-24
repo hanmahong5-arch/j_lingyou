@@ -229,7 +229,7 @@ public class BatchOperationDialog extends Stage {
         if (file.isDirectory()) {
             BatchDdlGenerator.generateDirectoryDdl(path, recursive, callback);
         } else {
-            BatchDdlGenerator.generateBatchDdl(List.of(file), callback);
+            BatchDdlGenerator.generateBatchDdl(java.util.Collections.singletonList(file), callback);
         }
     }
 
@@ -291,7 +291,7 @@ public class BatchOperationDialog extends Stage {
         if (file.isDirectory()) {
             BatchXmlImporter.importDirectoryXml(path, recursive, options, callback);
         } else {
-            BatchXmlImporter.importBatchXml(List.of(file), options, callback);
+            BatchXmlImporter.importBatchXml(java.util.Collections.singletonList(file), options, callback);
         }
     }
 }

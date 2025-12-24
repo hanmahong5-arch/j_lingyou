@@ -1,0 +1,8 @@
+{
+	"file_path":"D:\\AionReal58\\AionMap\\XML\\pvp_world_adjust.xml",
+	"xml_root_tag":"pvp_world_adjusts",
+	"list":[],
+	"xml_item_tag":"pvp_world_adjust",
+	"table_name":"pvp_world_adjust",
+	"sql":"select * from pvp_world_adjust order by CAST(id AS UNSIGNED) ASC"
+}

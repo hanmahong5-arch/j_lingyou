@@ -188,6 +188,14 @@ public class HotkeyManager {
         scene.setOnKeyPressed(event -> {
             if (!enabled) return;
 
+            // 忽略单独按下修饰键的情况（避免"Key code must not match modifier key"错误）
+            KeyCode code = event.getCode();
+            if (code == KeyCode.SHIFT || code == KeyCode.CONTROL || code == KeyCode.ALT ||
+                code == KeyCode.META || code == KeyCode.WINDOWS || code == KeyCode.COMMAND ||
+                code == KeyCode.SHORTCUT) {
+                return;
+            }
+
             // 构建按键组合
             KeyCombination.ModifierValue ctrl = event.isControlDown() ?
                     KeyCombination.ModifierValue.DOWN : KeyCombination.ModifierValue.UP;
@@ -196,7 +204,7 @@ public class HotkeyManager {
             KeyCombination.ModifierValue alt = event.isAltDown() ?
                     KeyCombination.ModifierValue.DOWN : KeyCombination.ModifierValue.UP;
 
-            KeyCodeCombination pressed = new KeyCodeCombination(event.getCode(), shift, ctrl, alt,
+            KeyCodeCombination pressed = new KeyCodeCombination(code, shift, ctrl, alt,
                     KeyCombination.ModifierValue.UP, KeyCombination.ModifierValue.UP);
 
             // 先检查场景级别快捷键

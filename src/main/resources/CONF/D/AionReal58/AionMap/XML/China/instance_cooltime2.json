@@ -1,0 +1,8 @@
+{
+	"file_path":"D:\\AionReal58\\AionMap\\XML\\China\\instance_cooltime2.xml",
+	"xml_root_tag":"instance_cooltime2s",
+	"list":[],
+	"xml_item_tag":"instance_cooltime2",
+	"table_name":"instance_cooltime2",
+	"sql":"select * from instance_cooltime2 order by CAST(id AS UNSIGNED) ASC"
+}

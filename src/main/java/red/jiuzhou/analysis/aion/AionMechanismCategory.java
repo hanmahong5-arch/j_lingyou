@@ -200,40 +200,42 @@ public enum AionMechanismCategory {
     }
 
     /**
-     * 获取分类的图标字符（用于UI显示）
+     * 获取分类的图标（Emoji图标，用于UI显示）
+     *
+     * 使用Emoji图标代替字母，更直观且无重复问题
      */
     public String getIcon() {
         switch (this) {
-            case ABYSS: return "A";
-            case SKILL: return "S";
-            case ITEM: return "I";
-            case NPC: return "N";
-            case NPC_AI: return "AI";
-            case QUEST: return "Q";
-            case INSTANCE: return "D";
-            case SHOP: return "$";
-            case LUNA: return "L";
-            case HOUSING: return "H";
-            case PET: return "P";
-            case CRAFT: return "C";
-            case DROP: return "D";
-            case ENCHANT: return "E";
-            case STIGMA_TRANSFORM: return "T";
-            case PLAYER_GROWTH: return "G";
-            case TITLE: return "T";
-            case LEGION: return "L";
-            case PVP_RANKING: return "R";
-            case PORTAL: return "P";
-            case TIME_EVENT: return "E";
-            case CLIENT_STRINGS: return "S";
-            case ANIMATION: return "A";
-            case ANIMATION_MARKERS: return "M";
-            case CHARACTER_PRESET: return "C";
-            case SUBZONE: return "Z";
-            case ID_MAPPING: return "#";
-            case GAME_CONFIG: return "C";
-            case GOTCHA: return "G";
-            default: return "?";
+            case ABYSS: return "⚔️";          // 深渊/战斗
+            case SKILL: return "✨";          // 技能/魔法
+            case ITEM: return "🎒";           // 物品/背包
+            case NPC: return "👤";            // NPC角色
+            case NPC_AI: return "🤖";         // AI系统
+            case QUEST: return "📜";          // 任务/卷轴
+            case INSTANCE: return "🏰";       // 副本/城堡
+            case SHOP: return "🛒";           // 商店
+            case LUNA: return "🌙";           // Luna月亮
+            case HOUSING: return "🏠";        // 房屋
+            case PET: return "🐾";            // 宠物
+            case CRAFT: return "🔨";          // 制作/锻造
+            case DROP: return "💎";           // 掉落/宝石
+            case ENCHANT: return "⚡";        // 强化/闪电
+            case STIGMA_TRANSFORM: return "🔮"; // 烙印/变身
+            case PLAYER_GROWTH: return "📈";  // 成长/图表
+            case TITLE: return "🏆";          // 称号/奖杯
+            case LEGION: return "🛡️";         // 军团/盾牌
+            case PVP_RANKING: return "🥇";    // 排名/奖牌
+            case PORTAL: return "🌀";         // 传送门
+            case TIME_EVENT: return "⏰";     // 时间事件
+            case CLIENT_STRINGS: return "📝"; // 字符串/文本
+            case ANIMATION: return "🎬";      // 动画
+            case ANIMATION_MARKERS: return "🎯"; // 动画标记
+            case CHARACTER_PRESET: return "👔"; // 角色预设
+            case SUBZONE: return "🗺️";        // 区域地图
+            case ID_MAPPING: return "🔢";     // ID映射
+            case GAME_CONFIG: return "⚙️";    // 配置/齿轮
+            case GOTCHA: return "🎰";         // 抽卡/老虎机
+            default: return "📄";             // 其他/文档
         }
     }
 

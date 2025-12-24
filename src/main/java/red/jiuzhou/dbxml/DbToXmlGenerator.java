@@ -138,10 +138,11 @@ public class DbToXmlGenerator {
                         continue;
                     }
                     if (itemMap.get(key) != null) {
+                        String value = String.valueOf(itemMap.get(key));
                         if(key.startsWith("_attr_")){
-                            element.addAttribute(key.replace("_attr_", ""), (String) itemMap.get(key));
+                            element.addAttribute(key.replace("_attr_", ""), value);
                         }else{
-                            element.addElement(key).setText((String) itemMap.get(key));
+                            element.addElement(key).setText(value);
                         }
                     }
                     if (listDbcolumnList.contains(key)) {
@@ -154,7 +155,12 @@ public class DbToXmlGenerator {
                     }
                 }
                 counterUtil.increment();
-                log.info("进度：" + counterUtil.getCount() + "/" + total + "，完成度：" + (counterUtil.getCount() / (double) total * 100) + "%");
+                // 只在每10%进度时打印日志，减少日志输出频率
+                long count = counterUtil.getCount();
+                double progress = (count / (double) total * 100);
+                if (count == 1 || count == total || count % Math.max(1, total / 10) == 0) {
+                    log.info("进度：" + count + "/" + total + "，完成度：" + String.format("%.1f", progress) + "%");
+                }
             }
 
             // 保存为临时文件

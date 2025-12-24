@@ -39,6 +39,10 @@ public class GameToolsStage extends Stage {
     /** 世界刷怪服务 */
     private final WorldSpawnService worldSpawnService = new WorldSpawnService();
 
+    /** 刷怪编辑器服务 */
+    private final red.jiuzhou.util.game.WorldSpawnEditor worldSpawnEditor =
+            new red.jiuzhou.util.game.WorldSpawnEditor(worldSpawnService);
+
     /** 当前选中的地图 */
     private String currentMapName;
 
@@ -202,7 +206,7 @@ public class GameToolsStage extends Stage {
         Label title = new Label("刷怪区域列表");
         title.setStyle("-fx-font-size: 14px; -fx-font-weight: bold;");
 
-        // 搜索框
+        // 搜索框和工具栏
         HBox searchBox = new HBox(10);
         searchBox.setAlignment(Pos.CENTER_LEFT);
         TextField territorySearchField = new TextField();
@@ -210,7 +214,29 @@ public class GameToolsStage extends Stage {
         territorySearchField.setPrefWidth(250);
         Label countLabel = new Label("");
         countLabel.setStyle("-fx-text-fill: #666;");
-        searchBox.getChildren().addAll(territorySearchField, countLabel);
+
+        // 新增区域按钮
+        Button addTerritoryBtn = new Button("➕ 新增区域");
+        addTerritoryBtn.setOnAction(e -> {
+            if (currentMapName != null) {
+                SpawnTerritoryEditorDialog dialog = new SpawnTerritoryEditorDialog(
+                    currentMapName, worldSpawnEditor);
+                dialog.showAndWait();
+                if (dialog.isSaved()) {
+                    loadMapTerritories(currentMapName);
+                }
+            } else {
+                Alert alert = new Alert(Alert.AlertType.WARNING);
+                alert.setTitle("提示");
+                alert.setHeaderText(null);
+                alert.setContentText("请先选择一个地图");
+                alert.showAndWait();
+            }
+        });
+
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        searchBox.getChildren().addAll(territorySearchField, countLabel, spacer, addTerritoryBtn);
 
         // 刷怪区域表格
         TableView<SpawnTerritory> territoryTable = new TableView<>(currentTerritories);
@@ -266,7 +292,27 @@ public class GameToolsStage extends Stage {
 
         // 右键菜单
         ContextMenu contextMenu = new ContextMenu();
-        MenuItem copyCoordItem = new MenuItem("复制中心坐标到生成器");
+
+        // 编辑菜单
+        MenuItem editItem = new MenuItem("✏️ 编辑区域");
+        editItem.setOnAction(e -> {
+            SpawnTerritory selected = territoryTable.getSelectionModel().getSelectedItem();
+            if (selected != null && currentMapName != null) {
+                editTerritory(selected);
+            }
+        });
+
+        // 删除菜单
+        MenuItem deleteItem = new MenuItem("🗑️ 删除区域");
+        deleteItem.setOnAction(e -> {
+            SpawnTerritory selected = territoryTable.getSelectionModel().getSelectedItem();
+            if (selected != null && currentMapName != null) {
+                deleteTerritory(selected);
+            }
+        });
+
+        // 复制坐标
+        MenuItem copyCoordItem = new MenuItem("📍 复制中心坐标到生成器");
         copyCoordItem.setOnAction(e -> {
             SpawnTerritory selected = territoryTable.getSelectionModel().getSelectedItem();
             if (selected != null && spawnStartX != null) {
@@ -277,8 +323,8 @@ public class GameToolsStage extends Stage {
             }
         });
 
-        MenuItem copyNpcItem = new MenuItem("复制NPC配置到模拟器");
-        MenuItem viewPointsItem = new MenuItem("查看所有刷怪点");
+        MenuItem copyNpcItem = new MenuItem("🎯 复制NPC配置到模拟器");
+        MenuItem viewPointsItem = new MenuItem("👁️ 查看所有刷怪点");
         viewPointsItem.setOnAction(e -> {
             SpawnTerritory selected = territoryTable.getSelectionModel().getSelectedItem();
             if (selected != null) {
@@ -286,7 +332,15 @@ public class GameToolsStage extends Stage {
             }
         });
 
-        contextMenu.getItems().addAll(copyCoordItem, copyNpcItem, new SeparatorMenuItem(), viewPointsItem);
+        contextMenu.getItems().addAll(
+            editItem,
+            deleteItem,
+            new SeparatorMenuItem(),
+            copyCoordItem,
+            copyNpcItem,
+            new SeparatorMenuItem(),
+            viewPointsItem
+        );
         territoryTable.setContextMenu(contextMenu);
 
         pane.getChildren().addAll(title, searchBox, territoryTable, new Label("区域详情:"), detailArea);
@@ -713,6 +767,79 @@ public class GameToolsStage extends Stage {
         );
 
         return root;
+    }
+
+    /**
+     * 编辑刷怪区域
+     */
+    private void editTerritory(SpawnTerritory territory) {
+        SpawnTerritoryEditorDialog dialog = new SpawnTerritoryEditorDialog(
+            currentMapName, worldSpawnEditor, territory);
+        dialog.showAndWait();
+
+        if (dialog.isSaved()) {
+            // 刷新列表
+            loadMapTerritories(currentMapName);
+        }
+    }
+
+    /**
+     * 删除刷怪区域（幂等）
+     */
+    private void deleteTerritory(SpawnTerritory territory) {
+        // 确认对话框
+        Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
+        confirm.setTitle("确认删除");
+        confirm.setHeaderText("删除刷怪区域");
+        confirm.setContentText(String.format(
+            "确定要删除刷怪区域 \"%s\" 吗？\n\n" +
+            "此操作会修改XML文件，建议先备份。\n" +
+            "系统会自动创建备份文件。",
+            territory.getName()
+        ));
+
+        confirm.showAndWait().ifPresent(response -> {
+            if (response == ButtonType.OK) {
+                try {
+                    // 执行删除（幂等操作）
+                    red.jiuzhou.util.game.WorldSpawnEditor.OperationResult result =
+                        worldSpawnEditor.deleteTerritory(currentMapName, territory.getName());
+
+                    // 显示结果
+                    Alert resultAlert = new Alert(Alert.AlertType.INFORMATION);
+                    resultAlert.setTitle("删除结果");
+                    resultAlert.setHeaderText(null);
+
+                    String message;
+                    switch (result.getStatus()) {
+                        case DELETED:
+                            message = "刷怪区域已删除: " + territory.getName() + "\n\n备份已自动创建";
+                            break;
+                        case NO_CHANGE:
+                            message = "区域不存在，无需删除";
+                            break;
+                        default:
+                            message = result.getMessage();
+                    }
+
+                    resultAlert.setContentText(message);
+                    resultAlert.showAndWait();
+
+                    // 刷新列表
+                    if (result.getStatus() == red.jiuzhou.util.game.WorldSpawnEditor.OperationStatus.DELETED) {
+                        loadMapTerritories(currentMapName);
+                    }
+
+                } catch (Exception e) {
+                    Alert error = new Alert(Alert.AlertType.ERROR);
+                    error.setTitle("删除失败");
+                    error.setHeaderText(null);
+                    error.setContentText("删除失败: " + e.getMessage());
+                    error.showAndWait();
+                    log.error("删除刷怪区域失败", e);
+                }
+            }
+        });
     }
 
     /**

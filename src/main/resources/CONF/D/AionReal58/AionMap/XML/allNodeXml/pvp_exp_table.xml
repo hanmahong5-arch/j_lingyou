@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<pvpexps>
+  <level level="1">
+    <exp/>
+    <delay_time/>
+    <get_max_from_all_user/>
+    <get_max_reduce_amount/>
+    <get_max_reduce_interval/>
+  </level>
+</pvpexps>

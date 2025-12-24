@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<toypet_dopings>
+  <toypet_doping>
+    <id/>
+    <name/>
+    <use_doping_drink/>
+    <use_doping_food/>
+    <use_doping_scroll/>
+  </toypet_doping>
+</toypet_dopings>

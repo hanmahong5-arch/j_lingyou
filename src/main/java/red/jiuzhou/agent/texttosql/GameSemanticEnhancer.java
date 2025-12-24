@@ -30,10 +30,40 @@ public class GameSemanticEnhancer {
     private final Map<String, Map<String, String>> fieldAliases = new ConcurrentHashMap<>();
 
     private JdbcTemplate jdbcTemplate;
+    private DynamicSemanticBuilder dynamicBuilder;
+    private boolean dynamicSemanticsEnabled = true;
+    private boolean dynamicSemanticsInitialized = false;
 
     public GameSemanticEnhancer(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
         initializeSemantics();
+        // 不在构造函数中初始化动态语义，避免阻塞启动
+        // 改为延迟加载或按需加载
+    }
+
+    /**
+     * 异步初始化动态语义（推荐使用）
+     */
+    public void initializeDynamicSemanticsAsync(Runnable onComplete) {
+        if (dynamicSemanticsInitialized) {
+            if (onComplete != null) {
+                onComplete.run();
+            }
+            return;
+        }
+
+        new Thread(() -> {
+            try {
+                initializeDynamicSemantics();
+                dynamicSemanticsInitialized = true;
+                if (onComplete != null) {
+                    onComplete.run();
+                }
+            } catch (Exception e) {
+                log.error("异步初始化动态语义失败", e);
+                dynamicSemanticsEnabled = false;
+            }
+        }, "DynamicSemantics-Init").start();
     }
 
     /**
@@ -164,12 +194,84 @@ public class GameSemanticEnhancer {
         return fieldAliases.getOrDefault(category, Collections.emptyMap());
     }
 
+
     /**
-     * 生成完整的语义增强提示词
+     * 初始化动态语义（从实际数据库发现）
+     * 注意：此方法可能耗时较长（5-10秒），建议在后台线程调用
+     */
+    private void initializeDynamicSemantics() {
+        try {
+            long startTime = System.currentTimeMillis();
+            log.info("开始初始化动态语义（可能需要5-10秒）...");
+
+            dynamicBuilder = new DynamicSemanticBuilder(jdbcTemplate);
+            dynamicBuilder.buildSemanticMappings();
+
+            // 将动态发现的映射合并到静态语义中
+            mergeDynamicSemantics();
+
+            long elapsed = System.currentTimeMillis() - startTime;
+            log.info("动态语义初始化完成，耗时 {} ms", elapsed);
+        } catch (Exception e) {
+            log.error("动态语义初始化失败", e);
+            dynamicSemanticsEnabled = false;
+        }
+    }
+
+    /**
+     * 合并动态语义到静态语义
+     */
+    private void mergeDynamicSemantics() {
+        if (dynamicBuilder == null) {
+            return;
+        }
+
+        Map<String, DynamicSemanticBuilder.SemanticMapping> dynamicMappings = dynamicBuilder.getMappings();
+        int mergedCount = 0;
+
+        for (DynamicSemanticBuilder.SemanticMapping mapping : dynamicMappings.values()) {
+            if (!mapping.isEnabled()) {
+                continue;
+            }
+
+            String keyword = mapping.getKeyword();
+            String sqlCondition = mapping.getSqlCondition();
+
+            // 如果静态语义中没有这个关键词，添加它
+            if (!semanticMap.containsKey(keyword)) {
+                semanticMap.put(keyword, sqlCondition);
+                mergedCount++;
+            }
+        }
+
+        log.info("合并了 {} 个动态语义映射到静态语义库", mergedCount);
+    }
+
+    /**
+     * 生成完整的语义增强提示词（包含动态语义）
      */
     public String generateSemanticPrompt() {
         StringBuilder sb = new StringBuilder();
-        sb.append("# 游戏语义映射表\n\n");
+
+        // 静态语义部分
+        sb.append(generateStaticSemanticPrompt());
+        sb.append("\n\n");
+
+        // 动态语义部分
+        if (dynamicSemanticsEnabled && dynamicBuilder != null) {
+            sb.append("---\n\n");
+            sb.append(dynamicBuilder.generateDynamicPrompt());
+        }
+
+        return sb.toString();
+    }
+
+    /**
+     * 生成静态语义提示词
+     */
+    private String generateStaticSemanticPrompt() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("# 游戏语义映射表（预定义）\n\n");
         sb.append("当用户使用以下游戏术语时，请转换为对应的SQL条件：\n\n");
 
         // 按类别组织
@@ -203,6 +305,54 @@ public class GameSemanticEnhancer {
         }
 
         return sb.toString();
+    }
+
+    /**
+     * 获取动态语义构建器（供UI使用）
+     */
+    public DynamicSemanticBuilder getDynamicBuilder() {
+        return dynamicBuilder;
+    }
+
+    /**
+     * 启用/禁用动态语义
+     */
+    public void setDynamicSemanticsEnabled(boolean enabled) {
+        this.dynamicSemanticsEnabled = enabled;
+        log.info("动态语义已{}", enabled ? "启用" : "禁用");
+    }
+
+    /**
+     * 重新加载动态语义（同步版本，会阻塞）
+     */
+    public void reloadDynamicSemantics() {
+        log.info("重新加载动态语义...");
+        dynamicSemanticsInitialized = false;
+        initializeDynamicSemantics();
+        dynamicSemanticsInitialized = true;
+    }
+
+    /**
+     * 异步重新加载动态语义
+     */
+    public void reloadDynamicSemanticsAsync(Runnable onComplete) {
+        log.info("异步重新加载动态语义...");
+        dynamicSemanticsInitialized = false;
+
+        new Thread(() -> {
+            initializeDynamicSemantics();
+            dynamicSemanticsInitialized = true;
+            if (onComplete != null) {
+                onComplete.run();
+            }
+        }, "DynamicSemantics-Reload").start();
+    }
+
+    /**
+     * 检查动态语义是否已初始化
+     */
+    public boolean isDynamicSemanticsInitialized() {
+        return dynamicSemanticsInitialized;
     }
 
     /**

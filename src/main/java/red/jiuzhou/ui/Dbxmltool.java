@@ -187,63 +187,7 @@ public class Dbxmltool extends Application {
         // 启用机制过滤标签栏
         searchableMenu.enableMechanismFilter(true);
 
-        // ==================== 创建快捷操作按钮组 ====================
-        // 提供常用的文件和目录操作功能
-        HBox quickActions = new HBox(8);
-        quickActions.setPadding(new Insets(0, 0, 6, 0));
-
-        // 打开位置 - 在文件管理器中显示选中项
-        Button openLocationBtn = new Button("📂 打开位置");
-        openLocationBtn.setTooltip(new Tooltip("在文件资源管理器中打开选中文件或文件夹的位置"));
-
-        // 复制路径 - 复制选中项的完整路径到剪贴板
-        Button copyPathBtn = new Button("📋 复制路径");
-        copyPathBtn.setTooltip(new Tooltip("复制选中文件或文件夹的完整路径到剪贴板"));
-
-        // 打开文件 - 在应用内打开选中的文件
-        Button openFileBtn = new Button("📄 打开文件");
-        openFileBtn.setTooltip(new Tooltip("在应用程序内打开选中的文件进行编辑"));
-
-        // 默认程序打开 - 使用系统默认程序打开文件
-        Button openWithAppBtn = new Button("🚀 默认程序打开");
-        openWithAppBtn.setTooltip(new Tooltip("使用系统默认关联程序打开选中的文件"));
-
-        // 刷新目录 - 重新扫描目录结构
-        Button refreshBtn = new Button("🔄 刷新目录");
-        refreshBtn.setTooltip(new Tooltip("重新扫描目录结构,更新文件列表"));
-
-        // ==================== 快捷操作按钮事件处理 ====================
-        openLocationBtn.setOnAction(e -> example.revealSelection(leftMenu));
-        copyPathBtn.setOnAction(e -> example.copySelectionPath(leftMenu));
-        openFileBtn.setOnAction(e -> example.openSelectionInTab(leftMenu, tabPane));
-        openWithAppBtn.setOnAction(e -> example.openSelectionWithDesktop(leftMenu));
-        refreshBtn.setOnAction(e -> example.refreshTree(leftMenu));
-
-        quickActions.getChildren().addAll(openLocationBtn, copyPathBtn, openFileBtn, openWithAppBtn, refreshBtn);
-
-        // ==================== 左侧菜单选择监听器 ====================
-        // 根据选中项的类型(文件夹/文件)动态启用或禁用快捷操作按钮
-        leftMenu.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, selected) -> {
-            boolean hasSelection = selected != null;
-            // 只要有选中项,就可以打开位置和复制路径
-            openLocationBtn.setDisable(!hasSelection);
-            copyPathBtn.setDisable(!hasSelection);
-            refreshBtn.setDisable(false);
-
-            // 只有选中文件(叶子节点)时,才能打开文件
-            boolean isFile = hasSelection && selected.getChildren().isEmpty();
-            openFileBtn.setDisable(!isFile);
-            openWithAppBtn.setDisable(!isFile);
-        });
-
-        // 初始状态:未选中任何项时,禁用相关按钮
-        openLocationBtn.setDisable(true);
-        copyPathBtn.setDisable(true);
-        openFileBtn.setDisable(true);
-        openWithAppBtn.setDisable(true);
-
         // 组装左侧面板
-        leftControl.getChildren().add(quickActions);
         leftControl.getChildren().add(searchableMenu);  // 使用可搜索菜单树
         // 让菜单树占满可用空间
         VBox.setVgrow(searchableMenu, Priority.ALWAYS);
@@ -476,42 +420,6 @@ public class Dbxmltool extends Application {
             "→ 配置团队共享的数据目录"
         ));
 
-        // ==================== 查询工具模块 ====================
-        // 提供各种数据查询和SQL处理功能
-
-        // 新建查询按钮 - 创建自定义SQL查询
-        Button newQueryBtn = new Button("⚡ SQL查询");
-        newQueryBtn.setTooltip(new Tooltip(
-            "多标签SQL查询编辑器\n\n" +
-            "🎯 核心功能:\n" +
-            "• 多标签页独立查询,互不干扰\n" +
-            "• 支持SELECT/UPDATE/INSERT/DELETE\n" +
-            "• 批量执行多条SQL(按分号分隔)\n" +
-            "• 结果表格展示,支持导出\n\n" +
-            "💡 适用场景:\n" +
-            "→ 快速查询验证游戏配置数据\n" +
-            "→ 批量修改测试数据\n" +
-            "→ 统计分析游戏数值"
-        ));
-
-        // 数据操作中心按钮 - 整合导入/导出/同步/编辑功能
-        Button dataOperationBtn = new Button("📊 数据操作");
-        dataOperationBtn.setTooltip(new Tooltip(
-            "数据操作中心 - 一站式数据管理\n\n" +
-            "🎯 核心功能:\n" +
-            "• 📤 数据导出 (DB → XML)\n" +
-            "• 📥 数据导入 (XML → DB)\n" +
-            "• 🔁 表同步 (客户端 ↔ 服务端)\n" +
-            "• ✏️ 批量编辑\n\n" +
-            "✨ 特色功能:\n" +
-            "• ID自动显示对应NAME\n" +
-            "• 操作前自动备份\n" +
-            "• 变更预览确认\n\n" +
-            "💡 适用场景:\n" +
-            "→ 日常数据导入导出\n" +
-            "→ 客户端服务端数据同步\n" +
-            "→ 批量修改游戏配置"
-        ));
 
         // ==================== 数据处理模块 ====================
         // 提供高级数据处理和批量操作功能
@@ -580,20 +488,6 @@ public class Dbxmltool extends Application {
             "→ 理解游戏系统间的关联"
         ));
 
-        // 设计洞察按钮 - XML数据分析洞察
-        Button designInsightBtn = new Button("📊 设计洞察");
-        designInsightBtn.setTooltip(new Tooltip(
-            "XML数据智能分析\n\n" +
-            "🎯 核心功能:\n" +
-            "• 数据一致性检查\n" +
-            "• 枚举值分布统计\n" +
-            "• 异常数据检测\n" +
-            "• AI辅助分析建议\n\n" +
-            "💡 适用场景:\n" +
-            "→ 发现配置数据问题\n" +
-            "→ 统计游戏数值分布\n" +
-            "→ 验证数据完整性"
-        ));
 
         // AI数据助手按钮 - 自然语言操作游戏数据
         Button aiAgentBtn = new Button("🤖 AI助手");
@@ -733,18 +627,6 @@ public class Dbxmltool extends Application {
             }
         });
 
-        // 设计洞察 - 打开设计洞察窗口
-        designInsightBtn.setOnAction(event -> {
-            try {
-                log.info("打开设计洞察窗口");
-                DesignerInsightStage stage = new DesignerInsightStage();
-                stage.initOwner(primaryStage);
-                stage.show();
-            } catch (Exception e) {
-                log.error("打开设计洞察窗口失败", e);
-                showError("打开设计洞察窗口失败: " + e.getMessage());
-            }
-        });
 
         // AI数据助手 - 打开AI对话窗口
         aiAgentBtn.setOnAction(event -> {
@@ -785,30 +667,6 @@ public class Dbxmltool extends Application {
             }
         });
 
-        // 新建查询 - 打开SQL查询编辑器
-        newQueryBtn.setOnAction(e -> {
-            try {
-                log.info("打开SQL查询编辑器");
-                new SqlQryApp().show();
-            } catch (Exception ex) {
-                log.error("打开SQL查询编辑器失败", ex);
-                showError("打开SQL查询编辑器失败: " + ex.getMessage());
-            }
-        });
-
-        // 数据操作中心 - 打开统一的数据操作窗口
-        dataOperationBtn.setOnAction(e -> {
-            try {
-                log.info("打开数据操作中心");
-                // 预加载ID->NAME缓存
-                IdNameResolver.getInstance().preloadAllSystems();
-                DataOperationCenterStage stage = new DataOperationCenterStage(primaryStage);
-                stage.show();
-            } catch (Exception ex) {
-                log.error("打开数据操作中心失败", ex);
-                showError("打开数据操作中心失败: " + ex.getMessage());
-            }
-        });
 
         // 搜索替换 - 打开全局搜索替换工具
         searchReplaceBtn.setOnAction(event -> {
@@ -889,19 +747,19 @@ public class Dbxmltool extends Application {
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
         // 组装工具栏:按功能模块分组（优化后的布局，更符合游戏设计师直觉）
-        // [数据配置] | [数据操作] | [关系分析] | [设计洞察] | [游戏工具] | [安全管理] ... [状态信息]
+        // [数据配置] | [数据校验] | [关系分析] | [分析工具] | [游戏工具] | [数据处理] ... [状态信息]
         toolBar.getItems().addAll(
             // 数据配置模块 - 配置数据源和路径
             confButton, addDirectoryBtn,
             new Separator(),
-            // 数据操作模块 - 统一的数据操作入口
-            newQueryBtn, dataOperationBtn, dataValidationBtn,
+            // 数据校验模块
+            dataValidationBtn,
             new Separator(),
             // 关系分析模块 - 字段关联和机制关系
             relationButton, mechanismRelationBtn,
             new Separator(),
-            // 设计洞察模块 - AI分析和可视化
-            mechanismExplorerBtn, designInsightBtn, aiAgentBtn,
+            // 分析工具模块 - 机制浏览和AI助手
+            mechanismExplorerBtn, aiAgentBtn,
             new Separator(),
             // 游戏工具模块 - 刷怪点规划和概率模拟
             gameToolsBtn,

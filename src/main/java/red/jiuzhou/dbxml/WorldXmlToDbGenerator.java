@@ -38,7 +38,9 @@ public class WorldXmlToDbGenerator {
     public WorldXmlToDbGenerator(String tabName, String mapType) {
         this.mapType = mapType;
         try {
-            TableConf table = TabConfLoad.getTale(tabName, null);
+            // 使用表名作为默认路径
+            String defaultPath = tabName + ".xml";
+            TableConf table = TabConfLoad.getTale(tabName, defaultPath);
             if (table == null) {
                 throw new RuntimeException("找不到表配置信息：" + tabName);
             }

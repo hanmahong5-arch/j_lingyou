@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<instance_pools>
+  <instance_pool>
+    <base/>
+    <min/>
+    <max/>
+    <delay/>
+  </instance_pool>
+</instance_pools>

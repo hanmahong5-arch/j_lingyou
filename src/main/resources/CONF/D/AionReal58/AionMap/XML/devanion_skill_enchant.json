@@ -1,0 +1,17 @@
+{
+	"file_path":"D:\\AionReal58\\AionMap\\XML\\devanion_skill_enchant.xml",
+	"xml_root_tag":"devanion_skill_enchants",
+	"list":[
+		{
+			"addDataNode":"reinforce_level_list",
+			"associatedFiled":"id",
+			"xml_tag":"data",
+			"db_column":"data",
+			"table_name":"devanion_skill_enchant__reinforce_level_list__data",
+			"sql":"select * from devanion_skill_enchant__reinforce_level_list__data where id = '#associated_filed' order by CAST(id AS UNSIGNED) ASC"
+		}
+	],
+	"xml_item_tag":"devanion_skill_enchant",
+	"table_name":"devanion_skill_enchant",
+	"sql":"select * from devanion_skill_enchant order by CAST(id AS UNSIGNED) ASC"
+}

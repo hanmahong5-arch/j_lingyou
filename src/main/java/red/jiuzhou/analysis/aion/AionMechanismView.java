@@ -63,6 +63,13 @@ public class AionMechanismView {
     }
 
     /**
+     * 获取所有机制分组（包括空的）
+     */
+    public List<MechanismGroup> getAllGroups() {
+        return new ArrayList<>(groups.values());
+    }
+
+    /**
      * 获取指定分类的机制组
      */
     public MechanismGroup getGroup(AionMechanismCategory category) {

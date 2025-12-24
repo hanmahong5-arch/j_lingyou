@@ -1,0 +1,8 @@
+{
+	"file_path":"D:\\AionReal58\\AionMap\\XML\\familiars.xml",
+	"xml_root_tag":"familiars",
+	"list":[],
+	"xml_item_tag":"familiar",
+	"table_name":"familiars",
+	"sql":"select * from familiars order by CAST(id AS UNSIGNED) ASC"
+}

@@ -3,8 +3,8 @@ package red.jiuzhou.agent.tools;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
+import red.jiuzhou.ai.AiModelClient;
 import red.jiuzhou.ai.AiModelFactory;
-import red.jiuzhou.ai.client.AiClient;
 import red.jiuzhou.util.DatabaseUtil;
 
 import java.util.*;
@@ -30,7 +30,8 @@ public class SqlExecutionTool {
 
     private final JdbcTemplate jdbcTemplate;
     private final DatabaseSchemaProvider schemaProvider;
-    private final AiClient aiClient;
+    private final ConfigBasedSchemaProvider configProvider;
+    private final AiModelClient aiClient;
 
     /** 危险操作关键字(禁止执行) */
     private static final Set<String> DANGEROUS_KEYWORDS = new HashSet<>(Arrays.asList(
@@ -145,6 +146,7 @@ public class SqlExecutionTool {
     public SqlExecutionTool(JdbcTemplate jdbcTemplate, String aiModel) {
         this.jdbcTemplate = jdbcTemplate;
         this.schemaProvider = new DatabaseSchemaProvider(jdbcTemplate);
+        this.configProvider = new ConfigBasedSchemaProvider(jdbcTemplate);
 
         // 初始化AI客户端
         if (aiModel == null || aiModel.isEmpty()) {
@@ -152,7 +154,7 @@ public class SqlExecutionTool {
         }
         this.aiClient = AiModelFactory.getClient(aiModel);
 
-        log.info("SqlExecutionTool 初始化完成, AI模型: {}", aiModel);
+        log.info("SqlExecutionTool 初始化完成, AI模型: {}, 配置驱动Schema: enabled", aiModel);
     }
 
     /**
@@ -207,41 +209,45 @@ public class SqlExecutionTool {
     }
 
     /**
-     * 构建SQL生成Prompt
+     * 构建SQL生成Prompt (配置驱动版,基于实际项目配置)
      */
     private String buildSqlGenerationPrompt(String query, List<String> relatedTables) {
         StringBuilder prompt = new StringBuilder();
 
-        prompt.append("你是一个MySQL SQL专家。基于以下数据库schema,将自然语言查询转换为标准SQL。\n\n");
+        prompt.append("你是一个精通Aion游戏数据库的MySQL SQL专家。基于以下数据库schema和项目配置,将自然语言查询转换为标准SQL。\n\n");
 
-        // 添加Schema上下文
-        if (relatedTables != null && !relatedTables.isEmpty()) {
-            // 只包含相关表
-            prompt.append("相关表结构:\n");
-            for (String tableName : relatedTables) {
-                String tableDesc = schemaProvider.getTableDescription(tableName);
-                prompt.append(tableDesc).append("\n");
-            }
-        } else {
-            // 包含所有表(简化版)
-            String schemaDesc = schemaProvider.getSchemaDescription(false);
-            prompt.append(schemaDesc).append("\n");
+        // 智能推荐相关表(基于实际配置文件)
+        if (relatedTables == null || relatedTables.isEmpty()) {
+            relatedTables = configProvider.recommendRelatedTables(query);
+            log.info("智能推荐相关表: {}", relatedTables);
         }
 
-        prompt.append("\n用户查询: ").append(query).append("\n\n");
+        // 使用配置驱动的Schema描述(来自JSON配置文件)
+        String enhancedSchema = configProvider.getEnhancedSchemaDescription(relatedTables);
+        prompt.append(enhancedSchema).append("\n");
 
-        prompt.append("请按以下格式返回:\n");
+        // 添加基于配置的SQL提示
+        String hints = configProvider.generateSqlHints(query);
+        if (hints != null && !hints.isEmpty()) {
+            prompt.append(hints).append("\n");
+        }
+
+        prompt.append("## 用户查询\n");
+        prompt.append(query).append("\n\n");
+
+        prompt.append("## 返回格式要求\n");
         prompt.append("```sql\n");
         prompt.append("-- 这里写SQL语句\n");
         prompt.append("```\n\n");
-        prompt.append("解释: (简要解释SQL的作用)\n\n");
+        prompt.append("解释: (简要解释SQL的作用和查询的业务含义)\n\n");
 
-        prompt.append("注意:\n");
-        prompt.append("1. 只返回SELECT查询,不要生成DELETE/UPDATE/INSERT等修改语句\n");
-        prompt.append("2. 使用标准MySQL语法\n");
-        prompt.append("3. 如果需要关联多张表,使用JOIN\n");
-        prompt.append("4. 字段名和表名如果是中文或特殊字符,用反引号包围\n");
-        prompt.append("5. 如果查询不明确,返回最合理的解释\n");
+        prompt.append("## 重要提示\n");
+        prompt.append("1. **只返回SELECT查询**,不要生成DELETE/UPDATE/INSERT等修改语句\n");
+        prompt.append("2. **使用标准MySQL语法**\n");
+        prompt.append("3. **表关联**: 如果需要关联多张表,使用JOIN\n");
+        prompt.append("4. **字段名**: 中文或特殊字符字段用反引号包围\n");
+        prompt.append("5. **数据过滤**: 根据表的实际字段和配置进行过滤\n");
+        prompt.append("6. **查询优化**: 优先使用索引字段(id等)进行过滤\n");
 
         return prompt.toString();
     }

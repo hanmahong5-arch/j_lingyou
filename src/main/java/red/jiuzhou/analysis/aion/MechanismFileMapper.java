@@ -284,6 +284,13 @@ public class MechanismFileMapper {
     }
 
     /**
+     * 获取所有机制列表（30种）
+     */
+    public List<AionMechanismCategory> getAllMechanisms() {
+        return Arrays.asList(AionMechanismCategory.values());
+    }
+
+    /**
      * 获取所有机制及其文件数量统计
      */
     public Map<AionMechanismCategory, Integer> getMechanismStats() {

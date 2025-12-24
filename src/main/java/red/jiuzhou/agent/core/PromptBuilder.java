@@ -1,24 +1,62 @@
 package red.jiuzhou.agent.core;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import red.jiuzhou.agent.texttosql.SqlExampleLibrary;
+import red.jiuzhou.agent.texttosql.GameSemanticEnhancer;
 import red.jiuzhou.agent.tools.ToolRegistry;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * Prompt构建器
+ * Prompt构建器（增强版）
  *
  * 构建发送给AI的系统提示词
  * 包含角色定义、表结构信息、工具说明、游戏语义映射
  *
+ * 新增：
+ * - SQL示例库（Few-Shot Learning）
+ * - 游戏语义增强
+ * - 动态上下文构建
+ *
  * @author yanxq
  * @date 2025-01-13
+ * @updated 2025-12-20 (TEXT-TO-SQL增强 + 异步加载优化)
  */
 public class PromptBuilder {
 
+    private static final Logger log = LoggerFactory.getLogger(PromptBuilder.class);
+
     private SchemaMetadataService metadataService;
     private ToolRegistry toolRegistry;
+    private SqlExampleLibrary exampleLibrary;
+    private GameSemanticEnhancer semanticEnhancer;
 
     public PromptBuilder(SchemaMetadataService metadataService, ToolRegistry toolRegistry) {
         this.metadataService = metadataService;
         this.toolRegistry = toolRegistry;
+        this.exampleLibrary = SqlExampleLibrary.getInstance();
+    }
+
+    /**
+     * 设置JDBC模板（用于语义增强）
+     * 注意：此方法会异步初始化动态语义，不会阻塞启动
+     */
+    public void setJdbcTemplate(JdbcTemplate jdbcTemplate) {
+        if (jdbcTemplate != null && this.semanticEnhancer == null) {
+            this.semanticEnhancer = new GameSemanticEnhancer(jdbcTemplate);
+
+            // 异步初始化动态语义（不阻塞启动）
+            this.semanticEnhancer.initializeDynamicSemanticsAsync(() -> {
+                log.info("动态语义异步初始化完成");
+            });
+        }
+    }
+
+    /**
+     * 获取语义增强器
+     */
+    public GameSemanticEnhancer getSemanticEnhancer() {
+        return semanticEnhancer;
     }
 
     /**
@@ -59,8 +97,13 @@ public class PromptBuilder {
     private String buildRoleDefinition() {
         return "# 角色定义\n\n" +
                "你是一个专业的游戏数据管理助手，专门帮助游戏设计师通过自然语言查询和修改游戏数据。\n\n" +
+               "## 数据库环境\n" +
+               "- **数据库类型**: MySQL 8.0\n" +
+               "- **重要**: 必须使用MySQL语法，禁止使用SQLite、PostgreSQL等其他数据库的语法\n" +
+               "- **查询元数据**: 使用 `information_schema.tables` 和 `information_schema.columns`\n" +
+               "- **禁止**: 使用 `sqlite_master`、`pg_catalog` 等非MySQL语法\n\n" +
                "## 你的能力\n" +
-               "1. **数据查询**: 根据用户的自然语言描述，生成SQL查询并返回结果\n" +
+               "1. **数据查询**: 根据用户的自然语言描述，生成MySQL SQL查询并返回结果\n" +
                "2. **数据修改**: 理解用户的修改意图，生成修改SQL并在用户确认后执行\n" +
                "3. **数据分析**: 分析游戏数据分布，给出平衡性建议\n" +
                "4. **历史回滚**: 查看操作历史，支持回滚到指定时间点\n\n" +
@@ -68,7 +111,8 @@ public class PromptBuilder {
                "- 永远先理解用户意图，必要时请求澄清\n" +
                "- 修改操作必须生成预览，等待用户确认\n" +
                "- 提供清晰的执行结果和影响范围说明\n" +
-               "- 对于不确定的操作，给出多个方案让用户选择";
+               "- 对于不确定的操作，给出多个方案让用户选择\n" +
+               "- **始终使用MySQL语法**";
     }
 
     /**
@@ -128,13 +172,66 @@ public class PromptBuilder {
     }
 
     /**
-     * 构建游戏语义映射
+     * 构建游戏语义映射（增强版）
      */
     private String buildSemanticSection() {
-        if (metadataService != null) {
-            return metadataService.generateSemanticMappingDescription();
+        StringBuilder sb = new StringBuilder();
+        sb.append("# 游戏语义映射\n\n");
+
+        // 使用新的语义增强器
+        if (semanticEnhancer != null) {
+            sb.append(semanticEnhancer.generateSemanticPrompt());
+        } else if (metadataService != null) {
+            sb.append(metadataService.generateSemanticMappingDescription());
+        } else {
+            sb.append("语义映射尚未加载。\n");
         }
-        return "# 游戏语义映射\n\n语义映射尚未加载。\n";
+
+        return sb.toString();
+    }
+
+    /**
+     * 构建针对特定查询的增强提示词（Few-Shot）
+     *
+     * @param userQuery 用户查询
+     * @return 增强后的提示词
+     */
+    public String buildEnhancedPrompt(String userQuery) {
+        StringBuilder sb = new StringBuilder();
+
+        // 1. 基础系统提示词（精简版）
+        sb.append(buildCompactSystemPrompt());
+        sb.append("\n\n");
+
+        // 2. Few-Shot示例
+        if (exampleLibrary != null) {
+            sb.append(exampleLibrary.generateFewShotPrompt(userQuery, 3));
+            sb.append("\n\n");
+        }
+
+        // 3. 语义增强提示
+        if (semanticEnhancer != null) {
+            String hints = semanticEnhancer.translateToSqlHints(userQuery);
+            if (!hints.isEmpty()) {
+                sb.append(hints);
+                sb.append("\n\n");
+            }
+        }
+
+        // 4. 当前用户查询
+        sb.append("## 用户查询\n\n");
+        sb.append(userQuery);
+        sb.append("\n\n");
+
+        // 5. 生成指导
+        sb.append("## 生成指导\n\n");
+        sb.append("请根据以上示例和语义映射，生成准确的SQL查询。\n");
+        sb.append("- 使用示例中的SQL模式作为参考\n");
+        sb.append("- 应用语义映射转换游戏术语\n");
+        sb.append("- 确保SQL语法正确且性能良好\n");
+        sb.append("- 添加LIMIT子句限制返回行数\n");
+
+        return sb.toString();
     }
 
     /**

@@ -136,10 +136,11 @@ public class WorldDbToXmlGenerator {
                         continue;
                     }
                     if (itemMap.get(key) != null) {
+                        String value = String.valueOf(itemMap.get(key));
                         if(key.startsWith("_attr_")){
-                            element.addAttribute(key.replace("_attr_", ""), (String) itemMap.get(key));
+                            element.addAttribute(key.replace("_attr_", ""), value);
                         }else{
-                            element.addElement(key).setText((String) itemMap.get(key));
+                            element.addElement(key).setText(value);
                         }
                     }
                     if (listDbcolumnList.contains(key)) {

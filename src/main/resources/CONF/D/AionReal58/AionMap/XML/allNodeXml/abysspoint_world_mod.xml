@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<abysspoint_world_mods>
+  <id ID="1">
+    <world/>
+    <drop_point_mod_light/>
+    <deathpenalty_point_mod_light/>
+    <drop_point_mod_dark/>
+    <deathpenalty_point_mod_dark/>
+  </id>
+</abysspoint_world_mods>

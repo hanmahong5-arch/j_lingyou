@@ -1,0 +1,8 @@
+{
+	"file_path":"D:\\AionReal58\\AionMap\\XML\\pvp_exp_table.xml",
+	"xml_root_tag":"pvpexps",
+	"list":[],
+	"xml_item_tag":"level",
+	"table_name":"pvp_exp_table",
+	"sql":"select * from pvp_exp_table order by CAST(exp AS UNSIGNED) ASC"
+}

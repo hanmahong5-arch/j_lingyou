@@ -14,9 +14,12 @@ import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import red.jiuzhou.agent.core.AgentMessage;
 import red.jiuzhou.agent.core.GameDataAgent;
+import red.jiuzhou.agent.tools.SqlExecutionTool;
 import red.jiuzhou.util.DatabaseUtil;
 
 import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.Map;
 
 /**
  * AI Agent 对话窗口
@@ -32,6 +35,7 @@ public class AgentChatStage extends Stage {
 
     private GameDataAgent agent;
     private JdbcTemplate jdbcTemplate;
+    private SqlExecutionTool sqlTool;
 
     // UI组件
     private VBox chatContainer;
@@ -41,6 +45,8 @@ public class AgentChatStage extends Stage {
     private ComboBox<String> modelSelector;
     private Label statusLabel;
     private ProgressIndicator loadingIndicator;
+    private ToggleButton sqlModeToggle;
+    private TabPane resultTabPane;
 
     // 样式常量
     private static final String USER_BG = "#E3F2FD";
@@ -65,9 +71,9 @@ public class AgentChatStage extends Stage {
     }
 
     private void initUI() {
-        setTitle("AI 游戏数据助手");
-        setWidth(900);
-        setHeight(700);
+        setTitle("AI 游戏数据助手 (增强版)");
+        setWidth(1100);
+        setHeight(750);
 
         BorderPane root = new BorderPane();
         root.setStyle("-fx-background-color: white;");
@@ -75,11 +81,24 @@ public class AgentChatStage extends Stage {
         // 顶部工具栏
         root.setTop(createToolbar());
 
-        // 中间聊天区域
-        root.setCenter(createChatArea());
+        // 中间区域：聊天 + 结果展示(使用SplitPane)
+        SplitPane mainSplitPane = new SplitPane();
+        mainSplitPane.setOrientation(javafx.geometry.Orientation.HORIZONTAL);
 
-        // 底部输入区域
-        root.setBottom(createInputArea());
+        // 左侧：聊天区域
+        BorderPane chatPane = new BorderPane();
+        chatPane.setCenter(createChatArea());
+        chatPane.setBottom(createInputArea());
+
+        // 右侧：结果展示区域
+        resultTabPane = new TabPane();
+        resultTabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.ALL_TABS);
+        resultTabPane.setStyle("-fx-border-color: #e0e0e0; -fx-border-width: 0 0 0 1;");
+
+        mainSplitPane.getItems().addAll(chatPane, resultTabPane);
+        mainSplitPane.setDividerPositions(0.6);
+
+        root.setCenter(mainSplitPane);
 
         Scene scene = new Scene(root);
         setScene(scene);
@@ -130,6 +149,24 @@ public class AgentChatStage extends Stage {
             }
         });
 
+        // SQL模式切换
+        sqlModeToggle = new ToggleButton("📊 SQL查询模式");
+        sqlModeToggle.setStyle("-fx-background-color: #2196F3; -fx-text-fill: white;");
+        sqlModeToggle.setOnAction(e -> {
+            if (sqlModeToggle.isSelected()) {
+                sqlModeToggle.setStyle("-fx-background-color: #4CAF50; -fx-text-fill: white;");
+                addSystemMessage("已切换到SQL查询模式\n输入自然语言,AI将自动生成SQL并展示结果");
+            } else {
+                sqlModeToggle.setStyle("-fx-background-color: #2196F3; -fx-text-fill: white;");
+                addSystemMessage("已退出SQL查询模式");
+            }
+        });
+
+        // 上下文管理按钮
+        Button contextBtn = new Button("🧠 上下文管理");
+        contextBtn.setTooltip(new Tooltip("管理AI的语义上下文和预设映射"));
+        contextBtn.setOnAction(e -> openContextManager());
+
         // 状态指示
         statusLabel = new Label("就绪");
         statusLabel.setStyle("-fx-text-fill: #666;");
@@ -145,6 +182,8 @@ public class AgentChatStage extends Stage {
             modelLabel, modelSelector,
             new Separator(),
             newChatBtn, clearBtn,
+            new Separator(),
+            sqlModeToggle, contextBtn,
             spacer,
             loadingIndicator, statusLabel
         );
@@ -266,14 +305,49 @@ public class AgentChatStage extends Stage {
             Platform.runLater(() -> addMessageToChat(message));
         });
 
-        // 初始化Agent
+        // 初始化Agent（快速启动，不阻塞UI）
         try {
             agent.initialize(jdbcTemplate);
-            addSystemMessage("AI游戏数据助手已就绪！\n可以用自然语言查询和修改游戏数据。\n例如：\"查询所有50级以上的紫色武器\"");
+
+            // 初始化SQL工具
+            sqlTool = new SqlExecutionTool(jdbcTemplate, modelSelector.getValue());
+
+            addSystemMessage("AI游戏数据助手已就绪！\n\n" +
+                "💬 对话模式: 可以用自然语言查询和修改游戏数据\n" +
+                "📊 SQL模式: 自动生成SQL查询并展示结果表格\n\n" +
+                "示例: \"查询所有50级以上的紫色武器\"");
+
+            // 异步初始化动态语义（后台进行，不阻塞UI）
+            initDynamicSemanticsAsync();
+
         } catch (Exception e) {
             log.error("Agent初始化失败", e);
             addErrorMessage("Agent初始化失败: " + e.getMessage());
         }
+    }
+
+    /**
+     * 异步初始化动态语义
+     * PromptBuilder.setJdbcTemplate()会自动触发异步初始化
+     */
+    private void initDynamicSemanticsAsync() {
+        // 显示加载提示
+        statusLabel.setText("正在后台加载智能上下文...");
+
+        // 延迟5秒后显示完成消息（动态语义在后台异步加载）
+        new Thread(() -> {
+            try {
+                Thread.sleep(5000);  // 等待5秒
+                Platform.runLater(() -> {
+                    statusLabel.setText("就绪");
+                    addSystemMessage("🧠 智能上下文已加载\n" +
+                        "AI现在可以理解游戏专业术语（如\"紫装\"、\"火属性\"等）\n" +
+                        "点击 🧠 上下文管理 查看详情");
+                });
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }, "DynamicSemantics-Notify").start();
     }
 
     private void sendMessage() {
@@ -285,10 +359,26 @@ public class AgentChatStage extends Stage {
         inputArea.clear();
         setLoading(true);
 
+        // 判断是否为SQL模式
+        boolean isSqlMode = sqlModeToggle.isSelected();
+
+        // SQL模式下需要手动显示用户消息（因为不调用agent.chat()）
+        // 非SQL模式下，agent.chat()会通过回调自动显示用户消息
+        if (isSqlMode) {
+            AgentMessage userMsg = AgentMessage.user(text);
+            Platform.runLater(() -> addMessageToChat(userMsg));
+        }
+
         // 在后台线程执行
         new Thread(() -> {
             try {
-                agent.chat(text);
+                if (isSqlMode) {
+                    // SQL模式: 生成并执行SQL
+                    handleSqlMode(text);
+                } else {
+                    // 普通对话模式（agent.chat会通过回调显示用户消息）
+                    agent.chat(text);
+                }
             } catch (Exception e) {
                 log.error("消息处理失败", e);
                 Platform.runLater(() -> addErrorMessage("处理失败: " + e.getMessage()));
@@ -299,6 +389,124 @@ public class AgentChatStage extends Stage {
                 });
             }
         }).start();
+    }
+
+    /**
+     * 处理SQL模式查询
+     */
+    private void handleSqlMode(String query) {
+        log.info("SQL模式查询: {}", query);
+
+        try {
+            // 1. 生成SQL
+            Platform.runLater(() -> statusLabel.setText("生成SQL中..."));
+            SqlExecutionTool.SqlGenerationResult genResult = sqlTool.generateSql(query);
+
+            if (!genResult.isSuccess()) {
+                Platform.runLater(() -> addErrorMessage("SQL生成失败: " + genResult.getError()));
+                return;
+            }
+
+            String sql = genResult.getSql();
+            String explanation = genResult.getExplanation();
+
+            // 2. 显示生成的SQL
+            Platform.runLater(() -> {
+                addSqlMessage(sql, explanation);
+            });
+
+            // 3. 执行SQL
+            Platform.runLater(() -> statusLabel.setText("执行SQL中..."));
+            SqlExecutionTool.SqlExecutionResult execResult = sqlTool.executeSql(sql);
+
+            if (!execResult.isSuccess()) {
+                Platform.runLater(() -> addErrorMessage("SQL执行失败: " + execResult.getError()));
+                return;
+            }
+
+            // 4. 显示结果
+            List<Map<String, Object>> rows = execResult.getRows();
+            int rowCount = execResult.getRowCount();
+            long execTime = execResult.getExecutionTimeMs();
+
+            Platform.runLater(() -> {
+                addAssistantMessage(String.format("✅ 查询完成\n返回 %d 行数据, 耗时 %d ms",
+                    rowCount, execTime));
+
+                if (execResult.isTruncated()) {
+                    addAssistantMessage("⚠️ 结果已截断,仅显示前 1000 行");
+                }
+
+                // 在右侧面板显示表格
+                displayResultTable(rows, query);
+            });
+
+        } catch (Exception e) {
+            log.error("SQL模式处理失败", e);
+            Platform.runLater(() -> addErrorMessage("处理失败: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * 显示SQL代码块消息
+     */
+    private void addSqlMessage(String sql, String explanation) {
+        StringBuilder content = new StringBuilder();
+        content.append("生成的SQL:\n\n");
+        content.append("```sql\n");
+        content.append(sql);
+        content.append("\n```\n");
+
+        if (explanation != null && !explanation.isEmpty()) {
+            content.append("\n").append(explanation);
+        }
+
+        AgentMessage msg = AgentMessage.assistant(content.toString());
+        addMessageToChat(msg);
+    }
+
+    /**
+     * 在右侧面板显示查询结果表格
+     */
+    private void displayResultTable(List<Map<String, Object>> rows, String queryName) {
+        if (rows == null || rows.isEmpty()) {
+            addAssistantMessage("查询无结果");
+            return;
+        }
+
+        // 创建TableView
+        TableView<Map<String, Object>> tableView = new TableView<>();
+        tableView.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+
+        // 动态创建列
+        Map<String, Object> firstRow = rows.get(0);
+        for (String columnName : firstRow.keySet()) {
+            TableColumn<Map<String, Object>, String> column = new TableColumn<>(columnName);
+            column.setCellValueFactory(cellData -> {
+                Object value = cellData.getValue().get(columnName);
+                return new javafx.beans.property.SimpleStringProperty(
+                    value != null ? value.toString() : "NULL"
+                );
+            });
+            tableView.getColumns().add(column);
+        }
+
+        // 填充数据
+        tableView.getItems().addAll(rows);
+
+        // 添加到ResultTabPane
+        Tab resultTab = new Tab("结果: " + queryName);
+        resultTab.setContent(tableView);
+        resultTabPane.getTabs().add(resultTab);
+        resultTabPane.getSelectionModel().select(resultTab);
+    }
+
+    /**
+     * 添加助手消息
+     */
+    private void addAssistantMessage(String text) {
+        AgentMessage msg = AgentMessage.assistant(text);
+        addMessageToChat(msg);
     }
 
     private void addMessageToChat(AgentMessage message) {
@@ -398,18 +606,45 @@ public class AgentChatStage extends Stage {
     }
 
     private void updatePendingBar() {
-        HBox pendingBar = (HBox) ((VBox) chatScrollPane.getParent().lookup(".input-area")).getChildren().get(0);
+        try {
+            boolean hasPending = agent != null && agent.hasPendingOperation();
 
-        boolean hasPending = agent != null && agent.hasPendingOperation();
-
-        // 查找pending bar（第一个子节点）
-        VBox inputBox = (VBox) sendButton.getParent().getParent();
-        if (inputBox.getChildren().size() > 0 && inputBox.getChildren().get(0) instanceof HBox) {
-            HBox bar = (HBox) inputBox.getChildren().get(0);
-            if (bar.getChildren().size() > 2) { // 确保是pending bar
-                bar.setVisible(hasPending);
-                bar.setManaged(hasPending);
+            // 查找pending bar（第一个子节点）
+            VBox inputBox = (VBox) sendButton.getParent().getParent();
+            if (inputBox != null && inputBox.getChildren().size() > 0
+                && inputBox.getChildren().get(0) instanceof HBox) {
+                HBox bar = (HBox) inputBox.getChildren().get(0);
+                if (bar.getChildren().size() > 2) { // 确保是pending bar
+                    bar.setVisible(hasPending);
+                    bar.setManaged(hasPending);
+                }
             }
+        } catch (Exception e) {
+            // 忽略pending bar更新失败（不影响主流程）
+            log.debug("更新pending bar失败", e);
+        }
+    }
+
+    /**
+     * 打开上下文管理器
+     */
+    private void openContextManager() {
+        try {
+            red.jiuzhou.agent.texttosql.GameSemanticEnhancer enhancer =
+                agent.getMetadataService() != null ?
+                    new red.jiuzhou.agent.texttosql.GameSemanticEnhancer(jdbcTemplate) :
+                    null;
+
+            if (enhancer == null) {
+                addErrorMessage("语义增强器未初始化");
+                return;
+            }
+
+            SemanticContextManagerStage contextStage = new SemanticContextManagerStage(enhancer, jdbcTemplate);
+            contextStage.show();
+        } catch (Exception e) {
+            log.error("打开上下文管理器失败", e);
+            addErrorMessage("打开上下文管理器失败: " + e.getMessage());
         }
     }
 
