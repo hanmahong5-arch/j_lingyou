@@ -1,0 +1,8 @@
+{
+	"file_path":"D:\\AionReal58\\AionMap\\XML\\absolute_stat_to_pc.xml",
+	"xml_root_tag":"absolute_stat_to_pcs",
+	"list":[],
+	"xml_item_tag":"absolute_stat_to_pc",
+	"table_name":"absolute_stat_to_pc",
+	"sql":"select * from absolute_stat_to_pc order by CAST(id AS UNSIGNED) ASC"
+}

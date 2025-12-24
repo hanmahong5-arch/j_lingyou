@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<animations>
+  <animation animation_length="1.8" name="cattack_noweapon_001">
+    <hitpoint TOOL_ParamId="40" when="0.8" what="skill"/>
+    <sound file="Sounds\monster\drakanbard\drakanbard_vritra_atk_armor_02.ogg" TOOL_desc="" TOOL_duration="2.146" TOOL_fadeoutStart="0" TOOL_fadeoutTime="0" TOOL_InRadius="9" TOOL_Is3D="1" TOOL_Loop="0" TOOL_OutRadius="25" TOOL_pan="127" TOOL_ParamId="9" TOOL_Stream="0" type="file" vol="100" when="0"/>
+    <skillfx TOOL_ParamId="28" when="0"/>
+  </animation>
+</animations>

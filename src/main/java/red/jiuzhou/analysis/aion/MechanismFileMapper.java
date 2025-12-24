@@ -50,59 +50,10 @@ public class MechanismFileMapper {
         AionMechanismCategory.CLIENT_STRINGS
     );
 
-    /** 文件夹级别映射（优先级最高） */
-    private static final Map<String, AionMechanismCategory> FOLDER_MAPPINGS = new HashMap<>();
-
-    /** 精确文件名映射（次高优先级） */
-    private static final Map<String, AionMechanismCategory> EXACT_FILE_MAPPINGS = new HashMap<>();
-
-    static {
-        // 文件夹映射
-        FOLDER_MAPPINGS.put("animationmarkers", AionMechanismCategory.ANIMATION_MARKERS);
-        FOLDER_MAPPINGS.put("animations", AionMechanismCategory.ANIMATION);
-        FOLDER_MAPPINGS.put("custompreset", AionMechanismCategory.CHARACTER_PRESET);
-        FOLDER_MAPPINGS.put("subzones", AionMechanismCategory.SUBZONE);
-        FOLDER_MAPPINGS.put("id", AionMechanismCategory.ID_MAPPING);
-        FOLDER_MAPPINGS.put("special01", AionMechanismCategory.GAME_CONFIG);
-        FOLDER_MAPPINGS.put("worlds", AionMechanismCategory.NPC); // World目录下主要是NPC刷怪
-
-        // 精确文件名映射
-        EXACT_FILE_MAPPINGS.put("abyss.xml", AionMechanismCategory.ABYSS);
-        EXACT_FILE_MAPPINGS.put("abyss_rank.xml", AionMechanismCategory.ABYSS);
-        EXACT_FILE_MAPPINGS.put("abyss_rank_points.xml", AionMechanismCategory.ABYSS);
-        EXACT_FILE_MAPPINGS.put("siege_locations.xml", AionMechanismCategory.ABYSS);
-
-        EXACT_FILE_MAPPINGS.put("npcs.xml", AionMechanismCategory.NPC);
-        EXACT_FILE_MAPPINGS.put("npc_shouts.xml", AionMechanismCategory.NPC);
-        EXACT_FILE_MAPPINGS.put("npc_walkers.xml", AionMechanismCategory.NPC);
-
-        EXACT_FILE_MAPPINGS.put("items.xml", AionMechanismCategory.ITEM);
-        EXACT_FILE_MAPPINGS.put("item_sets.xml", AionMechanismCategory.ITEM);
-        EXACT_FILE_MAPPINGS.put("item_random_bonus.xml", AionMechanismCategory.ITEM);
-
-        EXACT_FILE_MAPPINGS.put("skills.xml", AionMechanismCategory.SKILL);
-        EXACT_FILE_MAPPINGS.put("skill_trees.xml", AionMechanismCategory.SKILL);
-
-        EXACT_FILE_MAPPINGS.put("quests.xml", AionMechanismCategory.QUEST);
-        EXACT_FILE_MAPPINGS.put("quest_data.xml", AionMechanismCategory.QUEST);
-
-        EXACT_FILE_MAPPINGS.put("goodslists.xml", AionMechanismCategory.SHOP);
-        EXACT_FILE_MAPPINGS.put("merchants.xml", AionMechanismCategory.SHOP);
-
-        EXACT_FILE_MAPPINGS.put("toypets.xml", AionMechanismCategory.PET);
-        EXACT_FILE_MAPPINGS.put("familiars.xml", AionMechanismCategory.PET);
-
-        EXACT_FILE_MAPPINGS.put("recipes.xml", AionMechanismCategory.CRAFT);
-        EXACT_FILE_MAPPINGS.put("assembly.xml", AionMechanismCategory.CRAFT);
-
-        EXACT_FILE_MAPPINGS.put("titles.xml", AionMechanismCategory.TITLE);
-        EXACT_FILE_MAPPINGS.put("portals.xml", AionMechanismCategory.PORTAL);
-        EXACT_FILE_MAPPINGS.put("fly_paths.xml", AionMechanismCategory.PORTAL);
-        EXACT_FILE_MAPPINGS.put("instances.xml", AionMechanismCategory.INSTANCE);
-        EXACT_FILE_MAPPINGS.put("gotchas.xml", AionMechanismCategory.GOTCHA);
-        EXACT_FILE_MAPPINGS.put("game_config.xml", AionMechanismCategory.GAME_CONFIG);
-        EXACT_FILE_MAPPINGS.put("global_config.xml", AionMechanismCategory.GAME_CONFIG);
-    }
+    /**
+     * 使用 AionMechanismDetector 的静态映射，保持一致性
+     * 不再维护独立的映射副本，避免数据不一致
+     */
 
     private MechanismFileMapper() {
         // 初始化每个机制的文件集合
@@ -188,6 +139,7 @@ public class MechanismFileMapper {
 
     /**
      * 递归扫描目录
+     * 使用 AionMechanismDetector 的文件夹映射
      */
     private void scanRecursively(File dir, AionMechanismCategory parentCategory) {
         if (dir == null || !dir.exists()) return;
@@ -195,9 +147,9 @@ public class MechanismFileMapper {
         File[] files = dir.listFiles();
         if (files == null) return;
 
-        // 检查当前目录是否有文件夹级别映射
+        // 检查当前目录是否有文件夹级别映射（使用 AionMechanismDetector）
         String dirName = dir.getName().toLowerCase();
-        AionMechanismCategory folderCategory = FOLDER_MAPPINGS.get(dirName);
+        AionMechanismCategory folderCategory = AionMechanismDetector.getFolderMapping(dirName);
         if (folderCategory != null) {
             parentCategory = folderCategory;
         }
@@ -214,36 +166,11 @@ public class MechanismFileMapper {
 
     /**
      * 检测文件所属机制
+     * 委托给 AionMechanismDetector 以保持一致性
      */
     private AionMechanismCategory detectMechanism(File file, AionMechanismCategory parentCategory) {
-        String fileName = file.getName().toLowerCase();
-
-        // 1. 精确文件名匹配（最高优先级）
-        AionMechanismCategory exact = EXACT_FILE_MAPPINGS.get(fileName);
-        if (exact != null) {
-            return exact;
-        }
-
-        // 2. 继承父目录机制（文件夹级别映射）
-        if (parentCategory != null) {
-            return parentCategory;
-        }
-
-        // 3. 正则模式匹配（按优先级排序）
-        List<AionMechanismCategory> sortedCategories = new ArrayList<>(Arrays.asList(AionMechanismCategory.values()));
-        sortedCategories.sort((a, b) -> Integer.compare(b.getPriority(), a.getPriority()));
-
-        for (AionMechanismCategory category : sortedCategories) {
-            if (category == AionMechanismCategory.OTHER) continue;
-
-            Pattern pattern = category.getPattern();
-            if (pattern != null && pattern.matcher(fileName).matches()) {
-                return category;
-            }
-        }
-
-        // 4. 兜底分类
-        return AionMechanismCategory.OTHER;
+        // 委托给 AionMechanismDetector 的静态方法
+        return AionMechanismDetector.detectMechanismForFile(file, parentCategory);
     }
 
     /**
@@ -357,38 +284,10 @@ public class MechanismFileMapper {
 
     /**
      * 检测文件路径的机制（静态方法，不依赖缓存）
+     * 委托给 AionMechanismDetector 以保持一致性
      */
     public static AionMechanismCategory detectMechanismStatic(String filePath) {
         if (filePath == null) return AionMechanismCategory.OTHER;
-
-        File file = new File(filePath);
-        String fileName = file.getName().toLowerCase();
-
-        // 精确匹配
-        AionMechanismCategory exact = EXACT_FILE_MAPPINGS.get(fileName);
-        if (exact != null) return exact;
-
-        // 检查父目录
-        File parent = file.getParentFile();
-        while (parent != null) {
-            String dirName = parent.getName().toLowerCase();
-            AionMechanismCategory folderCategory = FOLDER_MAPPINGS.get(dirName);
-            if (folderCategory != null) return folderCategory;
-            parent = parent.getParentFile();
-        }
-
-        // 正则匹配
-        List<AionMechanismCategory> sortedCategories = new ArrayList<>(Arrays.asList(AionMechanismCategory.values()));
-        sortedCategories.sort((a, b) -> Integer.compare(b.getPriority(), a.getPriority()));
-
-        for (AionMechanismCategory category : sortedCategories) {
-            if (category == AionMechanismCategory.OTHER) continue;
-            Pattern pattern = category.getPattern();
-            if (pattern != null && pattern.matcher(fileName).matches()) {
-                return category;
-            }
-        }
-
-        return AionMechanismCategory.OTHER;
+        return AionMechanismDetector.detectMechanismForFile(new File(filePath), null);
     }
 }

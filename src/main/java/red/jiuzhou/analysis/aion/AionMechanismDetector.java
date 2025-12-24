@@ -506,4 +506,89 @@ public class AionMechanismDetector {
         }
         return sb.toString();
     }
+
+    // ==================== 静态工具方法（供其他类使用） ====================
+
+    /**
+     * 获取文件夹级别映射
+     * 供 MechanismFileMapper 使用，保持数据源一致性
+     *
+     * @param dirName 目录名（不区分大小写）
+     * @return 对应的机制分类，如果没有映射则返回 null
+     */
+    public static AionMechanismCategory getFolderMapping(String dirName) {
+        if (dirName == null) return null;
+        // 遍历查找（不区分大小写）
+        for (Map.Entry<String, AionMechanismCategory> entry : FOLDER_MAPPINGS.entrySet()) {
+            if (entry.getKey().equalsIgnoreCase(dirName)) {
+                return entry.getValue();
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 检测文件所属机制（静态方法）
+     * 供 MechanismFileMapper 使用，保持检测逻辑一致性
+     *
+     * @param file 要检测的文件
+     * @param parentCategory 父目录的机制分类（如果有的话）
+     * @return 检测到的机制分类
+     */
+    public static AionMechanismCategory detectMechanismForFile(File file, AionMechanismCategory parentCategory) {
+        if (file == null) return AionMechanismCategory.OTHER;
+
+        String fileName = file.getName().toLowerCase();
+
+        // 1. 检查手动覆盖配置（最高优先级）
+        MechanismOverrideConfig overrideConfig = MechanismOverrideConfig.getInstance();
+        if (overrideConfig.hasOverride(fileName)) {
+            return overrideConfig.getOverride(fileName);
+        }
+
+        // 2. 检查是否被排除
+        if (overrideConfig.isExcluded(fileName)) {
+            return AionMechanismCategory.OTHER;
+        }
+
+        // 3. 精确文件名匹配
+        AionMechanismCategory exact = EXACT_FILE_MAPPINGS.get(fileName);
+        if (exact != null) {
+            return exact;
+        }
+
+        // 4. 继承父目录机制（文件夹级别映射）
+        if (parentCategory != null) {
+            return parentCategory;
+        }
+
+        // 5. 检查文件所在目录是否有文件夹映射
+        File parent = file.getParentFile();
+        while (parent != null) {
+            AionMechanismCategory folderCategory = getFolderMapping(parent.getName());
+            if (folderCategory != null) {
+                return folderCategory;
+            }
+            parent = parent.getParentFile();
+        }
+
+        // 6. 正则模式匹配（按优先级排序）
+        List<AionMechanismCategory> sortedCategories = new ArrayList<>(Arrays.asList(AionMechanismCategory.values()));
+        Collections.sort(sortedCategories, new Comparator<AionMechanismCategory>() {
+            @Override
+            public int compare(AionMechanismCategory a, AionMechanismCategory b) {
+                return Integer.compare(b.getPriority(), a.getPriority());
+            }
+        });
+
+        for (AionMechanismCategory category : sortedCategories) {
+            if (category == AionMechanismCategory.OTHER) continue;
+            if (category.matches(fileName)) {
+                return category;
+            }
+        }
+
+        // 7. 兜底分类
+        return AionMechanismCategory.OTHER;
+    }
 }

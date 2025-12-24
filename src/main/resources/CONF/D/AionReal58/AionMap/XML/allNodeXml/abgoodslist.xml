@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<abgoodslists>
+  <abgoodslist>
+    <id/>
+    <name/>
+    <desc/>
+    <goods_list>
+      <data>
+        <item/>
+      </data>
+    </goods_list>
+  </abgoodslist>
+</abgoodslists>
