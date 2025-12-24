@@ -219,32 +219,53 @@ public class AionMechanismDetector {
 
     /**
      * 扫描并构建机制视图
+     *
+     * 扫描优先级（高到低）：
+     * 1. 本地化目录 - 最高优先级，覆盖服务端
+     * 2. 服务端目录 - 本地化没有的文件才显示
+     * 3. 客户端目录 - 独立的客户端配置
      */
     public AionMechanismView scan() {
         AionMechanismView view = new AionMechanismView();
 
         log.info("开始扫描Aion XML目录: {}", publicRoot.getAbsolutePath());
 
-        // 扫描公共目录（服务端XML）
-        Set<String> publicFileNames = new HashSet<>();
-        scanDirectory(publicRoot, publicRoot, view, false, publicFileNames);
+        // 用于去重的文件名集合（小写，便于比较）
+        Set<String> processedFileNames = new HashSet<>();
 
-        // 扫描本地化目录
+        // 1. 先扫描本地化目录（优先级最高）
+        Set<String> localizedFileNames = new HashSet<>();
         if (localizedRoot != null && localizedRoot.exists()) {
-            log.info("扫描本地化目录: {}", localizedRoot.getAbsolutePath());
-            Set<String> localizedFileNames = new HashSet<>();
+            log.info("扫描本地化目录（优先）: {}", localizedRoot.getAbsolutePath());
             scanDirectory(localizedRoot, localizedRoot, view, true, localizedFileNames);
+            // 记录本地化文件名用于去重
+            for (String name : localizedFileNames) {
+                processedFileNames.add(name.toLowerCase());
+            }
+            log.info("本地化目录: {} 个文件", localizedFileNames.size());
+        }
 
-            // 检测本地化覆盖
+        // 2. 扫描公共目录（服务端XML），跳过本地化已有的文件
+        Set<String> publicFileNames = new HashSet<>();
+        scanDirectoryWithDedup(publicRoot, publicRoot, view, false, publicFileNames, processedFileNames);
+        // 将公共目录文件名也加入去重集合
+        for (String name : publicFileNames) {
+            processedFileNames.add(name.toLowerCase());
+        }
+        log.info("服务端目录: {} 个文件（已排除本地化重复）", publicFileNames.size());
+
+        // 检测本地化覆盖关系
+        if (!localizedFileNames.isEmpty()) {
             detectLocalizedOverrides(view, publicFileNames, localizedFileNames);
         }
 
-        // 扫描客户端XML目录（如果配置了）
+        // 3. 扫描客户端XML目录（如果配置了）
         if (clientRoot != null && clientRoot.exists()) {
             log.info("扫描客户端XML目录: {}", clientRoot.getAbsolutePath());
             Set<String> clientFileNames = new HashSet<>();
-            scanDirectory(clientRoot, clientRoot, view, false, clientFileNames);
-            log.info("客户端XML目录扫描完成，新增 {} 个文件", clientFileNames.size());
+            // 客户端文件通常有不同命名（client_前缀），但也做去重检查
+            scanDirectoryWithDedup(clientRoot, clientRoot, view, false, clientFileNames, processedFileNames);
+            log.info("客户端目录: {} 个文件", clientFileNames.size());
         }
 
         // 更新统计
@@ -252,6 +273,68 @@ public class AionMechanismDetector {
 
         log.info("扫描完成: {}", view.getStatistics().getSummary());
         return view;
+    }
+
+    /**
+     * 带去重的目录扫描
+     */
+    private void scanDirectoryWithDedup(File dir, File root, AionMechanismView view,
+                                        boolean isLocalized, Set<String> fileNames,
+                                        Set<String> excludeFileNames) {
+        if (dir == null || !dir.exists() || !dir.isDirectory()) {
+            return;
+        }
+
+        File[] files = dir.listFiles(new FileFilter() {
+            @Override
+            public boolean accept(File f) {
+                return f.isFile() && f.getName().toLowerCase().endsWith(".xml");
+            }
+        });
+
+        File[] subDirs = dir.listFiles(new FileFilter() {
+            @Override
+            public boolean accept(File f) {
+                return f.isDirectory();
+            }
+        });
+
+        // 处理XML文件（跳过已存在的）
+        if (files != null) {
+            for (File file : files) {
+                String fileName = file.getName();
+                String fileNameLower = fileName.toLowerCase();
+
+                // 检查是否已被更高优先级目录处理
+                if (excludeFileNames.contains(fileNameLower)) {
+                    log.debug("跳过重复文件: {} (已有本地化版本)", fileName);
+                    continue;
+                }
+
+                String relativePath = getRelativePath(root, file);
+                DetectionResult result = detect(file, relativePath, isLocalized);
+
+                // 添加到视图（使用正确的构造函数）
+                AionMechanismView.FileEntry entry = new AionMechanismView.FileEntry(
+                        fileName,
+                        relativePath,
+                        file,
+                        result,
+                        isLocalized
+                );
+
+                // 使用 view.addFile 统一添加（自动处理统计）
+                view.addFile(entry);
+                fileNames.add(fileName);
+            }
+        }
+
+        // 递归处理子目录
+        if (subDirs != null) {
+            for (File subDir : subDirs) {
+                scanDirectoryWithDedup(subDir, root, view, isLocalized, fileNames, excludeFileNames);
+            }
+        }
     }
 
     /**
