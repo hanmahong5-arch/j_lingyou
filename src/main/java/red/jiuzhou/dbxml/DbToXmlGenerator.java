@@ -144,6 +144,11 @@ public class DbToXmlGenerator {
                         }else{
                             element.addElement(key).setText(value);
                         }
+                    } else {
+                        // 显式标记 NULL 值，保证往返一致性
+                        if(!key.startsWith("_attr_")){
+                            element.addElement(key).addAttribute("null", "true");
+                        }
                     }
                     if (listDbcolumnList.contains(key)) {
                         ColumnMapping columnMapping = table.getColumnMapping(key);

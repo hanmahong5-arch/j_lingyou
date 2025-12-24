@@ -102,76 +102,72 @@ public class XmlToDbGenerator {
         }
         // 按字符串长度倒序排序
         allTableNameList.sort(Comparator.comparingInt(String::length).reversed());
-        allTableNameList.forEach(DatabaseUtil::delTable);
-        try {
-            // 计算总数据量
-            int totalMain = mainTabList.size();
-            int totalSub = subTabList.values().stream().mapToInt(List::size).sum();
-            int totalRecords = totalMain + totalSub;
-            int processedRecords = 0;
 
-            System.out.printf("开始数据导入，总记录数: %d (主表: %d, 子表: %d)\n", totalRecords, totalMain, totalSub);
-            //ai处理字段
-            if(selectedColumns != null){
-                log.info("selectedColumns：{}", selectedColumns.toString());
-                selectedColumns.forEach(column -> {
-                    DashScopeBatchHelper.rewriteField(mainTabList, table.getTableName(), column, aiModule);
+        // 计算总数据量
+        int totalMain = mainTabList.size();
+        int totalSub = subTabList.values().stream().mapToInt(List::size).sum();
+        int totalRecords = totalMain + totalSub;
+        final int[] processedRecords = {0};
 
-                    int[] len = {DatabaseUtil.getColumnLength(table.getTableName(), column)};
-                    mainTabList.forEach(itemMap -> {
-                        String val = itemMap.get(column);
-                        if(val != null && val.length() > len[0]){
-                            try {
-                                DatabaseUtil.ensureVarcharLengthIfNeeded(table.getTableName(), column, val.length());
-                                len[0] = val.length();
-                            } catch (Exception e) {
-                                throw new RuntimeException(e);
-                            }
+        System.out.printf("开始数据导入，总记录数: %d (主表: %d, 子表: %d)\n", totalRecords, totalMain, totalSub);
+
+        // AI处理字段（在事务外进行）
+        if(selectedColumns != null){
+            log.info("selectedColumns：{}", selectedColumns.toString());
+            selectedColumns.forEach(column -> {
+                DashScopeBatchHelper.rewriteField(mainTabList, table.getTableName(), column, aiModule);
+
+                int[] len = {DatabaseUtil.getColumnLength(table.getTableName(), column)};
+                mainTabList.forEach(itemMap -> {
+                    String val = itemMap.get(column);
+                    if(val != null && val.length() > len[0]){
+                        try {
+                            DatabaseUtil.ensureVarcharLengthIfNeeded(table.getTableName(), column, val.length());
+                            len[0] = val.length();
+                        } catch (Exception e) {
+                            throw new RuntimeException(e);
                         }
-                    });
+                    }
                 });
-            }
-            // 处理主表数据
+            });
+        }
+
+        // 使用统一事务确保数据一致性（原子性：全部成功或全部回滚）
+        TransactionStatus globalTransaction = DatabaseUtil.beginTransaction();
+        try {
+            // 1. 在事务内删除旧数据
+            final List<String> finalTableList = allTableNameList;
+            finalTableList.forEach(DatabaseUtil::delTable);
+
+            // 2. 插入主表数据
             List<List<Map<String, String>>> mainBatches = splitList(mainTabList, 1000);
             for (List<Map<String, String>> batch : mainBatches) {
-                TransactionStatus transactionStatus = DatabaseUtil.beginTransaction();
-                try {
-                    DatabaseUtil.batchInsert(table.getTableName(), batch);
-                    DatabaseUtil.commitTransaction(transactionStatus);
-                    processedRecords += batch.size();
-                    printProgress(processedRecords, totalRecords);
-                }catch (Exception e){
-                    DatabaseUtil.rollbackTransaction(transactionStatus);
-                    throw e;
-                }
+                DatabaseUtil.batchInsert(table.getTableName(), batch);
+                processedRecords[0] += batch.size();
+                printProgress(processedRecords[0], totalRecords);
             }
 
-            // 处理子表数据
+            // 3. 插入子表数据
             for (Map.Entry<String, List<Map<String, String>>> entry : subTabList.entrySet()) {
                 String tableName = entry.getKey();
                 List<Map<String, String>> list = entry.getValue();
-                //FileUtil.writeUtf8String(JSON.toJSONString(list), "D:\\workspace\\xmlToDb\\data\\服务端xml\\XML\\China\\test" + File.separator + tableName + ".json");
-                //System.out.println("处理子表数据：" + tableName + "，总记录数: " + list.size() + " ..." + list.toString());
                 for (List<Map<String, String>> batch : splitList(list, 1000)) {
-                    TransactionStatus transactionStatus = DatabaseUtil.beginTransaction();
-                    try {
-                        DatabaseUtil.batchInsert(tableName, batch);
-                        DatabaseUtil.commitTransaction(transactionStatus);
-                        processedRecords += batch.size();
-                        printProgress(processedRecords, totalRecords);
-                    }catch (Exception e){
-                        DatabaseUtil.rollbackTransaction(transactionStatus);
-                        throw e;
-                    }
+                    DatabaseUtil.batchInsert(tableName, batch);
+                    processedRecords[0] += batch.size();
+                    printProgress(processedRecords[0], totalRecords);
                 }
             }
 
+            // 4. 全部成功，提交事务
+            DatabaseUtil.commitTransaction(globalTransaction);
             System.out.println("数据导入完成！");
-        } catch (Exception e) {
-            allTableNameList.forEach(DatabaseUtil::delTable);
-            throw new RuntimeException(e);
-        }
 
+        } catch (Exception e) {
+            // 任何失败都回滚，保证数据一致性
+            log.error("导入失败，回滚事务: {}", e.getMessage());
+            DatabaseUtil.rollbackTransaction(globalTransaction);
+            throw new RuntimeException("数据导入失败，已回滚: " + e.getMessage(), e);
+        }
     }
 
     public double getProgress() {
@@ -200,20 +196,27 @@ public class XmlToDbGenerator {
             for (Element element : elements) {
 
                 Iterator<Element> subEle = element.elementIterator();
-                Map<String, String> mainMap = new HashMap<>();
+                // 使用 LinkedHashMap 保证字段顺序稳定（导入导出对称性）
+                Map<String, String> mainMap = new LinkedHashMap<>();
                 while (subEle.hasNext()) {
                     Element subElement = subEle.next();
                     if (!subElement.elements().isEmpty()) {
                         //log.info("subEleName:::::{}", subElement.getName());
                         generateSubSql(element, subElement, table.getColumnMappingByXmlTag(subElement.getName()), mainMap);
                     } else {
-                        mainMap.put(subElement.getName(), subElement.getText());
+                        // 检查是否有 null="true" 属性标记（往返一致性）
+                        String nullAttr = subElement.attributeValue("null");
+                        if ("true".equals(nullAttr)) {
+                            mainMap.put(subElement.getName(), null);
+                        } else {
+                            mainMap.put(subElement.getName(), subElement.getText());
+                        }
                     }
                 }
-                if(!element.attributes().isEmpty()){
-                    Attribute attribute = element.attributes().get(0);
-                    mainMap.put("_attr_"+attribute.getName(), attribute.getValue());
-                }
+                // 修复：遍历所有属性（之前只取第一个导致属性丢失）
+                element.attributeIterator().forEachRemaining(attr -> {
+                    mainMap.put("_attr_" + attr.getName(), attr.getValue());
+                });
                 if("world".equals(table.getTableName())){
                     mapType = element.elementText("name");
                     mainMap.put("mapTp", mapType);
@@ -236,7 +239,8 @@ public class XmlToDbGenerator {
 
             List<Element> elements = element.elements(columnMaping.getXmlTag());
             elements.forEach(oneEle -> {
-                Map<String, String> subMap = new HashMap<>();
+                // 使用 LinkedHashMap 保证字段顺序稳定
+                Map<String, String> subMap = new LinkedHashMap<>();
                 List<Map<String, String>> subList = subTabList.getOrDefault(columnMaping.getTableName(), new ArrayList<>());
                 Iterator<Element> subEle = oneEle.elementIterator();
                 if(!columnMaping.getAssociatedFiled().contains(">")){
@@ -266,14 +270,21 @@ public class XmlToDbGenerator {
                         generateSubSql(oneEle, subElement, columnMaping.getColumnMappingByXmlTag(subElement.getName()), subMap);
                     } else {
 
-                        if(subMap.get(subElement.getName())!= null){
+                        // 检查是否有 null="true" 属性标记
+                        String nullAttr = subElement.attributeValue("null");
+                        if ("true".equals(nullAttr)) {
+                            subMap.put(subElement.getName(), null);
+                        } else if(subMap.get(subElement.getName())!= null){
                             subMap.put(subElement.getName(), subMap.get(subElement.getName()) + "!@#" + subElement.getText());
                         }else{
                             subMap.put(subElement.getName(), subElement.getText());
                         }
                         if(subElement.elements().isEmpty() && !subElement.attributes().isEmpty()){
                             subElement.attributes().forEach( attribute -> {
-                                subMap.put("_attr__" +subElement.getName() + "__" + attribute.getName(), attribute.getText());
+                                // 跳过 null 标记属性
+                                if (!"null".equals(attribute.getName())) {
+                                    subMap.put("_attr__" +subElement.getName() + "__" + attribute.getName(), attribute.getText());
+                                }
                             });
                         }
                     }
@@ -287,7 +298,8 @@ public class XmlToDbGenerator {
                 subTabList.put(columnMaping.getTableName(), subList);
             });
         }else{
-            Map<String, String> subMap = new HashMap<>();
+            // 使用 LinkedHashMap 保证字段顺序稳定
+            Map<String, String> subMap = new LinkedHashMap<>();
             List<Map<String, String>> subList = subTabList.getOrDefault(columnMaping.getTableName(), new ArrayList<>());
             Iterator<Element> subEle = element.elementIterator();
             if(!columnMaping.getAssociatedFiled().contains(">")){
@@ -316,15 +328,21 @@ public class XmlToDbGenerator {
                 if (!subElement.elements().isEmpty()) {
                     generateSubSql(element, subElement, columnMaping.getColumnMappingByXmlTag(subElement.getName()), subMap);
                 } else {
-                    //subMap.put(subElement.getName(), subElement.getText());
-                    if(subMap.get(subElement.getName())!= null){
+                    // 检查是否有 null="true" 属性标记
+                    String nullAttr = subElement.attributeValue("null");
+                    if ("true".equals(nullAttr)) {
+                        subMap.put(subElement.getName(), null);
+                    } else if(subMap.get(subElement.getName())!= null){
                         subMap.put(subElement.getName(), subMap.get(subElement.getName()) + "!@#" + subElement.getText());
                     }else{
                         subMap.put(subElement.getName(), subElement.getText());
                     }
                     if(subElement.elements().isEmpty() && !subElement.attributes().isEmpty()){
                         subElement.attributes().forEach( attribute -> {
-                            subMap.put("_attr__" +subElement.getName() + "__" + attribute.getName(), attribute.getText());
+                            // 跳过 null 标记属性
+                            if (!"null".equals(attribute.getName())) {
+                                subMap.put("_attr__" +subElement.getName() + "__" + attribute.getName(), attribute.getText());
+                            }
                         });
                     }
                 }
