@@ -35,13 +35,31 @@ public class AionMechanismDetector {
     private static final Set<String> LOCALIZATION_FOLDERS = new HashSet<>();
 
     static {
-        // 文件夹级别映射
+        // ==================== 服务端文件夹级别映射 ====================
         FOLDER_MAPPINGS.put("AnimationMarkers", AionMechanismCategory.ANIMATION_MARKERS);
         FOLDER_MAPPINGS.put("Animations", AionMechanismCategory.ANIMATION);
         FOLDER_MAPPINGS.put("Custompreset", AionMechanismCategory.CHARACTER_PRESET);
         FOLDER_MAPPINGS.put("Subzones", AionMechanismCategory.SUBZONE);
         FOLDER_MAPPINGS.put("ID", AionMechanismCategory.ID_MAPPING);
         FOLDER_MAPPINGS.put("Special01", AionMechanismCategory.GAME_CONFIG);
+
+        // ==================== 客户端文件夹级别映射 ====================
+        // 客户端XML目录结构: data/China/skills/skills, data/China/items, etc.
+        FOLDER_MAPPINGS.put("skills", AionMechanismCategory.SKILL);      // 技能目录
+        FOLDER_MAPPINGS.put("items", AionMechanismCategory.ITEM);        // 物品目录
+        FOLDER_MAPPINGS.put("Items", AionMechanismCategory.ITEM);        // 物品目录（大写）
+        FOLDER_MAPPINGS.put("Npcs", AionMechanismCategory.NPC);          // NPC目录
+        FOLDER_MAPPINGS.put("Quest", AionMechanismCategory.QUEST);       // 任务目录
+        FOLDER_MAPPINGS.put("func_pet", AionMechanismCategory.PET);      // 功能宠物目录
+        FOLDER_MAPPINGS.put("Housing", AionMechanismCategory.HOUSING);   // 房屋目录
+        FOLDER_MAPPINGS.put("Luna", AionMechanismCategory.LUNA);         // Luna目录
+        FOLDER_MAPPINGS.put("BM", AionMechanismCategory.SHOP);           // 商城目录
+        FOLDER_MAPPINGS.put("Goods", AionMechanismCategory.SHOP);        // 商品目录
+        FOLDER_MAPPINGS.put("FlightPath", AionMechanismCategory.PORTAL); // 飞行路径
+        FOLDER_MAPPINGS.put("rides", AionMechanismCategory.PET);         // 坐骑目录
+        FOLDER_MAPPINGS.put("world", AionMechanismCategory.NPC);         // 世界目录（主要是NPC刷怪）
+        FOLDER_MAPPINGS.put("Gather", AionMechanismCategory.CRAFT);      // 采集目录
+        FOLDER_MAPPINGS.put("monsterbook", AionMechanismCategory.NPC);   // 怪物图鉴
 
         // 精确文件名映射（常见的核心文件）
         EXACT_FILE_MAPPINGS.put("abyss.xml", AionMechanismCategory.ABYSS);
@@ -93,8 +111,24 @@ public class AionMechanismDetector {
         EXACT_FILE_MAPPINGS.put("polymorph_temp_skill.xml", AionMechanismCategory.SKILL);
         EXACT_FILE_MAPPINGS.put("stigma_hiddenskill.xml", AionMechanismCategory.SKILL);
 
-        // 客户端技能相关文件
+        // 客户端技能相关文件（服务端strings）
         EXACT_FILE_MAPPINGS.put("client_strings_skill.xml", AionMechanismCategory.SKILL);
+
+        // ==================== 客户端XML精确映射 ====================
+        // 客户端技能文件（位于 data/China/skills/skills 目录）
+        EXACT_FILE_MAPPINGS.put("client_skills.xml", AionMechanismCategory.SKILL);
+        EXACT_FILE_MAPPINGS.put("client_skill_learns.xml", AionMechanismCategory.SKILL);
+        EXACT_FILE_MAPPINGS.put("client_skill_charge.xml", AionMechanismCategory.SKILL);
+        EXACT_FILE_MAPPINGS.put("client_skill_prohibit.xml", AionMechanismCategory.SKILL);
+        EXACT_FILE_MAPPINGS.put("client_pc_skill_skin.xml", AionMechanismCategory.SKILL);
+        EXACT_FILE_MAPPINGS.put("client_polymorph_temp_skill.xml", AionMechanismCategory.SKILL);
+        EXACT_FILE_MAPPINGS.put("client_abyss_leader_skill.xml", AionMechanismCategory.SKILL);
+        EXACT_FILE_MAPPINGS.put("client_ultra_skills.xml", AionMechanismCategory.SKILL);
+        EXACT_FILE_MAPPINGS.put("client_absolute_stat_to_pc.xml", AionMechanismCategory.SKILL);
+        EXACT_FILE_MAPPINGS.put("conditional_bonuses.xml", AionMechanismCategory.SKILL);
+        EXACT_FILE_MAPPINGS.put("skill_shortcut_replace.xml", AionMechanismCategory.SKILL);
+        EXACT_FILE_MAPPINGS.put("skill_fx.xml", AionMechanismCategory.SKILL);
+        EXACT_FILE_MAPPINGS.put("stigma_slots.xml", AionMechanismCategory.STIGMA_TRANSFORM);
 
         // 任务系统核心文件
         EXACT_FILE_MAPPINGS.put("quests.xml", AionMechanismCategory.QUEST);
@@ -158,16 +192,29 @@ public class AionMechanismDetector {
 
     private final File publicRoot;
     private final File localizedRoot;
+    private final File clientRoot;  // 客户端XML目录
 
     /**
-     * 创建检测器
+     * 创建检测器（不含客户端目录）
      *
      * @param publicRoot    公共XML根目录
      * @param localizedRoot 本地化XML目录（可为null）
      */
     public AionMechanismDetector(File publicRoot, File localizedRoot) {
+        this(publicRoot, localizedRoot, null);
+    }
+
+    /**
+     * 创建检测器（含客户端目录）
+     *
+     * @param publicRoot    公共XML根目录
+     * @param localizedRoot 本地化XML目录（可为null）
+     * @param clientRoot    客户端XML目录（可为null）
+     */
+    public AionMechanismDetector(File publicRoot, File localizedRoot, File clientRoot) {
         this.publicRoot = publicRoot;
         this.localizedRoot = localizedRoot;
+        this.clientRoot = clientRoot;
     }
 
     /**
@@ -178,7 +225,7 @@ public class AionMechanismDetector {
 
         log.info("开始扫描Aion XML目录: {}", publicRoot.getAbsolutePath());
 
-        // 扫描公共目录
+        // 扫描公共目录（服务端XML）
         Set<String> publicFileNames = new HashSet<>();
         scanDirectory(publicRoot, publicRoot, view, false, publicFileNames);
 
@@ -190,6 +237,14 @@ public class AionMechanismDetector {
 
             // 检测本地化覆盖
             detectLocalizedOverrides(view, publicFileNames, localizedFileNames);
+        }
+
+        // 扫描客户端XML目录（如果配置了）
+        if (clientRoot != null && clientRoot.exists()) {
+            log.info("扫描客户端XML目录: {}", clientRoot.getAbsolutePath());
+            Set<String> clientFileNames = new HashSet<>();
+            scanDirectory(clientRoot, clientRoot, view, false, clientFileNames);
+            log.info("客户端XML目录扫描完成，新增 {} 个文件", clientFileNames.size());
         }
 
         // 更新统计

@@ -48,6 +48,7 @@ public class AionMechanismExplorerStage extends Stage {
     // 配置
     private String aionXmlPath;
     private String localizedPath;
+    private String clientXmlPath;  // 客户端XML路径
 
     // 导航状态
     private final Stack<NavigationState> navigationHistory = new Stack<>();
@@ -114,12 +115,17 @@ public class AionMechanismExplorerStage extends Stage {
         try {
             aionXmlPath = YamlUtils.getPropertyOrDefault("aion.xmlPath", "D:\\AionReal58\\AionMap\\XML");
             localizedPath = YamlUtils.getPropertyOrDefault("aion.localizedPath", aionXmlPath + "\\China");
+            clientXmlPath = YamlUtils.getPropertyOrDefault("aion.clientXmlPath", null);
             log.info("Aion XML路径: {}", aionXmlPath);
             log.info("本地化路径: {}", localizedPath);
+            if (clientXmlPath != null) {
+                log.info("客户端XML路径: {}", clientXmlPath);
+            }
         } catch (Exception e) {
             log.warn("加载配置失败，使用默认值: {}", e.getMessage());
             aionXmlPath = "D:\\AionReal58\\AionMap\\XML";
             localizedPath = aionXmlPath + "\\China";
+            clientXmlPath = null;
         }
     }
 
@@ -651,13 +657,17 @@ public class AionMechanismExplorerStage extends Stage {
         progressIndicator.setVisible(true);
         statusLabel.setText("正在扫描...");
         logPanel.info("开始扫描Aion XML目录: " + aionXmlPath);
+        if (clientXmlPath != null) {
+            logPanel.info("包含客户端XML目录: " + clientXmlPath);
+        }
 
         CompletableFuture.runAsync(() -> {
             try {
                 File publicRoot = new File(aionXmlPath);
                 File localizedRoot = new File(localizedPath);
+                File clientRoot = clientXmlPath != null ? new File(clientXmlPath) : null;
 
-                AionMechanismDetector detector = new AionMechanismDetector(publicRoot, localizedRoot);
+                AionMechanismDetector detector = new AionMechanismDetector(publicRoot, localizedRoot, clientRoot);
                 mechanismView = detector.scan();
 
                 Platform.runLater(() -> {
