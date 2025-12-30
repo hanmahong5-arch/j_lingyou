@@ -7,15 +7,18 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * SQL示例库 - Few-Shot Learning
+ * SQL示例库 - Few-Shot Learning（枚举单例模式）
  *
- * 类似Vanna.AI的训练数据，存储自然语言→SQL的映射示例
- * 用于增强AI理解游戏领域查询的准确性
+ * <p>类似Vanna.AI的训练数据，存储自然语言→SQL的映射示例
+ * <p>用于增强AI理解游戏领域查询的准确性
+ * <p>使用枚举单例模式确保线程安全且防止反射攻击
  *
  * @author Claude
  * @date 2025-12-20
  */
-public class SqlExampleLibrary {
+public enum SqlExampleLibrary {
+    /** 单例实例 */
+    INSTANCE;
 
     private static final Logger log = LoggerFactory.getLogger(SqlExampleLibrary.class);
 
@@ -72,19 +75,24 @@ public class SqlExampleLibrary {
     // 示例库存储
     private final Map<String, List<SqlExample>> examplesByCategory = new ConcurrentHashMap<>();
     private final List<SqlExample> allExamples = Collections.synchronizedList(new ArrayList<>());
+    private volatile boolean initialized = false;
 
-    private static SqlExampleLibrary instance;
-
+    /**
+     * 获取单例实例（兼容性方法）
+     */
     public static SqlExampleLibrary getInstance() {
-        if (instance == null) {
-            synchronized (SqlExampleLibrary.class) {
-                if (instance == null) {
-                    instance = new SqlExampleLibrary();
-                    instance.initializeDefaultExamples();
-                }
-            }
+        INSTANCE.ensureInitialized();
+        return INSTANCE;
+    }
+
+    /**
+     * 确保初始化（延迟初始化）
+     */
+    private synchronized void ensureInitialized() {
+        if (!initialized) {
+            initializeDefaultExamples();
+            initialized = true;
         }
-        return instance;
     }
 
     /**
@@ -204,13 +212,13 @@ public class SqlExampleLibrary {
             scored.add(new ScoredExample(example, score));
         }
 
-        // 按相似度排序
-        scored.sort((a, b) -> Double.compare(b.score, a.score));
+        // 按相似度排序（Record使用方法访问器）
+        scored.sort((a, b) -> Double.compare(b.score(), a.score()));
 
         // 返回topK个结果
         List<SqlExample> results = new ArrayList<>();
         for (int i = 0; i < Math.min(topK, scored.size()); i++) {
-            results.add(scored.get(i).example);
+            results.add(scored.get(i).example());
         }
 
         return results;
@@ -253,21 +261,32 @@ public class SqlExampleLibrary {
         return keywords;
     }
 
+    /** Few-Shot提示词模板（文本块） */
+    private static final String FEW_SHOT_HEADER = """
+        ## SQL查询示例
+
+        以下是一些类似查询的正确示例，请参考这些示例来生成SQL：
+
+        """;
+
+    /** 单个示例模板 */
+    private static final String EXAMPLE_TEMPLATE = """
+        **示例 %d**:
+        - 用户意图: %s
+        - SQL查询: `%s`
+
+        """;
+
     /**
      * 生成Few-Shot提示词
      */
     public String generateFewShotPrompt(String userQuery, int exampleCount) {
         List<SqlExample> examples = findSimilarExamples(userQuery, exampleCount);
 
-        StringBuilder sb = new StringBuilder();
-        sb.append("## SQL查询示例\n\n");
-        sb.append("以下是一些类似查询的正确示例，请参考这些示例来生成SQL：\n\n");
-
+        StringBuilder sb = new StringBuilder(FEW_SHOT_HEADER);
         for (int i = 0; i < examples.size(); i++) {
             SqlExample ex = examples.get(i);
-            sb.append(String.format("**示例 %d**:\n", i + 1));
-            sb.append(String.format("- 用户意图: %s\n", ex.getNaturalLanguage()));
-            sb.append(String.format("- SQL查询: `%s`\n\n", ex.getSql()));
+            sb.append(EXAMPLE_TEMPLATE.formatted(i + 1, ex.getNaturalLanguage(), ex.getSql()));
         }
 
         return sb.toString();
@@ -300,15 +319,7 @@ public class SqlExampleLibrary {
     }
 
     /**
-     * 带分数的示例（用于排序）
+     * 带分数的示例（用于排序）- Record模式
      */
-    private static class ScoredExample {
-        SqlExample example;
-        double score;
-
-        ScoredExample(SqlExample example, double score) {
-            this.example = example;
-            this.score = score;
-        }
-    }
+    private record ScoredExample(SqlExample example, double score) {}
 }

@@ -232,71 +232,41 @@ public class FocusAwareTreeCell<T> extends TreeCell<T> {
     }
 
     /**
-     * 根据机制类型获取文件图标
+     * 根据机制类型获取文件图标（Java 14+ switch 表达式）
      */
     private String getFileIconForMechanism(AionMechanismCategory mechanism) {
-        switch (mechanism) {
-            case ITEM:
-                return "🎁";
-            case NPC:
-                return "👾";
-            case SKILL:
-                return "⚔";
-            case QUEST:
-                return "📜";
-            case DROP:
-                return "💎";
-            case INSTANCE:
-                return "🏰";
-            case SHOP:
-                return "🛒";
-            case CRAFT:
-                return "🔨";
-            case ABYSS:
-                return "⚡";
-            case PET:
-                return "🐾";
-            case ENCHANT:
-                return "✨";
-            case TITLE:
-                return "🏅";
-            case PORTAL:
-                return "🚪";
-            case CLIENT_STRINGS:
-                return "📝";
-            case GOTCHA:
-                return "🎰";
-            case LEGION:
-                return "🏴";
-            case HOUSING:
-                return "🏠";
-            case LUNA:
-                return "🌙";
-            case STIGMA_TRANSFORM:
-                return "💠";
-            case NPC_AI:
-                return "🤖";
-            case PLAYER_GROWTH:
-                return "📈";
-            case PVP_RANKING:
-                return "🏆";
-            case TIME_EVENT:
-                return "⏰";
-            case ANIMATION:
-                return "🎬";
-            case ANIMATION_MARKERS:
-                return "📌";
-            case CHARACTER_PRESET:
-                return "👤";
-            case SUBZONE:
-                return "🗺";
-            case ID_MAPPING:
-                return "🔢";
-            case GAME_CONFIG:
-                return "⚙";
-            default:
-                return "📄";
-        }
+        return switch (mechanism) {
+            case ITEM -> "🎁";
+            case NPC -> "👾";
+            case SKILL -> "⚔";
+            case QUEST -> "📜";
+            case DROP -> "💎";
+            case INSTANCE -> "🏰";
+            case SHOP -> "🛒";
+            case CRAFT -> "🔨";
+            case ABYSS -> "⚡";
+            case PET -> "🐾";
+            case ENCHANT -> "✨";
+            case TITLE -> "🏅";
+            case PORTAL -> "🚪";
+            case CLIENT_STRINGS -> "📝";
+            case GOTCHA -> "🎰";
+            case LEGION -> "🏴";
+            case HOUSING -> "🏠";
+            case LUNA -> "🌙";
+            case STIGMA_TRANSFORM -> "💠";
+            case NPC_AI -> "🤖";
+            case PLAYER_GROWTH -> "📈";
+            case PVP_RANKING -> "🏆";
+            case TIME_EVENT -> "⏰";
+            case ANIMATION -> "🎬";
+            case ANIMATION_MARKERS -> "📌";
+            case CHARACTER_PRESET -> "👤";
+            case SUBZONE -> "🗺";
+            case ID_MAPPING -> "🔢";
+            case GAME_CONFIG -> "⚙";
+            case OTHER -> "📄";
+        };
     }
 
     /**

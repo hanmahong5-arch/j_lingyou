@@ -1,0 +1,8 @@
+{
+	"file_path":"D:\\AionReal58\\AionMap\\XML\\Special01\\boost_time_table_level_step_special01.xml",
+	"xml_root_tag":"boost_time_level_steps",
+	"list":[],
+	"xml_item_tag":"boost_time_level_step",
+	"table_name":"boost_time_table_level_step_special01",
+	"sql":"select * from boost_time_table_level_step_special01 order by CAST(id AS UNSIGNED) ASC"
+}

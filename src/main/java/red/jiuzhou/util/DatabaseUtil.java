@@ -262,30 +262,6 @@ public class DatabaseUtil {
         }
     }
 
-    /**
-     * 获取表的主键列名
-     */
-    private static String getPrimaryKeyColumn(String tableName) {
-        JdbcTemplate jdbcTemplate = getJdbcTemplate();
-
-        try {
-            String sql = "SELECT COLUMN_NAME FROM information_schema.KEY_COLUMN_USAGE " +
-                        "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND CONSTRAINT_NAME = 'PRIMARY'";
-
-            List<String> primaryKeys = jdbcTemplate.queryForList(sql, String.class, tableName);
-
-            if (primaryKeys.isEmpty()) {
-                return null;
-            }
-
-            // 返回第一个主键列（通常表只有一个主键或联合主键的第一列）
-            return primaryKeys.get(0);
-
-        } catch (Exception e) {
-            log.error("获取表 {} 的主键列失败: {}", tableName, e.getMessage());
-            return null;
-        }
-    }
 
     /**
      * 判断列是否为数值类型
@@ -373,6 +349,157 @@ public class DatabaseUtil {
         }
     }
 
+    /**
+     * 获取表的主键字段名
+     */
+    public static String getPrimaryKeyColumn(String tableName) {
+        String sql = "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE " +
+                     "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND CONSTRAINT_NAME = 'PRIMARY'";
+        try {
+            return jdbcTemplate.queryForObject(sql, String.class, tableName);
+        } catch (EmptyResultDataAccessException e) {
+            // 表没有主键
+            return null;
+        } catch (Exception e) {
+            log.warn("获取表 {} 的主键失败: {}", tableName, e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * 修复主键字段映射问题
+     * 如果主键字段不在 dataMap 中，尝试从 _attr_id 或其他字段复制值
+     *
+     * 改进点：
+     * 1. 支持所有 _attr_* 格式的字段作为主键候选
+     * 2. 优先使用与主键名称相关的 _attr_ 字段
+     * 3. 更智能的候选字段搜索顺序
+     */
+    private static void fixPrimaryKeyMapping(String tableName, Map<String, String> dataMap, String primaryKey) {
+        if (primaryKey == null || dataMap.containsKey(primaryKey)) {
+            return; // 主键已存在，无需修复
+        }
+
+        // 策略1: 优先查找精确匹配的 _attr_主键名 字段
+        String exactAttrMatch = "_attr_" + primaryKey;
+        if (dataMap.containsKey(exactAttrMatch)) {
+            String value = dataMap.get(exactAttrMatch);
+            if (value != null && !value.trim().isEmpty()) {
+                log.debug("自动修复表 {} 的主键 {}, 从字段 {} 复制值: {}",
+                         tableName, primaryKey, exactAttrMatch, value);
+                dataMap.put(primaryKey, value);
+                return;
+            }
+        }
+
+        // 策略2: 查找所有 _attr_* 开头的字段（按字母顺序优先）
+        List<String> attrFields = dataMap.keySet().stream()
+                .filter(key -> key.startsWith("_attr_"))
+                .sorted()
+                .collect(java.util.stream.Collectors.toList());
+
+        for (String attrField : attrFields) {
+            String value = dataMap.get(attrField);
+            if (value != null && !value.trim().isEmpty()) {
+                log.info("自动修复表 {} 的主键 {}, 从属性字段 {} 复制值: {}",
+                         tableName, primaryKey, attrField, value);
+                dataMap.put(primaryKey, value);
+                return;
+            }
+        }
+
+        // 策略3: 尝试从常见的 ID 字段复制值
+        String[] candidateFields = {"_attr_id", "_attr_ID", "id", "ID", "desc", "name", "dev_name"};
+        for (String candidate : candidateFields) {
+            String value = dataMap.get(candidate);
+            if (value != null && !value.trim().isEmpty()) {
+                log.debug("自动修复表 {} 的主键 {}, 从字段 {} 复制值: {}",
+                         tableName, primaryKey, candidate, value);
+                dataMap.put(primaryKey, value);
+                return;
+            }
+        }
+
+        // 策略4: 如果仍然没有值，生成一个唯一ID
+        if (!dataMap.containsKey(primaryKey)) {
+            String generatedId = UUID.randomUUID().toString();
+            log.warn("表 {} 的主键 {} 缺失，自动生成UUID: {}", tableName, primaryKey, generatedId);
+            dataMap.put(primaryKey, generatedId);
+        }
+    }
+
+    /**
+     * 检查并自动扩展字段长度（防止数据截断）
+     */
+    private static void checkAndExtendFieldLength(String tableName, String columnName, String value) {
+        if (value == null) {
+            return;
+        }
+
+        int valueLength = value.length();
+        if (valueLength > 255) { // 只检查超过255的长度
+            try {
+                int currentLength = getColumnLength(tableName, columnName);
+                if (currentLength < valueLength) {
+                    // 扩展为实际长度的1.2倍，避免频繁扩展
+                    int newLength = (int) (valueLength * 1.2);
+                    if (newLength > 16383) {
+                        // VARCHAR 最大长度限制，超过则转为 TEXT
+                        String alterSql = String.format("ALTER TABLE `%s` MODIFY COLUMN `%s` TEXT",
+                                tableName, columnName);
+                        jdbcTemplate.execute(alterSql);
+                        log.info("字段 {} 长度超限({})，已转为TEXT类型", columnName, valueLength);
+                    } else {
+                        ensureVarcharLengthIfNeeded(tableName, columnName, newLength);
+                        log.info("字段 {} 长度由 {} 扩展为 {}", columnName, currentLength, newLength);
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("检查字段长度失败 {}.{}: {}", tableName, columnName, e.getMessage());
+            }
+        }
+    }
+
+    /**
+     * 移除数据列表中的重复主键记录（保留第一条）
+     */
+    private static List<Map<String, String>> removeDuplicatePrimaryKeys(
+            String tableName,
+            List<Map<String, String>> dataList,
+            String primaryKey) {
+
+        if (primaryKey == null || dataList.size() <= 1) {
+            return dataList;
+        }
+
+        Set<String> seenKeys = new LinkedHashSet<>();
+        List<Map<String, String>> uniqueData = new ArrayList<>();
+        int duplicateCount = 0;
+
+        for (Map<String, String> row : dataList) {
+            String keyValue = row.get(primaryKey);
+            if (keyValue == null || keyValue.trim().isEmpty()) {
+                // 主键为空，保留该行（后续会生成UUID）
+                uniqueData.add(row);
+            } else if (seenKeys.add(keyValue)) {
+                // 首次出现的主键，保留
+                uniqueData.add(row);
+            } else {
+                // 重复主键，跳过
+                duplicateCount++;
+                log.warn("表 {} 发现重复主键 {} = {}, 已跳过该行",
+                         tableName, primaryKey, keyValue);
+            }
+        }
+
+        if (duplicateCount > 0) {
+            log.info("表 {} 移除了 {} 条重复主键记录，保留 {} 条唯一记录",
+                     tableName, duplicateCount, uniqueData.size());
+        }
+
+        return uniqueData;
+    }
+
     public static void batchInsert(String tableName, List<Map<String, String>> dataList) {
         if (dataList == null || dataList.isEmpty()) {
             return;
@@ -383,32 +510,61 @@ public class DatabaseUtil {
             throw new IllegalArgumentException("非法表名: " + tableName);
         }
 
-        // **2. 计算完整的字段集合**（遍历所有 Map，确保字段不丢）
+        // **2. 获取表的主键字段并修复映射问题**
+        String primaryKey = getPrimaryKeyColumn(tableName);
+        if (primaryKey != null) {
+            for (Map<String, String> row : dataList) {
+                fixPrimaryKeyMapping(tableName, row, primaryKey);
+            }
+
+            // **2.1 移除重复主键（保留第一条记录）**
+            dataList = removeDuplicatePrimaryKeys(tableName, dataList, primaryKey);
+
+            if (dataList.isEmpty()) {
+                log.warn("表 {} 的数据在去重后为空，跳过导入", tableName);
+                return;
+            }
+        }
+
+        // **3. 计算完整的字段集合**（遍历所有 Map，确保字段不丢）
         Set<String> columnSet = new LinkedHashSet<>();
         for (Map<String, String> row : dataList) {
             columnSet.addAll(row.keySet());  // 获取所有可能的字段
         }
         List<String> columns = new ArrayList<>(columnSet);
+
+        // **4. 检查字段长度并自动扩展（取第一条数据作为样本检测）**
+        if (!dataList.isEmpty()) {
+            Map<String, String> sampleRow = dataList.get(0);
+            for (String column : columns) {
+                String value = sampleRow.get(column);
+                checkAndExtendFieldLength(tableName, column, value);
+            }
+        }
+
         List<String> wrappedColumns = columns.stream()
                 .map(column -> "`" + column + "`")
                 .collect(Collectors.toList());
 
-        // **3. 生成 SQL 语句**
+        // **5. 生成 SQL 语句**
         String sql = String.format("INSERT INTO %s (%s) VALUES (%s)",
                 tableName,
                 String.join(",", wrappedColumns),
                 String.join(",", Collections.nCopies(columns.size(), "?")));
 
+        // 创建final引用以供匿名内部类使用
+        final List<Map<String, String>> finalDataList = dataList;
+
         try {
             jdbcTemplate.batchUpdate(sql, new BatchPreparedStatementSetter() {
                 @Override
                 public int getBatchSize() {
-                    return dataList.size();
+                    return finalDataList.size();
                 }
 
                 @Override
                 public void setValues(PreparedStatement ps, int i) throws SQLException {
-                    Map<String, String> row = dataList.get(i);
+                    Map<String, String> row = finalDataList.get(i);
                     int index = 1;
                     for (String column : columns) {  // 遍历完整字段
                         Object value = row.getOrDefault(column, null); // **如果字段缺失，填 NULL**
@@ -417,21 +573,47 @@ public class DatabaseUtil {
                 }
             });
         } catch (Exception e) {
-            log.error("批量插入数据失败: {}", dataList.toString(), e);
-            throw new RuntimeException(e);
+            log.error("批量插入数据失败，表名: {}, 主键: {}, 数据量: {}", tableName, primaryKey, finalDataList.size());
+            log.error("SQL语句: {}", sql);
+            if (!finalDataList.isEmpty()) {
+                log.error("第一条数据示例: {}", finalDataList.get(0));
+            }
+            throw new RuntimeException("批量插入失败: " + e.getMessage(), e);
         }
 
-        System.out.println("批量插入 " + dataList.size() + " 条数据成功");
+        log.debug("批量插入 {} 条数据成功到表 {}", finalDataList.size(), tableName);
     }
 
 
 
     /**
-     * 获取总记录数
+     * 获取总记录数（带优化）
+     * - 对于大表（>10万行），先尝试从统计信息获取估算值
+     * - 如果COUNT(*)超时，返回估算值
      */
     public static int getTotalRowCount(String tabName) {
         JdbcTemplate jdbcTemplate = DatabaseUtil.getJdbcTemplate();
-        return jdbcTemplate.queryForObject("SELECT COUNT(*) FROM " + tabName, Integer.class);
+
+        try {
+            // 先尝试从 INFORMATION_SCHEMA 获取估算值（非常快）
+            String estimateSql = "SELECT TABLE_ROWS FROM INFORMATION_SCHEMA.TABLES " +
+                                 "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?";
+            Long estimatedRows = jdbcTemplate.queryForObject(estimateSql, Long.class, tabName);
+
+            // 如果估算值显示数据量很大（>100,000），直接返回估算值，避免慢查询
+            if (estimatedRows != null && estimatedRows > 100000) {
+                log.info("表 {} 数据量较大（估算 {} 行），使用估算值，避免慢查询", tabName, estimatedRows);
+                return estimatedRows.intValue();
+            }
+
+            // 数据量不大，执行精确 COUNT(*)
+            Integer exactCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM " + tabName, Integer.class);
+            return exactCount != null ? exactCount : 0;
+
+        } catch (Exception e) {
+            log.warn("获取表 {} 的总行数失败: {}，返回默认值 1000", tabName, e.getMessage());
+            return 1000; // 失败时返回默认值
+        }
     }
     public static List<Map<String, Object>> fetchPageData(String tabName, int pageIndex, String whereCondition, String tabFilePath) {
         int offset = pageIndex * ROWS_PER_PAGE;

@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<client_combine_recipes>
+  <client_combine_recipe>
+    <id/>
+    <name/>
+    <desc/>
+    <combineskill/>
+    <qualification_race/>
+    <required_skillpoint/>
+    <auto_learn/>
+    <product/>
+    <product_quantity/>
+    <combine_recipe_expansion>
+      <data>
+        <component_quantity/>
+        <component1/>
+        <compo1_quantity/>
+        <component2/>
+        <compo2_quantity/>
+        <component3/>
+        <compo3_quantity/>
+        <component4/>
+        <compo4_quantity/>
+        <component5/>
+        <compo5_quantity/>
+        <component6/>
+        <compo6_quantity/>
+        <component7/>
+        <compo7_quantity/>
+        <component8/>
+        <compo8_quantity/>
+      </data>
+    </combine_recipe_expansion>
+    <require_dp/>
+    <mobile_event/>
+    <combo1_product/>
+    <combo2_product/>
+    <max_production_count/>
+    <desc_craftman/>
+    <craft_delay_id/>
+    <craft_delay_time/>
+    <task_type/>
+    <combo3_product/>
+    <combo4_product/>
+    <highdeva_type/>
+  </client_combine_recipe>
+</client_combine_recipes>

@@ -1,20 +1,32 @@
 package red.jiuzhou.ai;
 
-import java.util.Arrays;
 import java.util.List;
 
+/**
+ * AI模型工厂（Java 14+ switch表达式 + 不可变集合）
+ *
+ * <p>根据模型名称创建对应的AI客户端实例。
+ */
 public class AiModelFactory {
 
-    private static final List<String> SUPPORTED_MODELS = Arrays.asList("qwen", "doubao", "kimi", "deepseek");
+    /** 支持的模型列表（不可变） */
+    private static final List<String> SUPPORTED_MODELS = List.of("qwen", "doubao", "kimi", "deepseek");
 
+    /**
+     * 根据模型名称获取AI客户端
+     *
+     * @param modelName 模型名称
+     * @return AI客户端实例
+     * @throws IllegalArgumentException 如果模型不支持
+     */
     public static AiModelClient getClient(String modelName) {
-        switch (modelName.toLowerCase()) {
-            case "qwen": return new TongYiClient();
-            case "doubao": return new DoubaoClient();
-            case "kimi": return new KimiClient();
-            case "deepseek": return new DeepSeekClient();
-            default: throw new IllegalArgumentException("不支持的模型类型：" + modelName);
-        }
+        return switch (modelName.toLowerCase()) {
+            case "qwen" -> new TongYiClient();
+            case "doubao" -> new DoubaoClient();
+            case "kimi" -> new KimiClient();
+            case "deepseek" -> new DeepSeekClient();
+            default -> throw new IllegalArgumentException("不支持的模型类型：" + modelName);
+        };
     }
 
     /**

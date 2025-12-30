@@ -1,0 +1,31 @@
+DROP TABLE IF EXISTS xmldb_suiyue.Quest_SimpleHunt;
+CREATE TABLE xmldb_suiyue.Quest_SimpleHunt (
+    `dev_name` VARCHAR(255) PRIMARY KEY COMMENT 'dev_name',
+    `__order_index` INT NOT NULL DEFAULT 0 COMMENT '顺序索引',
+    `acquired_npc_name` VARCHAR(33) COMMENT 'acquired_npc_name',
+    `count1` VARCHAR(4) COMMENT 'count1',
+    `monster1` TEXT COMMENT 'monster1',
+    `reward_npc_name` VARCHAR(31) COMMENT 'reward_npc_name',
+    `con_quest` VARCHAR(5) COMMENT 'con_quest',
+    `count2` VARCHAR(3) COMMENT 'count2',
+    `monster2` TEXT COMMENT 'monster2',
+    `count3` VARCHAR(2) COMMENT 'count3',
+    `monster3` TEXT COMMENT 'monster3',
+    `count4` VARCHAR(1) COMMENT 'count4',
+    `monster4` VARCHAR(122) COMMENT 'monster4',
+    `count5` VARCHAR(1) COMMENT 'count5',
+    `monster5` VARCHAR(33) COMMENT 'monster5',
+    `cutsceneid1` VARCHAR(3) COMMENT 'cutsceneid1',
+    `cs1_haction` VARCHAR(4) COMMENT 'cs1_haction',
+    `talk_npc1` VARCHAR(24) COMMENT 'talk_npc1',
+    `talk_npc2` VARCHAR(15) COMMENT 'talk_npc2',
+    `talk_npc3` VARCHAR(9) COMMENT 'talk_npc3',
+    `give_item` VARCHAR(19) COMMENT 'give_item',
+    `mentor_type` VARCHAR(1) COMMENT 'mentor_type',
+    `mentor_minlevel` VARCHAR(2) COMMENT 'mentor_minlevel',
+    `mentor_maxlevel` VARCHAR(2) COMMENT 'mentor_maxlevel',
+    `give_item1` VARCHAR(19) COMMENT 'give_item1',
+    `remove_item2` VARCHAR(19) COMMENT 'remove_item2',
+    `_attr_id` VARCHAR(128) COMMENT 'id'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 ROW_FORMAT=DYNAMIC COMMENT = 'Quest_SimpleHunt';
+

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<client_setitems>
+  <client_setitem>
+    <id/>
+    <name/>
+    <desc/>
+    <item1/>
+    <item3/>
+    <item4/>
+    <item5/>
+    <item6/>
+    <item7/>
+    <piece_bonus2/>
+    <piece_bonus3/>
+    <piece_bonus4/>
+    <piece_bonus5/>
+    <piece_bonus6/>
+    <fullset_bonus/>
+    <item2/>
+  </client_setitem>
+</client_setitems>

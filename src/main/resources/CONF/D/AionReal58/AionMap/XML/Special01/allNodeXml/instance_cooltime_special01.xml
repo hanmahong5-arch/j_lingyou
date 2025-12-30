@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<instance_cooltimes>
+  <instance_cooltime>
+    <id/>
+    <name/>
+    <desc/>
+    <indun_type/>
+    <max_member_light/>
+    <max_member_dark/>
+    <enter_min_level_light/>
+    <enter_min_level_dark/>
+    <can_enter_mentor/>
+    <coolt_tbl_id/>
+    <f2p_coolt_tbl_id/>
+    <coolt_sync_id/>
+    <data>
+      <data>
+        <variable/>
+      </data>
+    </data>
+    <exit_world_1/>
+    <exit_alias_1/>
+    <exit_world_2/>
+    <exit_alias_2/>
+    <bm_restrict_category/>
+    <share_max_member/>
+    <enter_max_level_light/>
+    <enter_max_level_dark/>
+    <ui_gauge_max/>
+    <ext_condition_variable>
+      <data>
+        <variable/>
+      </data>
+    </ext_condition_variable>
+    <using_warpoint/>
+    <warpoint/>
+    <bonus_time/>
+    <bonus_warpoint/>
+    <pc_kill_warpoint/>
+    <intrusion_warpoint/>
+  </instance_cooltime>
+</instance_cooltimes>

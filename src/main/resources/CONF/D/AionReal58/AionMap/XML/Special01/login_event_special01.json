@@ -1,0 +1,17 @@
+{
+	"file_path":"D:\\AionReal58\\AionMap\\XML\\Special01\\login_event_special01.xml",
+	"xml_root_tag":"login_events",
+	"list":[
+		{
+			"addDataNode":"reward_item_list",
+			"associatedFiled":"id",
+			"xml_tag":"data",
+			"db_column":"data",
+			"table_name":"login_event_special01__reward_item_list__data",
+			"sql":"select * from login_event_special01__reward_item_list__data where id = '#associated_filed' order by CAST(id AS UNSIGNED) ASC"
+		}
+	],
+	"xml_item_tag":"login_event",
+	"table_name":"login_event_special01",
+	"sql":"select * from login_event_special01 order by CAST(id AS UNSIGNED) ASC"
+}

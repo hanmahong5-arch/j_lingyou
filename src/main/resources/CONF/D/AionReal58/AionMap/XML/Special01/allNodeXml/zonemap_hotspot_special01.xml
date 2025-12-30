@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<zonemap_hotspots>
+  <zonemap_hotspot>
+    <id/>
+    <name/>
+    <name_dev/>
+    <desc/>
+    <world/>
+    <x/>
+    <y/>
+    <z/>
+    <dir/>
+    <race/>
+    <required_base_gold/>
+    <required_distance_gold/>
+  </zonemap_hotspot>
+</zonemap_hotspots>

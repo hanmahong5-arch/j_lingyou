@@ -50,8 +50,8 @@ public class ErrorRecoverySystem {
     private int maxRetryAttempts = 3;
     private long retryDelayMs = 1000;
 
-    // 线程池
-    private final ExecutorService recoveryExecutor = Executors.newCachedThreadPool();
+    // 虚拟线程执行器（Java 21+）
+    private final ExecutorService recoveryExecutor = Executors.newVirtualThreadPerTaskExecutor();
 
     private ErrorRecoverySystem() {
         registerBuiltinHandlers();

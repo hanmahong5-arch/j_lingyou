@@ -12,8 +12,8 @@ import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.*;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
-import lombok.Data;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import red.jiuzhou.analysis.aion.AionMechanismCategory;
 import red.jiuzhou.analysis.aion.MechanismOverrideConfig;
 
@@ -32,8 +32,8 @@ import java.util.Optional;
  * @author Claude Sonnet 4.5
  * @date 2025-12-21
  */
-@Slf4j
 public class MechanismOverrideEditorDialog extends Stage {
+    private static final Logger log = LoggerFactory.getLogger(MechanismOverrideEditorDialog.class);
 
     private final MechanismOverrideConfig config;
 
@@ -461,7 +461,6 @@ public class MechanismOverrideEditorDialog extends Stage {
     /**
      * 手动覆盖条目（用于表格显示）
      */
-    @Data
     public static class OverrideEntry {
         private final SimpleStringProperty fileName;
         private final SimpleStringProperty categoryName;
@@ -489,7 +488,6 @@ public class MechanismOverrideEditorDialog extends Stage {
     /**
      * 排除文件条目（用于表格显示）
      */
-    @Data
     public static class ExcludedEntry {
         private final SimpleStringProperty fileName;
 

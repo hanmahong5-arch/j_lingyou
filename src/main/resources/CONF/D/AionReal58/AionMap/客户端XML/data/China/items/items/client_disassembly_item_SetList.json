@@ -1,0 +1,17 @@
+{
+	"file_path":"D:\\AionReal58\\AionMap\\客户端XML\\data\\China\\items\\items\\client_disassembly_item_SetList.xml",
+	"xml_root_tag":"disassemblyitemsetlists",
+	"list":[
+		{
+			"addDataNode":"disassembly_create_item_list",
+			"associatedFiled":"id",
+			"xml_tag":"data",
+			"db_column":"data",
+			"table_name":"client_disassembly_item_SetList__d_c_i_l__data",
+			"sql":"select * from client_disassembly_item_SetList__d_c_i_l__data where id = '#associated_filed' order by CAST(id AS UNSIGNED) ASC"
+		}
+	],
+	"xml_item_tag":"disassemblyitemsetlist",
+	"table_name":"client_disassembly_item_SetList",
+	"sql":"select * from client_disassembly_item_SetList order by CAST(id AS UNSIGNED) ASC"
+}

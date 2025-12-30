@@ -1,0 +1,17 @@
+{
+	"file_path":"D:\\AionReal58\\AionMap\\XML\\jumping_endquest.xml",
+	"xml_root_tag":"jumping_endquests",
+	"list":[
+		{
+			"addDataNode":"endquest_expansion",
+			"associatedFiled":"id",
+			"xml_tag":"data",
+			"db_column":"data",
+			"table_name":"jumping_endquest__endquest_expansion__data",
+			"sql":"select * from jumping_endquest__endquest_expansion__data where id = '#associated_filed' order by CAST(id AS UNSIGNED) ASC"
+		}
+	],
+	"xml_item_tag":"jumping_endquest",
+	"table_name":"jumping_endquest",
+	"sql":"select * from jumping_endquest order by CAST(id AS UNSIGNED) ASC"
+}

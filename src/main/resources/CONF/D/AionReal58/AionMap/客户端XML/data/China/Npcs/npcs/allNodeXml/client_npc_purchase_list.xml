@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<client_npc_purchase_lists>
+  <client_npc_purchase_list>
+    <id/>
+    <name/>
+    <desc/>
+    <use_category/>
+    <goods_list>
+      <data>
+        <item/>
+      </data>
+    </goods_list>
+  </client_npc_purchase_list>
+</client_npc_purchase_lists>

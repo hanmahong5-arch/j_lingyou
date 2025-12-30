@@ -1,0 +1,17 @@
+{
+	"file_path":"D:\\AionReal58\\AionMap\\XML\\item_multi_return.xml",
+	"xml_root_tag":"item_multi_returns",
+	"list":[
+		{
+			"addDataNode":"return_loc_list",
+			"associatedFiled":"id",
+			"xml_tag":"data",
+			"db_column":"data",
+			"table_name":"item_multi_return__return_loc_list__data",
+			"sql":"select * from item_multi_return__return_loc_list__data where id = '#associated_filed' order by CAST(id AS UNSIGNED) ASC"
+		}
+	],
+	"xml_item_tag":"item_multi_return",
+	"table_name":"item_multi_return",
+	"sql":"select * from item_multi_return order by CAST(id AS UNSIGNED) ASC"
+}

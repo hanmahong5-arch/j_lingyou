@@ -16,3 +16,46 @@ src/main/resources/application.yml
 # Temp files
 nul
 *.tmp
+
+# Temporary documentation files
+COMPILATION_*.md
+COMPILE_*.md
+CURRENT_STATUS.md
+FINAL_*.md
+LOMBOK_*.md
+QUICKSTART.md
+README_NEXT_STEPS.md
+READY_TO_TEST.md
+SOLUTION_FOUND.md
+START_MAIN_PROGRAM.md
+TEST_*.md
+TROUBLESHOOTING.md
+启动说明.md
+CLEANUP_PLAN.md
+
+# Temporary scripts
+compile*.bat
+compile*.ps1
+diagnose.bat
+quick-*.bat
+run-cli-test.bat
+run-compile.ps1
+run-simple-test.bat
+run-standalone.bat
+run-test*.bat
+run-with-log.bat
+simple-compile.bat
+start.bat
+start-dbxmltool.ps1
+test-compile.bat
+
+# Log files in root directory
+/*.txt
+
+# Maven temporary files
+dependency-reduced-pom.xml
+
+# Test files in src/main/java (should be in src/test/java)
+src/main/java/**/*Test.java
+src/main/java/**/*Stub.java
+src/main/java/**/test/

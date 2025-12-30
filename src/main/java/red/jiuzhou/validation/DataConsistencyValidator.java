@@ -27,7 +27,7 @@ import java.util.stream.Collectors;
 @Slf4j
 public class DataConsistencyValidator {
 
-    private final ExecutorService executorService = Executors.newFixedThreadPool(8);
+    private final ExecutorService executorService = Executors.newVirtualThreadPerTaskExecutor();
     private final Map<String, Document> documentCache = new ConcurrentHashMap<>();
     private final Map<String, Set<String>> referenceMap = new ConcurrentHashMap<>();
 

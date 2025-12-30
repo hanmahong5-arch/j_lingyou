@@ -16,6 +16,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import cn.hutool.core.io.FileUtil;
 import red.jiuzhou.analysis.aion.*;
+import red.jiuzhou.pattern.ui.PatternDataPanel;
 import red.jiuzhou.ui.components.ContextMenuFactory;
 import red.jiuzhou.ui.components.DashboardPanel;
 import red.jiuzhou.ui.components.OperationLogPanel;
@@ -75,6 +76,9 @@ public class AionMechanismExplorerStage extends Stage {
 
     // 操作日志面板
     private OperationLogPanel logPanel;
+
+    // 模式数据面板
+    private PatternDataPanel patternDataPanel;
 
     // 数据
     private AionMechanismView mechanismView;
@@ -160,97 +164,101 @@ public class AionMechanismExplorerStage extends Stage {
         VBox box = new VBox(8);
         box.setPadding(new Insets(0, 0, 10, 0));
 
-        // 标题行
-        HBox titleBox = new HBox(15);
-        titleBox.setAlignment(Pos.CENTER_LEFT);
+        // 标题行 + 统计卡片合并到一行
+        HBox titleStatsRow = new HBox(10);
+        titleStatsRow.setAlignment(Pos.CENTER_LEFT);
 
+        // 左侧：标题
         Label titleLabel = new Label("Aion 机制浏览器");
-        titleLabel.setFont(Font.font("Microsoft YaHei", FontWeight.BOLD, 22));
+        titleLabel.setFont(Font.font("Microsoft YaHei", FontWeight.BOLD, 20));
         titleLabel.setStyle("-fx-text-fill: #2c3e50;");
 
         progressIndicator = new ProgressIndicator();
-        progressIndicator.setMaxSize(24, 24);
+        progressIndicator.setMaxSize(20, 20);
         progressIndicator.setVisible(false);
 
-        Button refreshBtn = new Button("刷新");
-        refreshBtn.setStyle("-fx-background-color: #3498db; -fx-text-fill: white; -fx-cursor: hand;");
-        refreshBtn.setOnAction(e -> loadData());
+        // 操作按钮组
+        HBox buttonBox = new HBox(6);
+        buttonBox.setAlignment(Pos.CENTER_LEFT);
 
-        Button backBtn = new Button("← 返回");
-        backBtn.setStyle("-fx-background-color: #95a5a6; -fx-text-fill: white; -fx-cursor: hand;");
+        Button backBtn = new Button("←");
+        backBtn.setTooltip(new Tooltip("返回上一层"));
+        backBtn.setStyle("-fx-background-color: #95a5a6; -fx-text-fill: white; -fx-cursor: hand; -fx-padding: 5 10;");
         backBtn.setOnAction(e -> navigateBack());
 
-        Button manageBtn = new Button("⚙️ 管理分类");
-        manageBtn.setStyle("-fx-background-color: #2ea44f; -fx-text-fill: white; -fx-cursor: hand;");
+        Button refreshBtn = new Button("🔄");
+        refreshBtn.setTooltip(new Tooltip("刷新数据"));
+        refreshBtn.setStyle("-fx-background-color: #3498db; -fx-text-fill: white; -fx-cursor: hand; -fx-padding: 5 10;");
+        refreshBtn.setOnAction(e -> loadData());
+
+        Button manageBtn = new Button("⚙");
+        manageBtn.setTooltip(new Tooltip("管理分类覆盖"));
+        manageBtn.setStyle("-fx-background-color: #2ea44f; -fx-text-fill: white; -fx-cursor: hand; -fx-padding: 5 10;");
         manageBtn.setOnAction(e -> openMechanismManager());
 
         // 显示选项切换按钮
-        Button toggleBtn = new Button("显示全部(30)");
-        toggleBtn.setStyle("-fx-background-color: #8e44ad; -fx-text-fill: white; -fx-cursor: hand;");
+        Button toggleBtn = new Button("全部");
+        toggleBtn.setTooltip(new Tooltip("显示全部/仅显示非空分类"));
+        toggleBtn.setStyle("-fx-background-color: #8e44ad; -fx-text-fill: white; -fx-cursor: hand; -fx-padding: 5 10;");
         toggleBtn.setOnAction(e -> {
             showAllCategories = !showAllCategories;
-            if (showAllCategories) {
-                toggleBtn.setText("显示非空");
-            } else {
-                toggleBtn.setText("显示全部(30)");
-            }
+            toggleBtn.setText(showAllCategories ? "非空" : "全部");
             updateMechanismCards();
         });
 
+        Button createFeatureBtn = new Button("🎮 创建游戏功能");
+        createFeatureBtn.setTooltip(new Tooltip("基于模板创建副本、任务、活动等游戏功能"));
+        createFeatureBtn.setStyle("-fx-background-color: #27ae60; -fx-text-fill: white; -fx-cursor: hand; -fx-padding: 5 10;");
+        createFeatureBtn.setOnAction(e -> openGameFeatureWizard());
+
+        buttonBox.getChildren().addAll(backBtn, refreshBtn, manageBtn, toggleBtn, createFeatureBtn);
+
+        // 分隔符
+        Separator separator = new Separator(javafx.geometry.Orientation.VERTICAL);
+        separator.setPadding(new Insets(0, 5, 0, 5));
+
+        // 统计卡片组（紧凑版）
+        HBox statsBox = new HBox(8);
+        statsBox.setAlignment(Pos.CENTER_LEFT);
+
+        mechanismCountCard = StatCard.create("🎮", "机制", "27", StatCard.COLOR_PRIMARY)
+                .small()
+                .tooltip("Aion游戏的27个核心机制分类");
+
+        fileCountCard = StatCard.create("📁", "文件", "0", StatCard.COLOR_INFO)
+                .small()
+                .tooltip("已检测到的XML配置文件总数");
+
+        publicFileCard = StatCard.create("🌐", "公共", "0", StatCard.COLOR_SUCCESS)
+                .small()
+                .tooltip("公共目录下的配置文件");
+
+        localizedFileCard = StatCard.create("🇨🇳", "本地化", "0", StatCard.COLOR_WARNING)
+                .small()
+                .tooltip("本地化目录下的配置文件");
+
+        statsBox.getChildren().addAll(mechanismCountCard, fileCountCard, publicFileCard, localizedFileCard);
+
+        // 右侧弹性空间
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        titleBox.getChildren().addAll(titleLabel, progressIndicator, backBtn, refreshBtn, manageBtn, toggleBtn, spacer);
-
-        // 统计卡片区域
-        HBox statsBox = createStatsPanel();
+        titleStatsRow.getChildren().addAll(
+                titleLabel, progressIndicator,
+                buttonBox, separator, statsBox,
+                spacer
+        );
 
         // 面包屑导航
         breadcrumbBox = new HBox(5);
         breadcrumbBox.setAlignment(Pos.CENTER_LEFT);
-        breadcrumbBox.setPadding(new Insets(8, 12, 8, 12));
+        breadcrumbBox.setPadding(new Insets(6, 10, 6, 10));
         breadcrumbBox.setStyle("-fx-background-color: white; -fx-background-radius: 5; " +
                 "-fx-border-color: #e0e0e0; -fx-border-radius: 5;");
         updateBreadcrumb();
 
-        box.getChildren().addAll(titleBox, statsBox, breadcrumbBox);
+        box.getChildren().addAll(titleStatsRow, breadcrumbBox);
         return box;
-    }
-
-    /**
-     * 创建统计面板
-     */
-    private HBox createStatsPanel() {
-        HBox statsBox = new HBox(12);
-        statsBox.setAlignment(Pos.CENTER_LEFT);
-        statsBox.setPadding(new Insets(5, 0, 5, 0));
-
-        // 机制数量卡片
-        mechanismCountCard = StatCard.create("🎮", "游戏机制", "27", StatCard.COLOR_PRIMARY)
-                .small()
-                .subtitle("分类系统")
-                .tooltip("Aion游戏的27个核心机制分类");
-
-        // 文件数量卡片
-        fileCountCard = StatCard.create("📁", "配置文件", "0", StatCard.COLOR_INFO)
-                .small()
-                .subtitle("扫描中...")
-                .tooltip("已检测到的XML配置文件总数");
-
-        // 公共文件卡片
-        publicFileCard = StatCard.create("🌐", "公共文件", "0", StatCard.COLOR_SUCCESS)
-                .small()
-                .subtitle("全区通用")
-                .tooltip("公共目录下的配置文件");
-
-        // 本地化文件卡片
-        localizedFileCard = StatCard.create("🇨🇳", "本地化文件", "0", StatCard.COLOR_WARNING)
-                .small()
-                .subtitle("China区")
-                .tooltip("本地化目录下的配置文件");
-
-        statsBox.getChildren().addAll(mechanismCountCard, fileCountCard, publicFileCard, localizedFileCard);
-        return statsBox;
     }
 
     /**
@@ -263,8 +271,7 @@ public class AionMechanismExplorerStage extends Stage {
 
         Platform.runLater(() -> {
             mechanismCountCard.valueAnimated(String.valueOf(stats.getCategoryTypeCount()));
-            fileCountCard.valueAnimated(String.valueOf(stats.getTotalFiles()))
-                    .subtitle(stats.getTotalFiles() + " 个文件");
+            fileCountCard.valueAnimated(String.valueOf(stats.getTotalFiles()));
             publicFileCard.valueAnimated(String.valueOf(stats.getPublicFiles()));
             localizedFileCard.valueAnimated(String.valueOf(stats.getLocalizedFiles()));
         });
@@ -399,16 +406,44 @@ public class AionMechanismExplorerStage extends Stage {
         referenceBox.getChildren().addAll(refHeader, referenceTagsPane);
         referenceBox.setVisible(false);
 
+        // 模式数据面板（可折叠，懒加载）
+        patternDataPanel = new PatternDataPanel();
+        TitledPane patternPane = new TitledPane("📊 领域模式分析", patternDataPanel);
+        patternPane.setExpanded(false);  // 默认折叠
+        patternPane.setAnimated(true);
+        patternPane.setStyle("-fx-font-weight: bold;");
+
+        // 懒加载：只在展开时加载数据
+        patternPane.expandedProperty().addListener((obs, wasExpanded, isExpanded) -> {
+            if (isExpanded && selectedCategory != null) {
+                patternDataPanel.loadMechanismPattern(selectedCategory.name());
+            }
+        });
+
         // 详情区
         detailArea = new TextArea();
         detailArea.setEditable(false);
         detailArea.setFont(Font.font("Consolas", 12));
         detailArea.setWrapText(true);
-        detailArea.setPrefHeight(150);
+        detailArea.setPrefHeight(120);
         detailArea.setStyle("-fx-background-color: #f8f9fa;");
 
+        // 使用SplitPane分隔字段表格和模式面板
+        SplitPane splitPane = new SplitPane();
+        splitPane.setOrientation(javafx.geometry.Orientation.VERTICAL);
+
+        VBox topBox = new VBox(5);
+        topBox.getChildren().addAll(fieldListBox, referenceBox);
         VBox.setVgrow(fieldListBox, Priority.ALWAYS);
-        box.getChildren().addAll(fieldListBox, referenceBox, detailArea);
+
+        VBox bottomBox = new VBox(5);
+        bottomBox.getChildren().addAll(patternPane, detailArea);
+
+        splitPane.getItems().addAll(topBox, bottomBox);
+        splitPane.setDividerPositions(0.6);
+
+        VBox.setVgrow(splitPane, Priority.ALWAYS);
+        box.getChildren().add(splitPane);
         return box;
     }
 
@@ -885,6 +920,9 @@ public class AionMechanismExplorerStage extends Stage {
         updateBreadcrumb();
         highlightSelectedMechanism(selectedCategory);
         statusLabel.setText("已选择: " + selectedCategory.getDisplayName() + " (" + group.getFileCount() + " 个文件)");
+
+        // 注：模式数据面板采用懒加载，只在用户展开面板时才加载
+        // 见 createFieldColumn() 中的 patternPane.expandedProperty() 监听器
     }
 
     /**
@@ -1513,6 +1551,30 @@ public class AionMechanismExplorerStage extends Stage {
         dialog.showNonBlocking();
         dialog.logInfo("开始批量导出数据...");
 
+        // ==================== 导出预验证（2025-12-29新增）====================
+        dialog.logInfo("正在进行导出前检查...");
+        red.jiuzhou.validation.PreExportValidator validator = new red.jiuzhou.validation.PreExportValidator();
+        java.util.List<String> tableNames = group.getAllFiles().stream()
+            .map(f -> f.getFileName().replace(".xml", ""))
+            .collect(java.util.stream.Collectors.toList());
+
+        java.util.List<red.jiuzhou.validation.PreExportValidator.ValidationResult> validationResults =
+            validator.validateBatch(tableNames);
+
+        long canExportCount = validationResults.stream()
+            .filter(red.jiuzhou.validation.PreExportValidator.ValidationResult::canExport)
+            .count();
+        long hasIssuesCount = validationResults.stream()
+            .filter(red.jiuzhou.validation.PreExportValidator.ValidationResult::hasIssues)
+            .count();
+
+        dialog.logInfo(String.format("预检查完成: %d个可导出, %d个有警告", canExportCount, hasIssuesCount));
+
+        if (hasIssuesCount > 0) {
+            dialog.logWarning(String.format("发现 %d 个表有潜在问题，但仍将尝试导出", hasIssuesCount));
+        }
+        // ======================================================================
+
         new Thread(() -> {
             int index = 0;
 
@@ -1529,10 +1591,62 @@ public class AionMechanismExplorerStage extends Stage {
 
                 try {
                     dialog.logInfo(String.format("[%d/%d] 正在导出: %s", index, fileCount, tableName));
-                    // TODO: 集成实际的DbToXmlGenerator导出功能
-                    log.info("批量导出: " + tableName + " -> " + xmlPath);
-                    dialog.logSuccess(String.format("[%d/%d] %s - 导出成功", index, fileCount, tableName));
+
+                    // ==================== 真正的导出逻辑（2025-12-29实现）====================
+                    // 1. 检查表是否存在
+                    if (!red.jiuzhou.util.DatabaseUtil.tableExists(tableName)) {
+                        dialog.logWarning(String.format("[%d/%d] %s - 跳过（表不存在）", index, fileCount, tableName));
+                        dialog.updateProgress(index, false);
+                        continue;
+                    }
+
+                    // 2. 检查表数据量
+                    int rowCount = red.jiuzhou.util.DatabaseUtil.getTotalRowCount(tableName);
+                    if (rowCount == 0) {
+                        dialog.logWarning(String.format("[%d/%d] %s - 跳过（空表）", index, fileCount, tableName));
+                        dialog.updateProgress(index, true);  // 空表不算失败
+                        continue;
+                    }
+
+                    dialog.logInfo(String.format("     数据量: %,d 行", rowCount));
+
+                    // 3. 执行导出
+                    String tabFilePath = xmlPath.replace(".xml", "");
+                    String mapType = deriveMapType(tableName, file.getFile());
+
+                    String exportedFilePath;
+                    if ("world".equalsIgnoreCase(tableName)) {
+                        red.jiuzhou.dbxml.WorldDbToXmlGenerator generator =
+                            new red.jiuzhou.dbxml.WorldDbToXmlGenerator(tableName, mapType, tabFilePath);
+                        exportedFilePath = generator.processAndMerge();
+                    } else {
+                        red.jiuzhou.dbxml.DbToXmlGenerator generator =
+                            new red.jiuzhou.dbxml.DbToXmlGenerator(tableName, mapType, tabFilePath);
+                        exportedFilePath = generator.processAndMerge();
+                    }
+
+                    // 4. 验证导出文件
+                    java.io.File exportedFile = new java.io.File(exportedFilePath);
+                    if (!exportedFile.exists() || exportedFile.length() == 0) {
+                        throw new RuntimeException("导出文件无效: " + exportedFilePath);
+                    }
+
+                    // 5. 显示文件大小
+                    long fileSize = exportedFile.length();
+                    String fileSizeStr;
+                    if (fileSize < 1024) {
+                        fileSizeStr = fileSize + " B";
+                    } else if (fileSize < 1024 * 1024) {
+                        fileSizeStr = String.format("%.2f KB", fileSize / 1024.0);
+                    } else {
+                        fileSizeStr = String.format("%.2f MB", fileSize / (1024.0 * 1024.0));
+                    }
+
+                    dialog.logSuccess(String.format("[%d/%d] %s - 导出成功 (%s)",
+                        index, fileCount, tableName, fileSizeStr));
                     dialog.updateProgress(index, true);
+                    // ======================================================================
+
                 } catch (Exception e) {
                     dialog.logError(String.format("[%d/%d] %s - 失败: %s", index, fileCount, fileName, e.getMessage()));
                     dialog.updateProgress(index, false);
@@ -1540,8 +1654,63 @@ public class AionMechanismExplorerStage extends Stage {
                 }
             }
 
+            // ==================== 导出后合规性检查（2025-12-29新增）====================
+            dialog.logInfo("\n正在进行服务器合规性检查...");
+
+            try {
+                // 收集所有导出成功的文件
+                java.util.List<java.io.File> exportedFiles = new java.util.ArrayList<>();
+                for (AionMechanismView.FileEntry file : group.getAllFiles()) {
+                    java.io.File xmlFile = file.getFile();
+                    if (xmlFile.exists()) {
+                        exportedFiles.add(xmlFile);
+                    }
+                }
+
+                if (!exportedFiles.isEmpty()) {
+                    red.jiuzhou.validation.server.XmlServerComplianceChecker complianceChecker =
+                        new red.jiuzhou.validation.server.XmlServerComplianceChecker();
+                    java.util.List<red.jiuzhou.validation.server.XmlServerComplianceChecker.CheckResult> complianceResults =
+                        complianceChecker.checkBatch(exportedFiles);
+
+                    long compliantCount = complianceResults.stream()
+                        .filter(red.jiuzhou.validation.server.XmlServerComplianceChecker.CheckResult::isCompliant)
+                        .count();
+                    long nonCompliantCount = complianceResults.size() - compliantCount;
+                    long totalBlacklistedFields = complianceResults.stream()
+                        .flatMap(r -> r.getBlacklistedFieldsFound().stream())
+                        .distinct()
+                        .count();
+
+                    if (nonCompliantCount == 0) {
+                        dialog.logSuccess(String.format("✅ 合规性检查通过: %d 个文件全部符合服务器要求",
+                            complianceResults.size()));
+                    } else {
+                        dialog.logWarning(String.format("⚠️  合规性检查: %d个合规, %d个不合规, 发现%d个黑名单字段",
+                            compliantCount, nonCompliantCount, totalBlacklistedFields));
+
+                        // 列出不合规的文件
+                        complianceResults.stream()
+                            .filter(r -> !r.isCompliant())
+                            .forEach(r -> {
+                                dialog.logWarning(String.format("   • %s: %d 个黑名单字段",
+                                    r.getFileName(), r.getBlacklistedFieldsFound().size()));
+                            });
+
+                        dialog.logWarning("⚠️  警告: 不合规的文件可能导致服务器加载失败！");
+                        dialog.logInfo("💡 提示: 这些黑名单字段应该在导出时被自动过滤，请检查导出逻辑");
+                    }
+                } else {
+                    dialog.logWarning("未找到导出的XML文件，跳过合规性检查");
+                }
+            } catch (Exception e) {
+                dialog.logError("合规性检查失败: " + e.getMessage());
+                log.error("合规性检查失败", e);
+            }
+            // ======================================================================
+
             dialog.setCompleted();
-            dialog.logInfo("批量导出完成");
+            dialog.logInfo("\n批量导出完成");
         }, "BatchExport").start();
     }
 
@@ -1597,6 +1766,21 @@ public class AionMechanismExplorerStage extends Stage {
             dialog.setCompleted();
             dialog.logInfo("批量导入完成");
         }, "BatchImport").start();
+    }
+
+    /**
+     * 推导mapType（仅对world表有效）
+     * 从XML文件路径中提取地图类型（如China、Korea等）
+     */
+    private String deriveMapType(String tableName, java.io.File xmlFile) {
+        if (tableName == null || xmlFile == null) {
+            return null;
+        }
+        if (!"world".equalsIgnoreCase(tableName)) {
+            return null;
+        }
+        java.io.File parent = xmlFile.getParentFile();
+        return parent != null ? parent.getName() : null;
     }
 
     /**
@@ -2160,5 +2344,43 @@ public class AionMechanismExplorerStage extends Stage {
     private void openMechanismManager() {
         MechanismOverrideEditorDialog dialog = new MechanismOverrideEditorDialog();
         dialog.show();
+    }
+
+    /**
+     * 打开游戏功能创建向导
+     */
+    private void openGameFeatureWizard() {
+        try {
+            red.jiuzhou.ui.wizard.GameFeatureWizard wizard = new red.jiuzhou.ui.wizard.GameFeatureWizard();
+            wizard.showAndWait();
+
+            // 向导关闭后
+            if (wizard.isSuccess()) {
+                String newRecordId = wizard.getNewRecordId();
+                statusLabel.setText(String.format("创建成功: 新记录ID = %s", newRecordId));
+
+                // 刷新数据
+                loadData();
+
+                // 提示用户
+                Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                alert.setTitle("创建成功");
+                alert.setHeaderText("游戏功能创建成功");
+                alert.setContentText(String.format(
+                        "功能类型: %s\n新记录ID: %s\n\n数据已自动刷新",
+                        wizard.getSelectedFeature().getDisplayName(),
+                        newRecordId
+                ));
+                alert.showAndWait();
+            }
+
+        } catch (Exception e) {
+            log.error("打开游戏功能向导失败", e);
+            Alert alert = new Alert(Alert.AlertType.ERROR);
+            alert.setTitle("错误");
+            alert.setHeaderText("无法打开游戏功能向导");
+            alert.setContentText(e.getMessage());
+            alert.showAndWait();
+        }
     }
 }

@@ -1,0 +1,8 @@
+{
+	"file_path":"D:\\AionReal58\\AionMap\\XML\\Special01\\item_replace_special01.xml",
+	"xml_root_tag":"item_replaces",
+	"list":[],
+	"xml_item_tag":"item_replace",
+	"table_name":"item_replace_special01",
+	"sql":"select * from item_replace_special01 order by CAST(id AS UNSIGNED) ASC"
+}

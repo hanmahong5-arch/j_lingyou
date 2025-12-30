@@ -138,14 +138,9 @@ public class ModifyTool implements AgentTool {
         // 设置到上下文
         context.setPendingOperation(pending);
 
-        // 返回待确认结果
-        ToolResult result = ToolResult.pendingConfirmation(sql, previewData, estimatedRows, operationId);
-        result.setMessage(buildConfirmationMessage(sqlType, description, sql, estimatedRows, previewData));
-
-        // 添加警告信息
-        for (String warning : validation.getWarnings()) {
-            // 可以添加到extra data中
-        }
+        // 返回待确认结果（使用自定义消息）
+        String confirmMessage = buildConfirmationMessage(sqlType, description, sql, estimatedRows, previewData);
+        ToolResult result = ToolResult.pendingConfirmation(sql, previewData, estimatedRows, operationId, confirmMessage);
 
         log.info("修改操作已生成，等待确认。操作ID: {}, 预计影响: {} 行", operationId, estimatedRows);
         return result;

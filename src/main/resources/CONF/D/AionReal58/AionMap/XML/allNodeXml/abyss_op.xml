@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<abyss_ops>
+  <abyss_op>
+    <id/>
+    <name/>
+    <entity_name/>
+    <entity_type/>
+    <group_id/>
+    <point/>
+    <race/>
+    <world/>
+    <linked_npc_name/>
+    <x/>
+    <y/>
+    <z/>
+    <dir/>
+    <respawn_time/>
+  </abyss_op>
+</abyss_ops>

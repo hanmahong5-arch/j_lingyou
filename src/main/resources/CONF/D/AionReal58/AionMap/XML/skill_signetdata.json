@@ -1,0 +1,8 @@
+{
+	"file_path":"D:\\AionReal58\\AionMap\\XML\\skill_signetdata.xml",
+	"xml_root_tag":"skill_signetdatas",
+	"list":[],
+	"xml_item_tag":"skill_signetdata",
+	"table_name":"skill_signetdata",
+	"sql":"select * from skill_signetdata order by CAST(id AS UNSIGNED) ASC"
+}

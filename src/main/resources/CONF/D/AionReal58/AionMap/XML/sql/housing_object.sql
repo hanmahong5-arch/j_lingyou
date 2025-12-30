@@ -1,0 +1,33 @@
+DROP TABLE IF EXISTS xmldb_suiyue.housing_object;
+CREATE TABLE xmldb_suiyue.housing_object (
+    `id` VARCHAR(255) PRIMARY KEY COMMENT 'id',
+    `__order_index` INT NOT NULL DEFAULT 0 COMMENT '顺序索引',
+    `name` VARCHAR(45) COMMENT 'name',
+    `desc` VARCHAR(46) COMMENT 'desc',
+    `category` VARCHAR(10) COMMENT 'category',
+    `housing_size_tag` VARCHAR(24) COMMENT 'housing_size_tag',
+    `type` VARCHAR(3) COMMENT 'type',
+    `place_area` VARCHAR(8) COMMENT 'place_area',
+    `place_location` VARCHAR(5) COMMENT 'place_location',
+    `talking_distance` VARCHAR(8) COMMENT 'talking_distance',
+    `housingobj_max_use_days` VARCHAR(2) COMMENT 'housingobj_max_use_days',
+    `housingobj_function` VARCHAR(12) COMMENT 'housingobj_function',
+    `in_house_warehouse_idx` VARCHAR(2) COMMENT 'in_house_warehouse_idx',
+    `place_limit_tag` VARCHAR(17) COMMENT 'place_limit_tag',
+    `cannot_changecolor` VARCHAR(1) COMMENT 'cannot_changecolor',
+    `npcname` VARCHAR(32) COMMENT 'npcname',
+    `guild_level_permitted` VARCHAR(1) COMMENT 'guild_level_permitted',
+    `pc_use_type` VARCHAR(1) COMMENT 'pc_use_type',
+    `owner_usecount_per_day` VARCHAR(1) COMMENT 'owner_usecount_per_day',
+    `pc_use_final_condition` VARCHAR(1) COMMENT 'pc_use_final_condition',
+    `required_item` VARCHAR(26) COMMENT 'required_item',
+    `check_type` VARCHAR(1) COMMENT 'check_type',
+    `erase_value` VARCHAR(2) COMMENT 'erase_value',
+    `reward_use` VARCHAR(50) COMMENT 'reward_use',
+    `use_delay` VARCHAR(5) COMMENT 'use_delay',
+    `use_cooltime` VARCHAR(5) COMMENT 'use_cooltime',
+    `pc_use_count_max` VARCHAR(4) COMMENT 'pc_use_count_max',
+    `reward_final` VARCHAR(42) COMMENT 'reward_final',
+    `housingobj_max_use` VARCHAR(3) COMMENT 'housingobj_max_use'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 ROW_FORMAT=DYNAMIC COMMENT = 'housing_object';
+

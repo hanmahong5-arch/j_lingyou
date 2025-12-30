@@ -1,0 +1,8 @@
+{
+	"file_path":"D:\\AionReal58\\AionMap\\XML\\abyss_leader_skill.xml",
+	"xml_root_tag":"abyss_leader_skills",
+	"list":[],
+	"xml_item_tag":"abyss_leader_skill",
+	"table_name":"abyss_leader_skill",
+	"sql":"select * from abyss_leader_skill order by CAST(id AS UNSIGNED) ASC"
+}

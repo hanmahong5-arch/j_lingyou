@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<boost_time_level_steps>
+  <boost_time_level_step>
+    <id/>
+    <name/>
+    <weekday/>
+    <time/>
+    <level_step/>
+    <exp_bonus/>
+    <recovery_fee_bonus/>
+  </boost_time_level_step>
+</boost_time_level_steps>

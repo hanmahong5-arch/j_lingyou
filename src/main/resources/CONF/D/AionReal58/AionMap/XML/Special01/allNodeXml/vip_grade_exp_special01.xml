@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<vip_grade_exps>
+  <vip_lv vip_lv="1">
+    <grade/>
+    <min_vipexp/>
+    <max_vipexp/>
+  </vip_lv>
+</vip_grade_exps>

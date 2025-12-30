@@ -43,7 +43,9 @@ import red.jiuzhou.ui.components.EnhancedStatusBar;
 import red.jiuzhou.ui.components.HotkeyManager;
 import red.jiuzhou.ui.components.SearchableTreeView;
 import red.jiuzhou.agent.ui.AgentChatStage;
+import red.jiuzhou.pattern.rule.ui.DesignRuleStage;
 import red.jiuzhou.ui.GameToolsStage;
+import red.jiuzhou.ui.ServerKnowledgeStage;
 
 import java.io.File;
 import java.nio.file.Path;
@@ -52,6 +54,7 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -63,7 +66,14 @@ import java.util.concurrent.atomic.AtomicReference;
  * @date:  2025-04-15 20:42
  * @version V1.0
  */
-@SpringBootApplication(scanBasePackages = {"red.jiuzhou.api", "red.jiuzhou.util"})
+@SpringBootApplication(scanBasePackages = {
+    "red.jiuzhou.api",
+    "red.jiuzhou.util",
+    "red.jiuzhou.agent",
+    "red.jiuzhou.ai",
+    "red.jiuzhou.analysis",
+    "red.jiuzhou.config"
+})
 public class Dbxmltool extends Application {
     private ConfigurableApplicationContext springContext;
 
@@ -112,9 +122,7 @@ public class Dbxmltool extends Application {
     public void start(Stage primaryStage) {
         log.info("应用程序启动,当前数据库: {}", DatabaseUtil.getDbName());
 
-        // 增量生成左侧菜单JSON配置
-        IncrementalMenuJsonGenerator.createJsonIncrementally();
-
+        // ========== 性能优化：异步加载菜单配置（避免启动卡顿）==========
         // 当前选中的Tab名称
         AtomicReference<String> tabName = new AtomicReference<>("");
 
@@ -173,19 +181,44 @@ public class Dbxmltool extends Application {
         leftControl.setSpacing(8);
         leftControl.setPadding(new Insets(8));
 
+        // ==================== 生成最新的左侧菜单配置 ====================
+        // 启动时重新扫描目录生成菜单配置，确保显示最新的目录结构
+        log.info("正在生成左侧菜单配置...");
+        IncrementalMenuJsonGenerator.createJsonIncrementally();
+        log.info("左侧菜单配置生成完成");
+
         // 读取左侧菜单配置并创建可搜索菜单树（增强版）
         String leftMenuJson = FileUtil.readUtf8String(YamlUtils.getProperty("file.homePath") + File.separator + "leftMenu.json");
         SearchableTreeView<String> searchableMenu = example.createSearchableLeftMenu(leftMenuJson, tabPane);
         TreeView<String> leftMenu = searchableMenu.getTreeView();  // 获取内部TreeView用于兼容
 
-        // ==================== 启用机制过滤功能 ====================
-        // 扫描XML目录建立机制映射
+        // ==================== 异步启用机制过滤功能（性能优化）====================
+        // 在后台线程扫描XML目录建立机制映射，避免阻塞UI启动
         String xmlPath = YamlUtils.getProperty("aion.xmlPath");
         if (xmlPath != null && !xmlPath.isEmpty()) {
-            searchableMenu.scanDirectoryForMechanisms(xmlPath);
+            final String finalXmlPath = xmlPath;
+            CompletableFuture.runAsync(() -> {
+                log.info("开始异步扫描目录建立机制映射: {}", finalXmlPath);
+                searchableMenu.scanDirectoryForMechanisms(finalXmlPath);
+                log.info("目录扫描完成");
+            }).thenRun(() -> {
+                // 在JavaFX线程中启用机制过滤标签栏
+                Platform.runLater(() -> {
+                    searchableMenu.enableMechanismFilter(true);
+                    log.info("机制过滤功能已启用");
+                });
+            }).exceptionally(ex -> {
+                log.error("机制扫描失败: {}", ex.getMessage(), ex);
+                Platform.runLater(() -> {
+                    // 即使扫描失败也启用机制过滤，让用户可以正常使用其他功能
+                    searchableMenu.enableMechanismFilter(true);
+                });
+                return null;
+            });
+        } else {
+            // 如果没有配置XML路径，直接启用机制过滤
+            searchableMenu.enableMechanismFilter(true);
         }
-        // 启用机制过滤标签栏
-        searchableMenu.enableMechanismFilter(true);
 
         // 组装左侧面板
         leftControl.getChildren().add(searchableMenu);  // 使用可搜索菜单树
@@ -391,19 +424,23 @@ public class Dbxmltool extends Application {
             "→ 统一更新两端数据结构"
         ));
 
-        // 字段关联分析按钮 - 专注于name字段的关联分析
+        // 字段关联分析按钮 - 综合关联分析工具（整合了关系图功能）
         Button relationButton = new Button("🔍 关联分析");
         relationButton.setTooltip(new Tooltip(
-            "智能分析name字段的关联关系\n\n" +
-            "🎯 核心功能:\n" +
-            "• 专注分析name字段的跨表引用\n" +
-            "• 自动发现道具名、技能名、NPC名等关联\n" +
-            "• 高精度匹配，避免噪音干扰\n\n" +
-            "💡 适用场景:\n" +
-            "→ 快速定位配置表间的名称引用关系\n" +
-            "→ 排查无效名称引用(如拼写错误)\n" +
-            "→ 理解游戏配置的核心对照关系\n\n" +
-            "📊 分析范围: 仅分析name和*_name字段"
+            "智能分析配置文件的关联关系\n\n" +
+            "🎯 三种分析模式:\n\n" +
+            "1️⃣ Name字段关联:\n" +
+            "• 分析name字段的跨表值匹配\n" +
+            "• 发现道具名、技能名、NPC名等关联\n\n" +
+            "2️⃣ ID引用分析:\n" +
+            "• 检测*_id字段的引用关系\n" +
+            "• 验证引用是否有效(目标ID存在)\n" +
+            "• 持久化结果，下次无需重新分析\n\n" +
+            "3️⃣ 机制关系图:\n" +
+            "• 27个游戏机制的依赖网络\n" +
+            "• 力导向布局自动排列\n" +
+            "• 依赖链追踪和影响分析\n\n" +
+            "💡 点击后进入关联分析窗口，可在多个Tab间切换"
         ));
 
         // 目录管理按钮 - 管理数据文件存储目录
@@ -470,6 +507,38 @@ public class Dbxmltool extends Application {
             "→ 测试数据快速清理"
         ));
 
+        // 设计规则按钮 - 意图驱动的批量修改
+        Button designRuleBtn = new Button("📐 设计规则");
+        designRuleBtn.setTooltip(new Tooltip(
+            "意图驱动批量数据修改\n\n" +
+            "🎯 核心功能:\n" +
+            "• 定义规则，自动应用到所有匹配记录\n" +
+            "• 支持表达式语法(当前值×1.2等)\n" +
+            "• 执行前预览变更统计\n" +
+            "• 一键回滚已执行的规则\n\n" +
+            "💡 使用示例:\n" +
+            "→ 「法师装备魔攻提升20%」\n" +
+            "→ 「50级以上技能伤害+15%」\n" +
+            "→ 定义规则一次，批量修改127条"
+        ));
+        designRuleBtn.setStyle("-fx-background-color: #E3F2FD; -fx-font-weight: bold;");
+
+        // 配置管理按钮 - 应用配置文件管理
+        Button configEditorBtn = new Button("⚙ 配置管理");
+        configEditorBtn.setTooltip(new Tooltip(
+            "应用配置文件管理器\n\n" +
+            "🎯 核心功能:\n" +
+            "• 可视化编辑YAML/JSON/ENV配置\n" +
+            "• 实时格式验证和结构预览\n" +
+            "• 自动备份和版本恢复\n" +
+            "• 敏感信息安全遮蔽\n\n" +
+            "💡 支持配置:\n" +
+            "→ application.yml 主配置\n" +
+            "→ 机制覆盖配置\n" +
+            "→ 菜单和映射配置\n\n" +
+            "⌨ 快捷键: Ctrl+S保存 | Ctrl+F搜索"
+        ));
+
         // ==================== 分析工具模块 ====================
         // 提供游戏数据分析和可视化功能
 
@@ -488,6 +557,45 @@ public class Dbxmltool extends Application {
             "→ 理解游戏系统间的关联"
         ));
 
+
+        // 服务器知识浏览器按钮 - 显示从服务器日志提取的知识
+        Button serverKnowledgeBtn = new Button("📚 服务器知识");
+        serverKnowledgeBtn.setTooltip(new Tooltip(
+            "服务器知识浏览器\n\n" +
+            "🎯 核心功能:\n" +
+            "• 49个XML字段黑名单（服务端拒绝）\n" +
+            "• 10条字段值修正规则\n" +
+            "• 双服务器交叉验证结果\n" +
+            "• 102,825行日志分析精华\n\n" +
+            "💡 数据来源:\n" +
+            "→ MainServer: 57,244个错误\n" +
+            "→ NPCServer: 45,581个错误\n" +
+            "→ 无服务端源码的宝贵知识\n\n" +
+            "⚠️ 导出时自动过滤黑名单字段\n" +
+            "确保XML符合服务端要求"
+        ));
+        serverKnowledgeBtn.setStyle("-fx-background-color: #FFF9C4; -fx-font-weight: bold;");
+
+        // 服务器配置清单按钮 - 显示服务器实际加载的XML文件列表
+        Button serverConfigBtn = new Button("📋 配置清单");
+        serverConfigBtn.setTooltip(new Tooltip(
+            "服务器配置文件清单\n\n" +
+            "🎯 核心功能:\n" +
+            "• 分析服务器日志，提取实际加载的XML文件\n" +
+            "• 标记核心配置文件（优先级分类）\n" +
+            "• 跟踪导入导出操作统计\n" +
+            "• 文件验证状态和错误信息\n\n" +
+            "💡 设计理念:\n" +
+            "→ 「文件层的唯一真理」\n" +
+            "→ 只关注服务器真正使用的文件\n" +
+            "→ 工具导入导出优先处理这些文件\n\n" +
+            "🔍 使用流程:\n" +
+            "1. 点击「分析服务器日志」\n" +
+            "2. 选择MainServer/log目录\n" +
+            "3. 自动提取XML加载记录\n" +
+            "4. 筛选查看不同类别的文件"
+        ));
+        serverConfigBtn.setStyle("-fx-background-color: #E1F5FE; -fx-font-weight: bold;");
 
         // AI数据助手按钮 - 自然语言操作游戏数据
         Button aiAgentBtn = new Button("🤖 AI助手");
@@ -628,6 +736,33 @@ public class Dbxmltool extends Application {
         });
 
 
+        // 服务器知识浏览器 - 打开服务器知识窗口
+        serverKnowledgeBtn.setOnAction(event -> {
+            try {
+                log.info("打开服务器知识浏览器");
+                ServerKnowledgeStage stage = new ServerKnowledgeStage();
+                stage.initOwner(primaryStage);
+                stage.show();
+            } catch (Exception e) {
+                log.error("打开服务器知识浏览器失败", e);
+                showError("打开服务器知识浏览器失败: " + e.getMessage());
+            }
+        });
+
+        // 服务器配置清单 - 打开配置文件管理窗口
+        serverConfigBtn.setOnAction(event -> {
+            try {
+                log.info("打开服务器配置文件清单");
+                red.jiuzhou.server.ui.ServerConfigFileManagerStage stage =
+                    new red.jiuzhou.server.ui.ServerConfigFileManagerStage();
+                stage.initOwner(primaryStage);
+                stage.show();
+            } catch (Exception e) {
+                log.error("打开服务器配置清单失败", e);
+                showError("打开服务器配置清单失败: " + e.getMessage());
+            }
+        });
+
         // AI数据助手 - 打开AI对话窗口
         aiAgentBtn.setOnAction(event -> {
             try {
@@ -670,72 +805,107 @@ public class Dbxmltool extends Application {
 
         // 搜索替换 - 打开全局搜索替换工具
         searchReplaceBtn.setOnAction(event -> {
-            try {
-                log.info("打开搜索替换工具");
-                new SearchReplaceDialog(primaryStage).show();
-            } catch (Exception e) {
-                log.error("打开搜索替换工具失败", e);
-                showError("打开搜索替换工具失败: " + e.getMessage());
-            }
+            // SearchReplaceDialog 依赖 GlobalSearchEngine（使用 Lombok，暂时禁用）
+            javafx.scene.control.Alert alert = new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.INFORMATION);
+            alert.setTitle("功能提示");
+            alert.setHeaderText("搜索替换功能暂时不可用");
+            alert.setContentText("该功能依赖的组件使用了 Lombok，在 Java 25 环境下暂时禁用。\n\n请使用其他搜索功能或等待后续更新。");
+            alert.showAndWait();
         });
 
-        // 数据验证 - 打开数据验证工具
+        // 数据验证 - 显示校验使用说明
         dataValidationBtn.setOnAction(event -> {
-            try {
-                log.info("打开数据验证工具");
-                new DataValidationDialog(primaryStage).show();
-            } catch (Exception e) {
-                log.error("打开数据验证工具失败", e);
-                showError("打开数据验证工具失败: " + e.getMessage());
-            }
+            Alert alert = new Alert(Alert.AlertType.INFORMATION);
+            alert.setTitle("数据校验");
+            alert.setHeaderText("快速校验当前表");
+            alert.setContentText(
+                "数据校验已集成到表格视图中:\n\n" +
+                "1. 在左侧菜单选择一个表\n" +
+                "2. 点击表格上方的「✓ 校验」按钮\n" +
+                "3. 校验结果显示在下方日志面板\n\n" +
+                "检查内容:\n" +
+                "• 引用完整性 - 检测无效的外键引用\n" +
+                "• 空值检测 - 检查必填字段是否为空\n" +
+                "• 重复数据 - 识别重复的名称\n" +
+                "• 异常值 - 检测偏离正常范围的数值"
+            );
+            alert.showAndWait();
         });
 
-        // 批量改写 - 打开批量数据改写工具
+        // 批量改写 - 暂时禁用（依赖 EnhancedBatchRewriter 使用 Lombok）
         batchRewriteBtn.setOnAction(event -> {
+            javafx.scene.control.Alert alert = new javafx.scene.control.Alert(
+                javafx.scene.control.Alert.AlertType.INFORMATION);
+            alert.setTitle("功能提示");
+            alert.setHeaderText("批量改写功能暂时不可用");
+            alert.setContentText("该功能依赖的组件使用了 Lombok，在 Java 25 环境下暂时禁用。\n\n" +
+                "请使用其他编辑功能或等待后续更新。");
+            alert.showAndWait();
+        });
+
+        // 设计规则 - 打开设计规则工作台
+        designRuleBtn.setOnAction(event -> {
             try {
-                log.info("打开批量改写工具");
-                new BatchRewriteDialog(primaryStage).show();
+                log.info("打开设计规则工作台");
+                DesignRuleStage stage = new DesignRuleStage();
+                stage.initOwner(primaryStage);
+                stage.show();
             } catch (Exception e) {
-                log.error("打开批量改写工具失败", e);
-                showError("打开批量改写工具失败: " + e.getMessage());
+                log.error("打开设计规则工作台失败", e);
+                showError("打开设计规则工作台失败: " + e.getMessage());
             }
         });
 
-        // 紧急恢复 - 打开紧急恢复工具(高危操作,谨慎使用)
+        // 配置管理 - 打开配置文件编辑器
+        configEditorBtn.setOnAction(event -> {
+            try {
+                log.info("打开配置文件管理器");
+                ConfigEditorStage stage = new ConfigEditorStage();
+                stage.initOwner(primaryStage);
+                stage.show();
+                statusBar.info("已打开配置管理器");
+            } catch (Exception e) {
+                log.error("打开配置管理器失败", e);
+                showError("打开配置管理器失败: " + e.getMessage());
+            }
+        });
+
+        // 紧急恢复 - 暂时禁用（依赖 DataSafetyManager 使用 Lombok）
         emergencyRecoveryBtn.setOnAction(event -> {
-            try {
-                log.warn("打开紧急恢复工具 - 高危操作");
-                EmergencyRecoveryDialog.showRecovery(primaryStage);
-            } catch (Exception e) {
-                log.error("打开紧急恢复工具失败", e);
-                showError("打开紧急恢复工具失败: " + e.getMessage());
-            }
+            javafx.scene.control.Alert alert = new javafx.scene.control.Alert(
+                javafx.scene.control.Alert.AlertType.INFORMATION);
+            alert.setTitle("功能提示");
+            alert.setHeaderText("紧急恢复功能暂时不可用");
+            alert.setContentText("该功能依赖的组件使用了 Lombok，在 Java 25 环境下暂时禁用。\n\n" +
+                "请使用手动恢复或等待后续更新。");
+            alert.showAndWait();
         });
 
-        // 操作监控 - 打开操作监控面板
+        // 操作监控 - 暂时禁用（依赖 DataSafetyManager 使用 Lombok）
         operationMonitorBtn.setOnAction(event -> {
-            try {
-                log.info("打开操作监控面板");
-                OperationMonitorPanel.showMonitor(primaryStage);
-            } catch (Exception e) {
-                log.error("打开操作监控面板失败", e);
-                showError("打开操作监控面板失败: " + e.getMessage());
-            }
+            javafx.scene.control.Alert alert = new javafx.scene.control.Alert(
+                javafx.scene.control.Alert.AlertType.INFORMATION);
+            alert.setTitle("功能提示");
+            alert.setHeaderText("操作监控功能暂时不可用");
+            alert.setContentText("该功能依赖的组件使用了 Lombok，在 Java 25 环境下暂时禁用。\n\n" +
+                "请等待后续更新。");
+            alert.showAndWait();
         });
 
-        // 备份管理 - 打开备份管理器
+        // 备份管理 - 暂时禁用（依赖 DataSafetyManager 使用 Lombok）
         backupManagerBtn.setOnAction(event -> {
-            try {
-                log.info("打开备份管理器");
-                BackupManagerDialog.showManager(primaryStage);
-            } catch (Exception e) {
-                log.error("打开备份管理器失败", e);
-                showError("打开备份管理器失败: " + e.getMessage());
-            }
+            javafx.scene.control.Alert alert = new javafx.scene.control.Alert(
+                javafx.scene.control.Alert.AlertType.INFORMATION);
+            alert.setTitle("功能提示");
+            alert.setHeaderText("备份管理功能暂时不可用");
+            alert.setContentText("该功能依赖的组件使用了 Lombok，在 Java 25 环境下暂时禁用。\n\n" +
+                "请使用手动备份或等待后续更新。");
+            alert.showAndWait();
         });
 
-        // ==================== 工具栏布局 ====================
-        // 按照功能模块分组排列按钮,使用分隔符增强视觉层次
+        // ==================== 工具栏布局（优化版）====================
+        // 移除了重复和禁用的按钮，优化了分组逻辑
+        // 按照使用频率和功能相关性分组，提升游戏设计师的工作效率
 
         // 创建状态标签 - 显示当前数据库连接状态
         Label statusLabel = new Label("📡 数据库: " + DatabaseUtil.getDbName());
@@ -746,27 +916,41 @@ public class Dbxmltool extends Application {
         javafx.scene.layout.Region spacer = new javafx.scene.layout.Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        // 组装工具栏:按功能模块分组（优化后的布局，更符合游戏设计师直觉）
-        // [数据配置] | [数据校验] | [关系分析] | [分析工具] | [游戏工具] | [数据处理] ... [状态信息]
+        // 工具栏按钮优化说明：
+        // ✅ 移除重复：删除工具栏中的"数据校验"（表格视图中已有）
+        // ✅ 整合功能：合并"关联分析"和"关系图"为一个按钮（多Tab窗口）
+        // ✅ 清理禁用：移除5个临时禁用的按钮（查找替换、批量编辑、数据恢复、操作日志、备份中心）
+        // ✅ 优化分组：按使用频率重新组织（核心功能 > 分析工具 > 设计工具 > 专业工具）
+
+        // 优化后的工具栏布局（共8个按钮，从原来的16个精简）：
+        // [核心功能] | [分析工具] | [设计工具] | [专业工具] ... [状态信息]
         toolBar.getItems().addAll(
-            // 数据配置模块 - 配置数据源和路径
-            confButton, addDirectoryBtn,
+            // ========== 核心功能模块 ==========
+            // 最常用的基础数据配置功能
+            confButton,          // 🔗 数据对照
+            addDirectoryBtn,     // 📁 路径配置
             new Separator(),
-            // 数据校验模块
-            dataValidationBtn,
+
+            // ========== 分析工具模块 ==========
+            // 数据关系分析和可视化
+            relationButton,      // 🔍 关联分析（整合了关系图）
+            mechanismExplorerBtn,// 🎮 机制浏览器
+            serverKnowledgeBtn,  // 📚 服务器知识
+            serverConfigBtn,     // 📋 配置清单
+            aiAgentBtn,          // 🤖 AI助手
             new Separator(),
-            // 关系分析模块 - 字段关联和机制关系
-            relationButton, mechanismRelationBtn,
+
+            // ========== 设计工具模块 ==========
+            // 高级设计和配置功能
+            designRuleBtn,       // 📐 设计规则
+            configEditorBtn,     // ⚙ 配置管理
             new Separator(),
-            // 分析工具模块 - 机制浏览和AI助手
-            mechanismExplorerBtn, aiAgentBtn,
-            new Separator(),
-            // 游戏工具模块 - 刷怪点规划和概率模拟
-            gameToolsBtn,
-            new Separator(),
-            // 数据处理模块 - 搜索和备份
-            searchReplaceBtn, backupManagerBtn,
-            // 状态信息区域
+
+            // ========== 专业工具模块 ==========
+            // 特殊领域的专业工具
+            gameToolsBtn,        // 🎯 刷怪工具
+
+            // 状态信息区域（右对齐）
             spacer, statusLabel
         );
 

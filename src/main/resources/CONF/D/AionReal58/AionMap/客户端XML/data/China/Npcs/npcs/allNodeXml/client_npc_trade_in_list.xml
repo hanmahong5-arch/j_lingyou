@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<client_npc_trade_in_lists>
+  <client_npc_trade_in_list>
+    <id/>
+    <name/>
+    <desc/>
+    <use_category/>
+    <goods_list>
+      <data>
+        <item/>
+      </data>
+    </goods_list>
+  </client_npc_trade_in_list>
+</client_npc_trade_in_lists>

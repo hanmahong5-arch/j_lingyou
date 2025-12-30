@@ -1,0 +1,8 @@
+{
+	"file_path":"D:\\AionReal58\\AionMap\\XML\\Special01\\jumping_pc_special01.xml",
+	"xml_root_tag":"jumping_pcs",
+	"list":[],
+	"xml_item_tag":"jumping_pc",
+	"table_name":"jumping_pc_special01",
+	"sql":"select * from jumping_pc_special01 order by CAST(id AS UNSIGNED) ASC"
+}

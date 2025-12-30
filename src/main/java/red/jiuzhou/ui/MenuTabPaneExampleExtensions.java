@@ -361,6 +361,75 @@ public class MenuTabPaneExampleExtensions {
      * 一键将目录内所有表导出为 XML
      */
     public static void exportFolderToXml(TreeItem<String> selectedItem) {
+        // ==================== 导出预验证（2025-12-29新增）====================
+        if (selectedItem == null) {
+            showError("请选择一个目录执行此操作");
+            return;
+        }
+
+        String folderPath = getFolderPathFromTreeItem(selectedItem);
+        if (folderPath == null || folderPath.trim().isEmpty()) {
+            showError("无法获取目录路径");
+            return;
+        }
+
+        File folder = new File(folderPath);
+        if (!folder.exists() || !folder.isDirectory()) {
+            showError("请选择有效的目录节点");
+            return;
+        }
+
+        List<File> xmlFiles = collectXmlFiles(folder);
+        if (xmlFiles.isEmpty()) {
+            showInformation("批量导出XML", "目录中没有可处理的XML文件。");
+            return;
+        }
+
+        // 收集所有表名进行预验证
+        List<String> tableNames = xmlFiles.stream()
+            .map(f -> FileUtil.mainName(f))
+            .collect(Collectors.toList());
+
+        log.info("批量导出XML - 开始预验证 {} 个表", tableNames.size());
+        red.jiuzhou.validation.PreExportValidator validator = new red.jiuzhou.validation.PreExportValidator();
+        List<red.jiuzhou.validation.PreExportValidator.ValidationResult> validationResults =
+            validator.validateBatch(tableNames);
+
+        long canExportCount = validationResults.stream()
+            .filter(red.jiuzhou.validation.PreExportValidator.ValidationResult::canExport)
+            .count();
+        long hasIssuesCount = validationResults.stream()
+            .filter(red.jiuzhou.validation.PreExportValidator.ValidationResult::hasIssues)
+            .count();
+        long totalBlacklistedFields = validationResults.stream()
+            .mapToLong(r -> r.getBlacklistedFields().size())
+            .sum();
+
+        log.info("预检查完成: {}个可导出, {}个有警告, 共{}个字段将被过滤",
+            canExportCount, hasIssuesCount, totalBlacklistedFields);
+
+        // 显示预验证结果摘要（如果有警告）
+        if (hasIssuesCount > 0) {
+            StringBuilder summary = new StringBuilder();
+            summary.append(String.format("预检查完成:\n\n"));
+            summary.append(String.format("✅ %d 个表可导出\n", canExportCount));
+            summary.append(String.format("⚠️  %d 个表有警告\n", hasIssuesCount));
+            summary.append(String.format("🔧 %d 个不兼容字段将自动过滤\n\n", totalBlacklistedFields));
+            summary.append("是否继续导出？");
+
+            Alert confirmAlert = new Alert(Alert.AlertType.CONFIRMATION);
+            confirmAlert.setTitle("导出预检查");
+            confirmAlert.setHeaderText("发现潜在问题");
+            confirmAlert.setContentText(summary.toString());
+
+            Optional<ButtonType> result = confirmAlert.showAndWait();
+            if (!result.isPresent() || result.get() != ButtonType.OK) {
+                log.info("用户取消导出操作");
+                return;
+            }
+        }
+        // ======================================================================
+
         executeFolderOperation(
             "批量导出XML",
             "正在导出数据库数据为XML...",
@@ -370,14 +439,15 @@ public class MenuTabPaneExampleExtensions {
                 String tabName = FileUtil.mainName(xmlFile);
                 String tabFilePath = stripXmlExtension(xmlPath);
                 String mapType = deriveMapType(tabName, xmlFile);
+                String exportedFilePath;
                 if ("world".equalsIgnoreCase(tabName)) {
                     WorldDbToXmlGenerator generator = new WorldDbToXmlGenerator(tabName, mapType, tabFilePath);
-                    generator.processAndMerge();
+                    exportedFilePath = generator.processAndMerge();
                 } else {
                     DbToXmlGenerator generator = new DbToXmlGenerator(tabName, mapType, tabFilePath);
-                    generator.processAndMerge();
+                    exportedFilePath = generator.processAndMerge();
                 }
-                return "导出成功";
+                return "导出成功 → " + exportedFilePath;
             },
             null
         );

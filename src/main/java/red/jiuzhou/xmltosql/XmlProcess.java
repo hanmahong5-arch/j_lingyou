@@ -3,7 +3,7 @@ package red.jiuzhou.xmltosql;
 import cn.hutool.core.io.FileUtil;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.serializer.SerializerFeature;
-import org.junit.Test;
+// Note: @Test annotation removed - these are utility methods, not tests
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import red.jiuzhou.util.JSONRecord;
@@ -58,7 +58,6 @@ public class XmlProcess {
      * 合并成一个单一的、包含所有节点的全节点XML，然后基于这个合并后的文件生成
      * 数据库建表语句。
      */
-    @Test
     public void initSvrWorlds() {
         String confPath = YamlUtils.getProperty("file.confPath");
         String svrDataPath = YamlUtils.getProperty("file.svrDataPath");
@@ -184,11 +183,17 @@ public class XmlProcess {
         JSONRecord filedLenJson = XmlFieldLen.getFiledLenJson(filePath);
 
         String tabConf = XMLToConf.generateMySQLTables(filePath, allNodeXmlStr, null);
+        if (tabConf == null || tabConf.trim().isEmpty()) {
+            throw new RuntimeException("生成表配置失败（配置为空），文件: " + filePath);
+        }
         FileUtil.writeUtf8String(tabConf, fPath + File.separator + fileName + ".json");
 
         String sql = XMLToMySQLGenerator.generateMysqlTables(fileName, allNodeXmlStr, filedLenJson, null);
+        if (sql == null || sql.trim().isEmpty()) {
+            throw new RuntimeException("生成DDL SQL失败（SQL为空），文件: " + filePath);
+        }
         String sqlFilePath = fPath + File.separator + "sql" + File.separator + fileName + ".sql";
-
+        log.info("✅ 成功生成DDL SQL，长度: {} 字符，文件: {}", sql.length(), sqlFilePath);
         FileUtil.writeUtf8String(sql, sqlFilePath);
 
         XmlFiledValNum.getFiledLenJson(filedValNumJson, filePath, null);

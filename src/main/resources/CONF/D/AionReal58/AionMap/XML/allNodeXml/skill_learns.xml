@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<skill_learns>
+  <skill_learn>
+    <id/>
+    <name/>
+    <race/>
+    <class/>
+    <pc_level/>
+    <skill/>
+    <skill_level/>
+    <autolearn/>
+  </skill_learn>
+</skill_learns>

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<stigma_hiddenskills>
+  <stigma_hiddenskill>
+    <id/>
+    <name/>
+    <hidden_skill/>
+    <class/>
+    <level/>
+    <condition_skill>
+      <data>
+        <condition_skill_num/>
+        <condition_skill_group/>
+        <condition_skill_level/>
+        <only_enchant/>
+      </data>
+    </condition_skill>
+  </stigma_hiddenskill>
+</stigma_hiddenskills>

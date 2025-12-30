@@ -43,7 +43,8 @@ public class BatchTransformEngine {
     private final Map<String, String> transformCache = new ConcurrentHashMap<>();
 
     public BatchTransformEngine(int maxConcurrency) {
-        this.executorService = Executors.newFixedThreadPool(maxConcurrency);
+        // Java 21+ 虚拟线程：无需配置并发数，自动伸缩
+        this.executorService = Executors.newVirtualThreadPerTaskExecutor();
     }
 
     /**

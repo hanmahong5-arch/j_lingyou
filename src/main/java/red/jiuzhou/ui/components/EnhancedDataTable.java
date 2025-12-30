@@ -73,8 +73,8 @@ public class EnhancedDataTable extends VBox {
     private Consumer<Map<String, Object>> onRowDoubleClick;
     private Consumer<List<Map<String, Object>>> onSelectionChange;
 
-    // 线程池
-    private final ExecutorService searchExecutor = Executors.newSingleThreadExecutor();
+    // 虚拟线程执行器（Java 21+）
+    private final ExecutorService searchExecutor = Executors.newVirtualThreadPerTaskExecutor();
 
     public EnhancedDataTable() {
         setSpacing(0);

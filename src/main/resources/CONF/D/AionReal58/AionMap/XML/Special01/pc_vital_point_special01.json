@@ -1,0 +1,8 @@
+{
+	"file_path":"D:\\AionReal58\\AionMap\\XML\\Special01\\pc_vital_point_special01.xml",
+	"xml_root_tag":"pc_vital_points",
+	"list":[],
+	"xml_item_tag":"level",
+	"table_name":"pc_vital_point_special01",
+	"sql":"select * from pc_vital_point_special01 order by CAST(vp_per_tic_light AS UNSIGNED) ASC"
+}

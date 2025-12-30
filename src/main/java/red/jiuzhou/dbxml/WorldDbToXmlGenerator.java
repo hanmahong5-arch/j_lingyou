@@ -32,8 +32,6 @@ public class WorldDbToXmlGenerator {
     private static final Logger log = LoggerFactory.getLogger(WorldDbToXmlGenerator.class);
     private double progress;
     private static TableConf table;
-    // 根据CPU核心数调整
-    private static final int THREAD_POOL_SIZE = 16;
     // 每页数据量
     private static final int PAGE_SIZE = 1000;
     // 临时文件存放目录
@@ -41,11 +39,10 @@ public class WorldDbToXmlGenerator {
     private int total;
     private CounterUtil counterUtil = new CounterUtil();
     private static String mapType;
+    // 虚拟线程执行器 (Java 21+)
+    private static final ExecutorService executorService = Executors.newVirtualThreadPerTaskExecutor();
 
     static List<String> worldSpecialTabNames = Arrays.asList(YamlUtils.getProperty("world.specialTabName").split(","));
-
-    private static final ExecutorService executorService =
-            Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors() * 2);
     public WorldDbToXmlGenerator(String tabName, String mapType, String tabFilePath) {
         this.mapType = mapType;
         TableConf table = TabConfLoad.getTale(tabName, tabFilePath);
@@ -56,46 +53,53 @@ public class WorldDbToXmlGenerator {
         this.table = table;
     }
 
-    public void processAndMerge() {
+    public String processAndMerge() {
         try {
             // 1. 获取总数据量
             int totalRecords = DatabaseUtil.getTotalRowCount(table.getTableName());
             this.total = totalRecords;
             int totalPages = (totalRecords + PAGE_SIZE - 1) / PAGE_SIZE;
 
-            // 2. 初始化线程池
-            ExecutorService executor = Executors.newFixedThreadPool(THREAD_POOL_SIZE);
-            List<Future<?>> futures = new ArrayList<>();
             FileUtil.del(YamlUtils.getProperty("file.exportDataPath") + File.separator + TEMP_DIR);
-            // 3. 分页提交任务
-            for (int page = 0; page < totalPages; page++) {
-                int offset = page * PAGE_SIZE;
-                int finalPage = page;
-                Callable<Void> task = () -> {
-                    String fileName = TEMP_DIR + "part_" + finalPage + ".xml";
-                    log.info("开始处理分页：{}", finalPage);
-                    generateXmlPart(table, offset,  PAGE_SIZE, fileName);
-                    return null;
-                };
-                futures.add(executor.submit(task));
-            }
 
-            // 4. 等待所有线程完成
-            for (Future<?> future : futures) {
-                future.get();
-            }
-            executor.shutdown();
+            // 2. 使用虚拟线程并行处理分页（Java 21+）
+            try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+                List<Runnable> tasks = new ArrayList<>();
+                for (int page = 0; page < totalPages; page++) {
+                    int offset = page * PAGE_SIZE;
+                    int finalPage = page;
+                    tasks.add(() -> {
+                        String fileName = TEMP_DIR + "part_" + finalPage + ".xml";
+                        log.info("开始处理分页：{}", finalPage);
+                        generateXmlPart(table, offset, PAGE_SIZE, fileName);
+                    });
+                }
+
+                // 3. 提交所有任务并等待完成
+                tasks.stream()
+                    .map(executor::submit)
+                    .toList()
+                    .forEach(future -> {
+                        try {
+                            future.get();
+                        } catch (Exception e) {
+                            throw new RuntimeException("分页处理失败", e);
+                        }
+                    });
+            } // try-with-resources 自动关闭 executor
 
             // 5. 合并所有临时文件
             List<File> tempFileList = FileUtil.loopFiles(YamlUtils.getProperty("file.exportDataPath") + File.separator + TEMP_DIR).stream()
                     .filter(file -> file.getName().endsWith(".xml"))
                     .collect(Collectors.toList());
             tempFileList.sort(Comparator.comparing(File::getName));
-            mergeXmlFiles(tempFileList);
+            String exportedFilePath = mergeXmlFiles(tempFileList);
 
             // 6. 清理临时文件
             FileUtil.del(YamlUtils.getProperty("file.exportDataPath") + File.separator + TEMP_DIR);
 
+            // 7. 返回导出的文件路径
+            return exportedFilePath;
 
         } catch (Exception e) {
             throw new RuntimeException("处理失败", e);
@@ -169,7 +173,7 @@ public class WorldDbToXmlGenerator {
         }
     }
     // 合并所有XML文件
-    private void mergeXmlFiles(List<File> xmlFiles) throws Exception {
+    private String mergeXmlFiles(List<File> xmlFiles) throws Exception {
         Document document = DocumentHelper.createDocument();
         Element root = document.addElement(table.getXmlRootTag());
         if(table.getXmlRootAttr() != null && !table.getXmlRootAttr().trim().isEmpty()){
@@ -196,6 +200,10 @@ public class WorldDbToXmlGenerator {
         if(table.getFilePath().contains("AionMap")){
             XmlStringModifier.insertStringAfterFirstLine(xmlFile);
         }
+
+        // 返回导出的文件绝对路径
+        log.info("✅ 文件已导出到: {}", xmlFile);
+        return xmlFile;
     }
 
 

@@ -1,0 +1,83 @@
+{
+	"file_path":"D:\\AionReal58\\AionMap\\XML\\Special01\\abyss_special01.xml",
+	"xml_root_tag":"abysss",
+	"list":[
+		{
+			"addDataNode":"abyss_dome_skill",
+			"associatedFiled":"id",
+			"xml_tag":"data",
+			"db_column":"data",
+			"list":[
+				{
+					"addDataNode":"dome_available_skills",
+					"associatedFiled":"id",
+					"xml_tag":"data",
+					"db_column":"data",
+					"table_name":"abyss_special01__abyss_dome_skill__data__d_a_s__data",
+					"sql":"select * from abyss_special01__abyss_dome_skill__data__d_a_s__data where id = '#associated_filed' order by CAST(id AS UNSIGNED) ASC"
+				}
+			],
+			"table_name":"abyss_special01__abyss_dome_skill__data",
+			"sql":"select * from abyss_special01__abyss_dome_skill__data where id = '#associated_filed' order by CAST(id AS UNSIGNED) ASC"
+		},
+		{
+			"addDataNode":"weak_race_buff_set",
+			"associatedFiled":"id",
+			"xml_tag":"data",
+			"db_column":"data",
+			"table_name":"abyss_special01__weak_race_buff_set__data",
+			"sql":"select * from abyss_special01__weak_race_buff_set__data where id = '#associated_filed' order by CAST(id AS UNSIGNED) ASC"
+		},
+		{
+			"addDataNode":"contributor_reward",
+			"associatedFiled":"id",
+			"xml_tag":"data",
+			"db_column":"data",
+			"table_name":"abyss_special01__contributor_reward__data",
+			"sql":"select * from abyss_special01__contributor_reward__data where id = '#associated_filed' order by CAST(id AS UNSIGNED) ASC"
+		},
+		{
+			"addDataNode":"defender_reward",
+			"associatedFiled":"id",
+			"xml_tag":"data",
+			"db_column":"data",
+			"table_name":"abyss_special01__defender_reward__data",
+			"sql":"select * from abyss_special01__defender_reward__data where id = '#associated_filed' order by CAST(id AS UNSIGNED) ASC"
+		},
+		{
+			"addDataNode":"protect_reward",
+			"associatedFiled":"id",
+			"xml_tag":"data",
+			"db_column":"data",
+			"table_name":"abyss_special01__protect_reward__data",
+			"sql":"select * from abyss_special01__protect_reward__data where id = '#associated_filed' order by CAST(id AS UNSIGNED) ASC"
+		},
+		{
+			"addDataNode":"luna_reward",
+			"associatedFiled":"id",
+			"xml_tag":"data",
+			"db_column":"data",
+			"table_name":"abyss_special01__luna_reward__data",
+			"sql":"select * from abyss_special01__luna_reward__data where id = '#associated_filed' order by CAST(id AS UNSIGNED) ASC"
+		},
+		{
+			"addDataNode":"siege_reward",
+			"associatedFiled":"id",
+			"xml_tag":"data",
+			"db_column":"data",
+			"table_name":"abyss_special01__siege_reward__data",
+			"sql":"select * from abyss_special01__siege_reward__data where id = '#associated_filed' order by CAST(id AS UNSIGNED) ASC"
+		},
+		{
+			"addDataNode":"siege_leader_reward",
+			"associatedFiled":"id",
+			"xml_tag":"data",
+			"db_column":"data",
+			"table_name":"abyss_special01__siege_leader_reward__data",
+			"sql":"select * from abyss_special01__siege_leader_reward__data where id = '#associated_filed' order by CAST(id AS UNSIGNED) ASC"
+		}
+	],
+	"xml_item_tag":"abyss",
+	"table_name":"abyss_special01",
+	"sql":"select * from abyss_special01 order by CAST(id AS UNSIGNED) ASC"
+}

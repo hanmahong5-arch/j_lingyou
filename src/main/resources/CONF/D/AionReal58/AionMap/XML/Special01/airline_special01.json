@@ -1,0 +1,17 @@
+{
+	"file_path":"D:\\AionReal58\\AionMap\\XML\\Special01\\airline_special01.xml",
+	"xml_root_tag":"airlines",
+	"list":[
+		{
+			"addDataNode":"airline_list",
+			"associatedFiled":"id",
+			"xml_tag":"data",
+			"db_column":"data",
+			"table_name":"airline_special01__airline_list__data",
+			"sql":"select * from airline_special01__airline_list__data where id = '#associated_filed' order by CAST(id AS UNSIGNED) ASC"
+		}
+	],
+	"xml_item_tag":"airline",
+	"table_name":"airline_special01",
+	"sql":"select * from airline_special01 order by CAST(id AS UNSIGNED) ASC"
+}

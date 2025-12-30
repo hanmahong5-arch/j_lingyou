@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<pve_adjusts>
+  <name name="Branch_Event_UndeadLightWiD_15_An">
+    <__comment__/>
+    <pve_attack_ratio_physical_light/>
+    <pve_defend_ratio_physical_light/>
+    <pve_attack_ratio_magical_light/>
+    <pve_defend_ratio_magical_light/>
+    <pve_attack_ratio_physical_dark/>
+    <pve_defend_ratio_physical_dark/>
+    <pve_attack_ratio_magical_dark/>
+    <pve_defend_ratio_magical_dark/>
+  </name>
+</pve_adjusts>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<under_control_items>
+  <under_control_item>
+    <id/>
+    <name/>
+    <drop_ctrl_period_type/>
+    <drop_limit/>
+    <intersvr_drop_limit/>
+    <indunsvr_drop_limit/>
+  </under_control_item>
+</under_control_items>

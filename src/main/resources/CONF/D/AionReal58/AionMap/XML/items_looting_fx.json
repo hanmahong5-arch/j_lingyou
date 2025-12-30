@@ -1,0 +1,8 @@
+{
+	"file_path":"D:\\AionReal58\\AionMap\\XML\\items_looting_fx.xml",
+	"xml_root_tag":"item_looting_fxs",
+	"list":[],
+	"xml_item_tag":"item_looting_fx",
+	"table_name":"items_looting_fx",
+	"sql":"select * from items_looting_fx order by CAST(id AS UNSIGNED) ASC"
+}

@@ -33,6 +33,9 @@ import red.jiuzhou.util.DatabaseUtil;
 import red.jiuzhou.util.JSONRecord;
 import red.jiuzhou.util.YamlUtils;
 import red.jiuzhou.util.YmlConfigUtil;
+import red.jiuzhou.validation.DatabaseValidationService;
+import red.jiuzhou.validation.DatabaseValidationService.Severity;
+import red.jiuzhou.validation.DatabaseValidationService.ValidationIssue;
 import red.jiuzhou.xmltosql.XmlProcess;
 
 import java.io.File;
@@ -69,8 +72,8 @@ public class PaginatedTable{
     private  ProgressBar progressBar;
 
     private  String mapType;
-    // 线程池
-    private final ExecutorService executor = Executors.newSingleThreadExecutor();
+    // 任务执行器（虚拟线程）
+    private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
 
     private List<String> filterList;
 
@@ -90,13 +93,9 @@ public class PaginatedTable{
             this.tabName = tabName;
             this.tabFilePath = tab.getUserData() + "";
             log.info("tabFilePath init: {}", tabFilePath);
-            // 查询总记录数
-            try{
-                totalRows = DatabaseUtil.getTotalRowCount(tabName  + buildWhereClause());
-            }catch (Exception e) {
-                log.error("获取总行数失败: {}", e.getMessage());
-                // 延迟初始化logPanel时不能在这里调用，因为此时logPanel还未创建
-            }
+
+            // 初始化为0，稍后异步加载
+            totalRows = 0;
 
             // 创建 TableView
             tableView = new TableView<>();
@@ -181,12 +180,8 @@ public class PaginatedTable{
             searchButton.setOnAction(e -> searchById());
             clearFilterButton.setOnAction(e -> {
                 filterList.clear();
-                this.totalRows = DatabaseUtil.getTotalRowCount(tabName + buildWhereClause());
-                int pageCount = (int) Math.ceil((double) totalRows / DatabaseUtil.ROWS_PER_PAGE);
-                pagination.setPageCount(pageCount);
-                pagination.setCurrentPageIndex(0);
-                pagination.setPageFactory(this::createPage);
-                logPanel.info("已清除所有筛选条件，总行数: " + totalRows);
+                refreshTotalRowsAsync();
+                logPanel.info("已清除所有筛选条件，正在刷新数据...");
             });
             xmlToDb.setOnAction(e -> {
                 String filePath = ensureXmlExtension((String) tab.getUserData());
@@ -199,8 +194,14 @@ public class PaginatedTable{
             });
             progressLabel = new Label("");
 
+            // 数据校验按钮 - 一键检查当前表的数据质量
+            Button validateBtn = new Button("✓ 校验");
+            validateBtn.setTooltip(new Tooltip("一键检查当前表的数据质量\n• 引用完整性\n• 空值检测\n• 重复数据\n• 异常值"));
+            validateBtn.setStyle("-fx-background-color: #E8F5E9;");
+            validateBtn.setOnAction(e -> runTableValidation());
+
             // 按钮区域
-            HBox searchBox = new HBox(10, searchField, searchButton, clearFilterButton, xmlToDb, xmlToDbWithField, dbToXml, ddlBun);
+            HBox searchBox = new HBox(10, searchField, searchButton, clearFilterButton, validateBtn, xmlToDb, xmlToDbWithField, dbToXml, ddlBun);
             searchBox.setPadding(new Insets(10));
             VBox progressBox = null;
             if("world".equals(tabName)){
@@ -211,9 +212,8 @@ public class PaginatedTable{
             progressBox = new VBox(5, progressLabel, new Region());
             progressBox.setPadding(new Insets(10));
 
-            // 创建 Pagination 控件
-            int pageCount = (int) Math.ceil((double) totalRows / DatabaseUtil.ROWS_PER_PAGE);
-            pagination = new Pagination(pageCount, 0);
+            // 创建 Pagination 控件（初始页数设为1，稍后异步加载总行数后更新）
+            pagination = new Pagination(1, 0);
             pagination.setMaxPageIndicatorCount(10);
             pagination.setPageFactory(this::createPage);
 
@@ -228,22 +228,65 @@ public class PaginatedTable{
             rightControl.getChildren().add(pagination);
             rightControl.getChildren().add(logPanel); // 添加日志面板
             //VBox vBox = new VBox(searchBox, progressBox, pagination);
-            log.info("time {}", System.currentTimeMillis() - startTime);
 
             // 添加初始化日志
             logPanel.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
             logPanel.success("数据页签已加载完成");
             logPanel.info("表名: " + tabName);
-            logPanel.info("总行数: " + totalRows);
             logPanel.info("文件路径: " + tabFilePath);
             if ("world".equals(tabName) && mapType != null) {
                 logPanel.info("地图类型: " + mapType);
             }
             logPanel.info("页面大小: " + DatabaseUtil.ROWS_PER_PAGE + " 行/页");
-            logPanel.info("总页数: " + pageCount);
+            logPanel.info("正在统计总行数...");
             logPanel.info("加载耗时: " + (System.currentTimeMillis() - startTime) + " ms");
-            logPanel.success("系统就绪，可以开始操作");
-            logPanel.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
+            // ==================== 异步加载总行数（性能优化）====================
+            // 在后台线程查询总行数，避免阻塞UI
+            javafx.concurrent.Task<Integer> countTask = new javafx.concurrent.Task<>() {
+                @Override
+                protected Integer call() throws Exception {
+                    return DatabaseUtil.getTotalRowCount(tabName + buildWhereClause());
+                }
+
+                @Override
+                protected void succeeded() {
+                    totalRows = getValue();
+                    int pageCount = (int) Math.ceil((double) totalRows / DatabaseUtil.ROWS_PER_PAGE);
+
+                    Platform.runLater(() -> {
+                        // 更新分页控件
+                        pagination.setPageCount(Math.max(1, pageCount));
+
+                        // 更新日志
+                        logPanel.success(String.format("总行数统计完成: %,d 行", totalRows));
+                        logPanel.info("总页数: " + pageCount);
+                        logPanel.success("系统就绪，可以开始操作");
+                        logPanel.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+                    });
+                }
+
+                @Override
+                protected void failed() {
+                    Throwable ex = getException();
+                    log.error("获取总行数失败: {}", ex.getMessage(), ex);
+
+                    Platform.runLater(() -> {
+                        logPanel.error("获取总行数失败: " + ex.getMessage());
+                        logPanel.warning("使用默认分页，可能显示不完整");
+                        logPanel.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
+                        // 设置一个默认值
+                        totalRows = 1000;
+                        pagination.setPageCount(10);
+                    });
+                }
+            };
+
+            // 启动异步任务
+            Thread countThread = new Thread(countTask);
+            countThread.setDaemon(true);
+            countThread.start();
 
             return rightControl;
         } catch (Exception e) {
@@ -257,8 +300,9 @@ public class PaginatedTable{
         tableView.getColumns().clear();
         List<Map<String, Object>> sampleData = null;
         try  {
+            // 优化：只使用 LIMIT 1 获取列结构，加载更快
             sampleData = DatabaseUtil.getJdbcTemplate()
-                    .queryForList("SELECT * FROM " + tabName + " limit 15");
+                    .queryForList("SELECT * FROM " + tabName + " limit 1");
         } catch (Exception e) {
             log.error("获取数据失败:{}", e.getMessage());
             if (logPanel != null) {
@@ -321,11 +365,10 @@ public class PaginatedTable{
                 showPopup.setOnAction(event -> showColumnDetails(columnName));
                 clearFilter.setOnAction(event -> {
                     filterList.removeIf(item -> item.startsWith(columnName + "="));
-                    this.totalRows = DatabaseUtil.getTotalRowCount(tabName + buildWhereClause());
-                    int pageCount = (int) Math.ceil((double) totalRows / DatabaseUtil.ROWS_PER_PAGE);
-                    pagination.setPageCount(pageCount);
-                    pagination.setCurrentPageIndex(0);
-                    pagination.setPageFactory(this::createPage);
+                    refreshTotalRowsAsync();
+                    if (logPanel != null) {
+                        logPanel.info("已清除 " + columnName + " 列的筛选条件");
+                    }
                 });
 
                 contextMenu.getItems().add(showPopup);
@@ -392,11 +435,10 @@ public class PaginatedTable{
                     String condition = columnName + "='" + rowData.getValue() + "'";
                     filterList.removeIf(item -> item.startsWith(columnName + "="));
                     filterList.add(condition);
-                    this.totalRows = DatabaseUtil.getTotalRowCount(tabName + buildWhereClause());
-                    int pageCount = (int) Math.ceil((double) totalRows / DatabaseUtil.ROWS_PER_PAGE);
-                    pagination.setPageCount(pageCount);
-                    pagination.setCurrentPageIndex(0);
-                    pagination.setPageFactory(this::createPage);
+                    refreshTotalRowsAsync();
+                    if (logPanel != null) {
+                        logPanel.info("已添加筛选条件: " + condition);
+                    }
                     popupStage.close();
                 }
             });
@@ -414,23 +456,90 @@ public class PaginatedTable{
 
 
     /**
-     * 创建某个分页的数据页面
+     * 创建某个分页的数据页面（异步加载优化）
      */
     private VBox createPage(int pageIndex) {
-        List<Map<String, Object>> data = Collections.emptyList();
-        try {
-            data = DatabaseUtil.fetchPageData(tabName, pageIndex, buildWhereClause(), tabFilePath);
+        // 创建加载指示器
+        ProgressIndicator loadingIndicator = new ProgressIndicator();
+        loadingIndicator.setPrefSize(50, 50);
+        Label loadingLabel = new Label("正在加载数据...");
+        loadingLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: #666;");
 
-        } catch (Exception e) {
-            log.error("获取数据失败:{}", e.getMessage());
-            //showError(e.getMessage());
-            //throw new RuntimeException(e);
-        }
+        VBox loadingBox = new VBox(10, loadingIndicator, loadingLabel);
+        loadingBox.setAlignment(Pos.CENTER);
+        loadingBox.setPrefHeight(400);
 
-        // 更新 TableView 数据
-        ObservableList<Map<String, Object>> observableData = FXCollections.observableArrayList(data);
-        tableView.setItems(observableData);
-        return new VBox(tableView);
+        VBox pageBox = new VBox(loadingBox);
+
+        // 在后台线程异步加载数据
+        javafx.concurrent.Task<List<Map<String, Object>>> loadTask = new javafx.concurrent.Task<>() {
+            @Override
+            protected List<Map<String, Object>> call() throws Exception {
+                return DatabaseUtil.fetchPageData(tabName, pageIndex, buildWhereClause(), tabFilePath);
+            }
+
+            @Override
+            protected void succeeded() {
+                List<Map<String, Object>> data = getValue();
+                // 在 JavaFX 线程更新 UI
+                Platform.runLater(() -> {
+                    ObservableList<Map<String, Object>> observableData =
+                            FXCollections.observableArrayList(data);
+                    tableView.setItems(observableData);
+
+                    // 移除加载指示器，显示表格
+                    pageBox.getChildren().clear();
+                    pageBox.getChildren().add(tableView);
+
+                    if (logPanel != null) {
+                        logPanel.info(String.format("加载第 %d 页数据完成，共 %d 条记录",
+                                pageIndex + 1, data.size()));
+                    }
+                });
+            }
+
+            @Override
+            protected void failed() {
+                Throwable ex = getException();
+                log.error("加载数据失败: {}", ex.getMessage(), ex);
+
+                Platform.runLater(() -> {
+                    // 显示错误信息
+                    Label errorLabel = new Label("❌ 数据加载失败");
+                    errorLabel.setStyle("-fx-font-size: 16px; -fx-text-fill: #f44336; -fx-font-weight: bold;");
+
+                    Label errorDetail = new Label(ex.getMessage());
+                    errorDetail.setStyle("-fx-font-size: 12px; -fx-text-fill: #666;");
+                    errorDetail.setWrapText(true);
+                    errorDetail.setMaxWidth(600);
+
+                    Button retryButton = new Button("🔄 重试");
+                    retryButton.setStyle("-fx-background-color: #2196F3; -fx-text-fill: white;");
+                    retryButton.setOnAction(e -> {
+                        // 重新加载当前页
+                        pagination.setPageFactory(PaginatedTable.this::createPage);
+                    });
+
+                    VBox errorBox = new VBox(15, errorLabel, errorDetail, retryButton);
+                    errorBox.setAlignment(Pos.CENTER);
+                    errorBox.setPadding(new Insets(50));
+
+                    pageBox.getChildren().clear();
+                    pageBox.getChildren().add(errorBox);
+
+                    if (logPanel != null) {
+                        logPanel.error("加载第 " + (pageIndex + 1) + " 页数据失败: " + ex.getMessage());
+                    }
+                });
+            }
+        };
+
+        // 在后台线程池执行任务
+        Thread loadThread = new Thread(loadTask);
+        loadThread.setDaemon(true);
+        loadThread.start();
+
+        return pageBox;
     }
 
     /**
@@ -570,52 +679,164 @@ public class PaginatedTable{
                 throw new RuntimeException("请选择地图类型");
             }
         }
+
+        // ==================== 数据量预警机制（2025-12-29新增）====================
+        // 导出前检查数据量，大表需要二次确认，避免误操作
+        try {
+            int rowCount = DatabaseUtil.getTotalRowCount(tabName + buildWhereClause());
+
+            // 数据量预警阈值
+            final int WARNING_THRESHOLD = 10000;  // 1万行
+            final int DANGER_THRESHOLD = 50000;   // 5万行
+
+            if (rowCount > WARNING_THRESHOLD) {
+                String warningMsg;
+                String detailMsg;
+
+                if (rowCount > DANGER_THRESHOLD) {
+                    warningMsg = String.format("⚠️ 数据量超大警告\n\n" +
+                        "表 %s 包含 %,d 行数据（超过 %,d 行）\n" +
+                        "导出可能需要较长时间（预计 %d 分钟以上）。\n\n" +
+                        "是否确认导出？",
+                        tabName, rowCount, DANGER_THRESHOLD, rowCount / 10000);
+                    detailMsg = String.format("💡 提示：\n" +
+                        "• 建议使用筛选条件缩小范围\n" +
+                        "• 或者分批导出数据\n" +
+                        "• 导出过程中请勿关闭应用");
+                } else {
+                    warningMsg = String.format("⚠️ 数据量较大提醒\n\n" +
+                        "表 %s 包含 %,d 行数据\n" +
+                        "导出可能需要 %d 秒左右。\n\n" +
+                        "是否继续？",
+                        tabName, rowCount, rowCount / 100);
+                    detailMsg = "💡 提示：可以使用筛选功能缩小导出范围";
+                }
+
+                // 显示确认对话框
+                Platform.runLater(() -> {
+                    Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+                    alert.setTitle("数据量确认");
+                    alert.setHeaderText(warningMsg);
+                    alert.setContentText(detailMsg);
+
+                    Optional<ButtonType> result = alert.showAndWait();
+                    if (result.isPresent() && result.get() == ButtonType.OK) {
+                        // 用户确认后继续导出
+                        logPanel.info(String.format("用户确认导出大表：%s（%,d 行）", tabName, rowCount));
+                        performExport();
+                    } else {
+                        logPanel.info("用户取消导出操作");
+                    }
+                });
+                return; // 等待用户确认，不直接执行
+            } else {
+                // 数据量不大，直接导出
+                logPanel.info(String.format("准备导出表 %s（%,d 行）", tabName, rowCount));
+            }
+        } catch (Exception e) {
+            log.warn("获取数据量失败，跳过预警检查: {}", e.getMessage());
+        }
+        // ===========================================================
+
+        performExport();
+    }
+
+    /**
+     * 执行实际的导出操作（提取为独立方法，支持预警后调用）
+     */
+    private void performExport() {
         Stage progressStage = createProgressDialog("正在导出数据至XML...");
         executor.execute(() -> {
             updateProgress(0, "导出数据中...");
             logPanel.info("数据库导出任务开始，表: " + tabName);
             Thread importThread = null;
-            if("world".equals(tabName)){
-                WorldDbToXmlGenerator dbToXmlGenerator = new WorldDbToXmlGenerator(tabName, mapType, tabFilePath);
-                // 在新线程中执行 dbToXml 导入
-                importThread = new Thread(dbToXmlGenerator::processAndMerge);
-                importThread.start();
-                while (true){
-                    try {
-                        Thread.sleep(500);
-                        double progress = dbToXmlGenerator.getProgress();
-                        updateProgress(progress, "导出进度: " + String.format("%.2f", (progress * 100)) + "%");
-                        if(progress == 1){
-                            break;
+            final String[] exportedFilePath = {null}; // 存储导出的文件路径
+            final AtomicReference<Throwable> threadException = new AtomicReference<>();
+
+            try {
+                if("world".equals(tabName)){
+                    WorldDbToXmlGenerator dbToXmlGenerator = new WorldDbToXmlGenerator(tabName, mapType, tabFilePath);
+                    // 在新线程中执行 dbToXml 导出，并获取返回的文件路径
+                    importThread = new Thread(() -> {
+                        try {
+                            exportedFilePath[0] = dbToXmlGenerator.processAndMerge();
+                        } catch (Throwable t) {
+                            log.error("导出过程发生异常: {}", JSONRecord.getErrorMsg(t));
+                            threadException.set(t);
                         }
-                    } catch (InterruptedException e) {
-                        logPanel.error("导出任务被中断", e);
-                        throw new RuntimeException(e);
+                    });
+                    importThread.start();
+                    while (importThread.isAlive()){
+                        try {
+                            Thread.sleep(500);
+                            // 检查是否有异常
+                            if (threadException.get() != null) {
+                                break;
+                            }
+                            double progress = dbToXmlGenerator.getProgress();
+                            updateProgress(progress, "导出进度: " + String.format("%.2f", (progress * 100)) + "%");
+                            if(progress == 1){
+                                break;
+                            }
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            logPanel.error("导出任务被中断", e);
+                            showErrorAndClose(progressStage, "导出任务被中断: " + e.getMessage());
+                            return;
+                        }
+                    }
+                }else{
+                    DbToXmlGenerator dbToXmlGenerator = new DbToXmlGenerator(tabName, mapType, tabFilePath);
+                    importThread = new Thread(() -> {
+                        try {
+                            exportedFilePath[0] = dbToXmlGenerator.processAndMerge();
+                        } catch (Throwable t) {
+                            log.error("导出过程发生异常: {}", JSONRecord.getErrorMsg(t));
+                            threadException.set(t);
+                        }
+                    });
+                    importThread.start();
+                    while (importThread.isAlive()){
+                        try {
+                            Thread.sleep(500);
+                            // 检查是否有异常
+                            if (threadException.get() != null) {
+                                break;
+                            }
+                            double progress = dbToXmlGenerator.getProgress();
+                            updateProgress(progress, "导出进度: " + String.format("%.2f", (progress * 100)) + "%");
+                            if(progress == 1){
+                                break;
+                            }
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            logPanel.error("导出任务被中断", e);
+                            showErrorAndClose(progressStage, "导出任务被中断: " + e.getMessage());
+                            return;
+                        }
                     }
                 }
-            }else{
-                DbToXmlGenerator dbToXmlGenerator = new DbToXmlGenerator(tabName, mapType, tabFilePath);
-                importThread = new Thread(dbToXmlGenerator::processAndMerge);
-                importThread.start();
-                while (true){
-                    try {
-                        Thread.sleep(500);
-                        double progress = dbToXmlGenerator.getProgress();
-                        updateProgress(progress, "导出进度: " + String.format("%.2f", (progress * 100)) + "%");
-                        if(progress == 1){
-                            break;
-                        }
-                    } catch (InterruptedException e) {
-                        logPanel.error("导出任务被中断", e);
-                        throw new RuntimeException(e);
-                    }
+
+                // 检查导出线程是否抛出异常
+                if (threadException.get() != null) {
+                    String errorMsg = threadException.get().getMessage();
+                    log.error("导出失败: " + JSONRecord.getErrorMsg(threadException.get()));
+                    logPanel.error("数据库导出失败: " + errorMsg);
+                    showErrorAndClose(progressStage, "导出失败: " + errorMsg);
+                    return;
                 }
+
+                updateProgress(1, "导出完成");
+                logPanel.success("数据库导出完成，表: " + tabName);
+                if (exportedFilePath[0] != null) {
+                    logPanel.success("文件已保存到: " + exportedFilePath[0]);
+                }
+                Platform.runLater(progressStage::close);
+            } catch (Exception e) {
+                log.error("导出任务执行异常: {}", JSONRecord.getErrorMsg(e));
+                logPanel.error("导出任务执行异常: " + e.getMessage());
+                showErrorAndClose(progressStage, "导出失败: " + e.getMessage());
             }
-
-
-            updateProgress(1, "导出完成");
-            logPanel.success("数据库导出完成，表: " + tabName);
-            Platform.runLater(progressStage::close);
         });
     }
 
@@ -1047,5 +1268,126 @@ public class PaginatedTable{
         });
     }
 
+    /**
+     * 执行表数据校验
+     * 一键检查当前表的数据质量，结果显示在日志面板中
+     */
+    private void runTableValidation() {
+        if (tabName == null || tabName.isEmpty()) {
+            logPanel.warning("请先选择一个表");
+            return;
+        }
+
+        logPanel.info("━━━━━━ 开始数据校验 ━━━━━━");
+        logPanel.info("表名: " + tabName);
+
+        executor.submit(() -> {
+            try {
+                DatabaseValidationService service = new DatabaseValidationService(DatabaseUtil.getJdbcTemplate());
+                List<ValidationIssue> issues = service.validateTable(tabName);
+
+                Platform.runLater(() -> {
+                    if (issues.isEmpty()) {
+                        logPanel.success("✅ 校验通过，未发现问题");
+                    } else {
+                        // 统计各类问题
+                        long errors = issues.stream().filter(i -> i.getSeverity() == Severity.ERROR).count();
+                        long warnings = issues.stream().filter(i -> i.getSeverity() == Severity.WARNING).count();
+                        long infos = issues.stream().filter(i -> i.getSeverity() == Severity.INFO).count();
+
+                        logPanel.info("发现 " + issues.size() + " 个问题:");
+                        if (errors > 0) logPanel.error("  ❌ 错误: " + errors + " 个");
+                        if (warnings > 0) logPanel.warning("  ⚠️ 警告: " + warnings + " 个");
+                        if (infos > 0) logPanel.info("  ℹ️ 提示: " + infos + " 个");
+
+                        logPanel.info("────────────────────────────");
+
+                        // 显示问题详情（限制数量避免刷屏）
+                        int shown = 0;
+                        for (ValidationIssue issue : issues) {
+                            if (shown >= 20) {
+                                logPanel.info("... 还有 " + (issues.size() - 20) + " 个问题，请导出完整报告查看");
+                                break;
+                            }
+
+                            String icon = issue.getSeverityIcon();
+                            String msg = icon + " [" + issue.getType() + "] " + issue.getMessage();
+
+                            switch (issue.getSeverity()) {
+                                case ERROR:
+                                    logPanel.error(msg);
+                                    break;
+                                case WARNING:
+                                    logPanel.warning(msg);
+                                    break;
+                                default:
+                                    logPanel.info(msg);
+                            }
+
+                            // 显示建议（如果有）
+                            if (issue.getSuggestion() != null) {
+                                logPanel.info("   💡 " + issue.getSuggestion());
+                            }
+
+                            shown++;
+                        }
+                    }
+
+                    logPanel.info("━━━━━━ 校验完成 ━━━━━━");
+                });
+
+            } catch (Exception e) {
+                log.error("数据校验失败", e);
+                Platform.runLater(() -> {
+                    logPanel.error("校验失败: " + e.getMessage());
+                });
+            }
+        });
+    }
+
+    /**
+     * 异步刷新总行数和分页（性能优化方法）
+     * 在后台线程查询总行数，避免阻塞UI
+     */
+    private void refreshTotalRowsAsync() {
+        javafx.concurrent.Task<Integer> countTask = new javafx.concurrent.Task<>() {
+            @Override
+            protected Integer call() throws Exception {
+                return DatabaseUtil.getTotalRowCount(tabName + buildWhereClause());
+            }
+
+            @Override
+            protected void succeeded() {
+                totalRows = getValue();
+                int pageCount = (int) Math.ceil((double) totalRows / DatabaseUtil.ROWS_PER_PAGE);
+
+                Platform.runLater(() -> {
+                    pagination.setPageCount(Math.max(1, pageCount));
+                    pagination.setCurrentPageIndex(0);
+                    pagination.setPageFactory(PaginatedTable.this::createPage);
+
+                    if (logPanel != null) {
+                        logPanel.info(String.format("总行数: %,d 行, 总页数: %d", totalRows, pageCount));
+                    }
+                });
+            }
+
+            @Override
+            protected void failed() {
+                Throwable ex = getException();
+                log.error("刷新总行数失败: {}", ex.getMessage(), ex);
+
+                Platform.runLater(() -> {
+                    if (logPanel != null) {
+                        logPanel.error("刷新总行数失败: " + ex.getMessage());
+                    }
+                });
+            }
+        };
+
+        Thread countThread = new Thread(countTask);
+        countThread.setDaemon(true);
+        countThread.start();
+    }
 }
 

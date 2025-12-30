@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<guild_rank_rewards>
+  <guild_rank_reward>
+    <id/>
+    <name/>
+    <rank_period_start/>
+    <rank_period_end/>
+    <rank_list>
+      <data>
+        <rank/>
+        <reward_ratio/>
+        <correction_min/>
+        <correction_max/>
+      </data>
+    </rank_list>
+  </guild_rank_reward>
+</guild_rank_rewards>

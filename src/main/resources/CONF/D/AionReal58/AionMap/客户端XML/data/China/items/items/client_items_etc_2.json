@@ -1,0 +1,18 @@
+{
+	"file_path":"D:\\AionReal58\\AionMap\\客户端XML\\data\\China\\items\\items\\client_items_etc_2.xml",
+	"xml_root_attr":"table_count=2",
+	"xml_root_tag":"client_items",
+	"list":[
+		{
+			"addDataNode":"trade_in_item_list",
+			"associatedFiled":"id",
+			"xml_tag":"data",
+			"db_column":"data",
+			"table_name":"client_items_etc_2__trade_in_item_list__data",
+			"sql":"select * from client_items_etc_2__trade_in_item_list__data where id = '#associated_filed' order by CAST(id AS UNSIGNED) ASC"
+		}
+	],
+	"xml_item_tag":"client_item",
+	"table_name":"client_items_etc_2",
+	"sql":"select * from client_items_etc_2 order by CAST(id AS UNSIGNED) ASC"
+}

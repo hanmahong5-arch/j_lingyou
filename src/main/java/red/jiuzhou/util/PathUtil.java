@@ -1,11 +1,12 @@
 package red.jiuzhou.util;
 
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 
-@Slf4j
 public class PathUtil {
+    private static final Logger log = LoggerFactory.getLogger(PathUtil.class);
     public static String getConfPath(String fullPath) {
         String os = System.getProperty("os.name").toLowerCase();
         String joinedPath;

@@ -1,0 +1,17 @@
+{
+	"file_path":"D:\\AionReal58\\AionMap\\XML\\Special01\\monster_scaling_drop_setList_special01.xml",
+	"xml_root_tag":"scaling_drop_setlists",
+	"list":[
+		{
+			"addDataNode":"scailing_create_item_list",
+			"associatedFiled":"id",
+			"xml_tag":"data",
+			"db_column":"data",
+			"table_name":"monster_scaling_drop_setList_special01__s_c_i_l__data",
+			"sql":"select * from monster_scaling_drop_setList_special01__s_c_i_l__data where id = '#associated_filed' order by CAST(id AS UNSIGNED) ASC"
+		}
+	],
+	"xml_item_tag":"scaling_drop_setlist",
+	"table_name":"monster_scaling_drop_setList_special01",
+	"sql":"select * from monster_scaling_drop_setList_special01 order by CAST(id AS UNSIGNED) ASC"
+}

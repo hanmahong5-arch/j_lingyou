@@ -1,0 +1,8 @@
+{
+	"file_path":"D:\\AionReal58\\AionMap\\XML\\Special01\\world_timeattack_special01.xml",
+	"xml_root_tag":"world_timeattacks",
+	"list":[],
+	"xml_item_tag":"world_timeattack",
+	"table_name":"world_timeattack_special01",
+	"sql":"select * from world_timeattack_special01 order by CAST(id AS UNSIGNED) ASC"
+}

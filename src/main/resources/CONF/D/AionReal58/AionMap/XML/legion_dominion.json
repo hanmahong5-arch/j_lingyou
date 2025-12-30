@@ -1,0 +1,17 @@
+{
+	"file_path":"D:\\AionReal58\\AionMap\\XML\\legion_dominion.xml",
+	"xml_root_tag":"legion_dominions",
+	"list":[
+		{
+			"addDataNode":"rank_reward",
+			"associatedFiled":"id",
+			"xml_tag":"data",
+			"db_column":"data",
+			"table_name":"legion_dominion__rank_reward__data",
+			"sql":"select * from legion_dominion__rank_reward__data where id = '#associated_filed' order by CAST(id AS UNSIGNED) ASC"
+		}
+	],
+	"xml_item_tag":"legion_dominion",
+	"table_name":"legion_dominion",
+	"sql":"select * from legion_dominion order by CAST(id AS UNSIGNED) ASC"
+}

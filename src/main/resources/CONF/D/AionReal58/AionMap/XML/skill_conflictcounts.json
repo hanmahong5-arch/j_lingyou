@@ -1,0 +1,8 @@
+{
+	"file_path":"D:\\AionReal58\\AionMap\\XML\\skill_conflictcounts.xml",
+	"xml_root_tag":"skill_conflictcounts",
+	"list":[],
+	"xml_item_tag":"skill_conflictcount",
+	"table_name":"skill_conflictcounts",
+	"sql":"select * from skill_conflictcounts order by CAST(id AS UNSIGNED) ASC"
+}

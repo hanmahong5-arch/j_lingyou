@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<quest_simplecollectitems>
+  <id id="1103">
+    <dev_name/>
+    <acquired_npc_name/>
+    <object1/>
+    <reward_npc_name/>
+    <con_quest/>
+    <object2/>
+    <party_drop/>
+    <object3/>
+    <give_item/>
+    <object4/>
+    <cutsceneid1/>
+    <cs1_haction/>
+    <talk_npc1/>
+    <talk_npc2/>
+    <talk_npc3/>
+    <reward_check/>
+    <give_item1/>
+    <remove_item2/>
+  </id>
+</quest_simplecollectitems>

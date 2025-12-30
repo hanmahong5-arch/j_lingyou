@@ -1,0 +1,8 @@
+{
+	"file_path":"D:\\AionReal58\\AionMap\\XML\\Special01\\instance_scaling_special01.xml",
+	"xml_root_tag":"instance_scalings",
+	"list":[],
+	"xml_item_tag":"instance_scaling",
+	"table_name":"instance_scaling_special01",
+	"sql":"select * from instance_scaling_special01 order by CAST(id AS UNSIGNED) ASC"
+}

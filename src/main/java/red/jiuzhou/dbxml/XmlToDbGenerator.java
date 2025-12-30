@@ -13,6 +13,11 @@ import red.jiuzhou.ai.DashScopeBatchHelper;
 import red.jiuzhou.util.AliyunTranslateUtil;
 import red.jiuzhou.util.DatabaseUtil;
 import red.jiuzhou.util.YamlUtils;
+import red.jiuzhou.util.FileEncodingDetector;
+import red.jiuzhou.util.EncodingFallbackStrategy;
+import red.jiuzhou.util.EncodingMetadataManager;
+import red.jiuzhou.util.BomAwareFileReader;
+import red.jiuzhou.validation.XmlFieldValidator;
 
 import java.io.File;
 import java.nio.charset.StandardCharsets;
@@ -83,8 +88,24 @@ public class XmlToDbGenerator {
             if(filePath != null){
                 xmlFilePath = filePath;
             }
-            log.info("xml文件路径：：：：：：：：：：" + xmlFilePath);
-            String fileContent = FileUtil.readString( xmlFilePath, StandardCharsets.UTF_16);
+            log.info("xml文件路径：{}", xmlFilePath);
+            File xmlFile = new File(xmlFilePath);
+
+            // ========== 透明编码转换层：智能编码检测（带降级策略）==========
+            FileEncodingDetector.EncodingInfo encoding = EncodingFallbackStrategy.detectWithFallback(xmlFile, tabName);
+            int confidence = EncodingFallbackStrategy.calculateConfidence(encoding, xmlFile);
+            log.info("✅ 检测到文件编码: {} (可信度: {}%)", encoding, confidence);
+
+            // 保存编码元数据（确保导出时能还原），支持 World 表的 mapType 区分
+            EncodingMetadataManager.saveMetadata(tabName, mapType != null ? mapType : "", xmlFile, encoding);
+            // =================================================
+
+            // ========== 使用 BOM-aware 读取器，避免 "前言中不允许有内容" 错误 ==========
+            String fileContent = BomAwareFileReader.readString(xmlFile, encoding);
+            log.debug("文件内容长度: {} 字符, 是否以BOM开头: {}",
+                     fileContent.length(), BomAwareFileReader.startsWithBOM(fileContent));
+            // ==========================================================================
+
             this.document = DocumentHelper.parseText(fileContent);
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -110,6 +131,32 @@ public class XmlToDbGenerator {
         final int[] processedRecords = {0};
 
         System.out.printf("开始数据导入，总记录数: %d (主表: %d, 子表: %d)\n", totalRecords, totalMain, totalSub);
+
+        // ==================== 数据验证（在事务外进行，基于服务器日志分析）====================
+        log.info("开始数据验证...");
+        XmlFieldValidator.ValidationResult mainValidation = XmlFieldValidator.validateBatch(table.getTableName(), mainTabList);
+
+        // 验证所有子表
+        for (Map.Entry<String, List<Map<String, String>>> entry : subTabList.entrySet()) {
+            XmlFieldValidator.ValidationResult subValidation =
+                XmlFieldValidator.validateBatch(entry.getKey(), entry.getValue());
+            mainValidation.getErrors().addAll(subValidation.getErrors());
+            mainValidation.getWarnings().addAll(subValidation.getWarnings());
+        }
+
+        // 处理验证结果
+        if (mainValidation.hasWarnings()) {
+            log.warn("数据验证发现警告:\n{}", mainValidation.getSummary());
+        }
+
+        if (mainValidation.hasErrors()) {
+            String errorMsg = mainValidation.getSummary();
+            log.error("数据验证失败:\n{}", errorMsg);
+            throw new RuntimeException("数据验证失败，中止导入。请修正以下错误后重试:\n" + errorMsg);
+        }
+
+        log.info("✅ 数据验证通过");
+        // =================================================================
 
         // AI处理字段（在事务外进行）
         if(selectedColumns != null){

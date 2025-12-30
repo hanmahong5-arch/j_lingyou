@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<pc_make_up_bonuss>
+  <level level="1">
+    <standard_playtime/>
+    <standard_exp_per_hour/>
+    <check_start_time/>
+    <check_interval/>
+    <bonus_point_per_min/>
+    <bonus_interval/>
+    <bonus_use_ratio/>
+    <display_max_point/>
+    <drop_ratio/>
+  </level>
+</pc_make_up_bonuss>

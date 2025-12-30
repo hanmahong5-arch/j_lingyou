@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<item_random_options>
+  <item_random_option>
+    <id/>
+    <name/>
+    <random_attr_group_list>
+      <data>
+        <attr_group_id/>
+        <prob/>
+        <random_attr1/>
+        <random_attr2/>
+        <random_attr3/>
+        <random_attr4/>
+        <random_attr5/>
+        <random_attr6/>
+        <random_attr7/>
+        <random_attr8/>
+      </data>
+    </random_attr_group_list>
+  </item_random_option>
+</item_random_options>

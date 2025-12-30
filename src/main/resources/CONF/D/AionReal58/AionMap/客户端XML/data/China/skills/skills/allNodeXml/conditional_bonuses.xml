@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<client_conditional_bonuss>
+  <client_conditional_bonus>
+    <id/>
+    <name/>
+    <desc_title/>
+    <desc/>
+    <group/>
+    <icon_name/>
+    <apply_normal_svr/>
+    <apply_special_svr/>
+    <exp_bonus/>
+    <bonus_attr1/>
+    <craft_exp_bonus/>
+    <death_penalty_reduce/>
+    <bonus_attr2/>
+    <bonus_attr3/>
+    <bonus_attr4/>
+    <indun_drop_bonus/>
+    <gather_exp_bonus/>
+    <aerial_gather_exp_bonus/>
+    <ap_bonus/>
+    <returnhome_cooltime_reduce/>
+    <enchant_boost/>
+    <authorize_boost/>
+    <enchant_option_boost/>
+    <avatar_hp_bonus/>
+    <ap_penalty_reduce/>
+    <add_skill/>
+    <vital_point_boost/>
+    <bonus_attr5/>
+    <bonus_attr6/>
+    <bonus_attr7/>
+    <bonus_attr8/>
+    <f2p_enchant_boost/>
+    <f2p_authorize_boost/>
+    <f2p_enchant_option_boost/>
+  </client_conditional_bonus>
+</client_conditional_bonuss>

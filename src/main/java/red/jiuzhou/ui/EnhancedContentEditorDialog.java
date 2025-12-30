@@ -12,8 +12,8 @@ import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
-import lombok.Getter;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import red.jiuzhou.ai.AiModelClient;
 import red.jiuzhou.ai.AiModelFactory;
 
@@ -31,12 +31,15 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * - 实时预览和对比
  * - 自定义提示词
  */
-@Slf4j
 public class EnhancedContentEditorDialog extends Stage {
+    private static final Logger log = LoggerFactory.getLogger(EnhancedContentEditorDialog.class);
 
-    @Getter
     private String resultContent;
     private final AtomicBoolean confirmed = new AtomicBoolean(false);
+
+    public String getResultContent() {
+        return resultContent;
+    }
 
     // UI组件
     private TextArea originalTextArea;

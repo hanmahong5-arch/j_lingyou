@@ -15,19 +15,38 @@ import java.io.File;
 import java.util.*;
 
 class MenuNode {
-    @Setter
-    @Getter
     private String dbName;
-    @Setter
-    @Getter
     private String name;
-    @Getter
     private String path;
     private List<MenuNode> children = new ArrayList<>();
 
     public MenuNode() {}
     public MenuNode(String name, String path) {
         this.name = name;
+        this.path = path;
+    }
+
+    public String getDbName() {
+        return dbName;
+    }
+
+    public void setDbName(String dbName) {
+        this.dbName = dbName;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getPath() {
+        return path;
+    }
+
+    public void setPath(String path) {
         this.path = path;
     }
 
@@ -63,25 +82,39 @@ class MenuNode {
 public class IncrementalMenuJsonGenerator {
 
     public static String createJsonIncrementally() {
-        String confPathRaw = YamlUtils.getProperty("xmlPath." + DatabaseUtil.getDbName());
         String homePath = YamlUtils.getProperty("file.homePath");
+
+        // 读取目录管理器配置的路径（与 DirectoryManagerDialog 保持一致）
+        String confPathRaw = YamlUtils.getProperty("xmlPath." + DatabaseUtil.getDbName());
+
         if(!StringUtils.hasLength(confPathRaw)){
             File jsonFile = new File(homePath + "LeftMenu.json");
             FileUtil.writeUtf8String("{}", jsonFile);
             return "{}";
         }
+
+        // 支持逗号分隔的多个目录
         String[] confPaths = confPathRaw.split(",");
         List<MenuNode> allRoots = new ArrayList<>();
+
         for (String path : confPaths) {
             File dir = new File(path.trim());
             if (dir.exists() && dir.isDirectory()) {
                 MenuNode node = directoryToJson(dir);
                 if (node != null) {
                     node.setDbName(DatabaseUtil.getDbName());
+                    // 使用完整路径作为显示名称，让用户清楚看到是哪个目录
                     node.setName(dir.getAbsolutePath());
                     allRoots.add(node);
                 }
             }
+        }
+
+        // 如果没有任何目录，返回空JSON
+        if (allRoots.isEmpty()) {
+            File jsonFile = new File(homePath + "LeftMenu.json");
+            FileUtil.writeUtf8String("{}", jsonFile);
+            return "{}";
         }
 
         MenuNode newRoot = new MenuNode("Root", "ROOT");

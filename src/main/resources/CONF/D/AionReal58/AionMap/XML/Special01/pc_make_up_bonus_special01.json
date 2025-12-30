@@ -1,0 +1,8 @@
+{
+	"file_path":"D:\\AionReal58\\AionMap\\XML\\Special01\\pc_make_up_bonus_special01.xml",
+	"xml_root_tag":"pc_make_up_bonuss",
+	"list":[],
+	"xml_item_tag":"level",
+	"table_name":"pc_make_up_bonus_special01",
+	"sql":"select * from pc_make_up_bonus_special01 order by CAST(standard_playtime AS UNSIGNED) ASC"
+}

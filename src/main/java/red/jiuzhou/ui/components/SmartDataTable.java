@@ -56,8 +56,8 @@ public class SmartDataTable {
     private String currentSearchTerm = "";
     private final List<FilterCriteria> activeFilters = new ArrayList<>();
 
-    // 线程池
-    private final ExecutorService executor = Executors.newCachedThreadPool();
+    // 虚拟线程执行器（Java 21+）
+    private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
 
     public SmartDataTable() {
         this.container = new VBox();

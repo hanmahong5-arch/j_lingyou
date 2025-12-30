@@ -9,6 +9,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.transaction.TransactionStatus;
 import red.jiuzhou.util.DatabaseUtil;
+import red.jiuzhou.util.FileEncodingDetector;
+import red.jiuzhou.util.EncodingFallbackStrategy;
+import red.jiuzhou.util.EncodingMetadataManager;
+import red.jiuzhou.util.BomAwareFileReader;
 
 import java.io.File;
 import java.nio.charset.StandardCharsets;
@@ -51,7 +55,21 @@ public class WorldXmlToDbGenerator {
                 String parent = FileUtil.getParent(xmlFilePath, 1);
                 xmlFilePath = parent + File.separator + mapType + File.separator + FileUtil.getName(xmlFilePath);
             }
-            String fileContent = FileUtil.readString( xmlFilePath, StandardCharsets.UTF_16);
+            File xmlFile = new File(xmlFilePath);
+
+            // ========== 透明编码转换层：智能编码检测（带降级策略）==========
+            FileEncodingDetector.EncodingInfo encoding = EncodingFallbackStrategy.detectWithFallback(xmlFile, tabName);
+            int confidence = EncodingFallbackStrategy.calculateConfidence(encoding, xmlFile);
+            log.info("✅ 检测到文件编码: {} (可信度: {}%)", encoding, confidence);
+
+            // 保存编码元数据（World 表，支持 mapType 区分）
+            EncodingMetadataManager.saveMetadata(tabName, mapType != null ? mapType : "", xmlFile, encoding);
+
+            // 使用 BOM-aware 读取器，避免 "前言中不允许有内容" 错误
+            String fileContent = BomAwareFileReader.readString(xmlFile, encoding);
+            log.debug("文件内容长度: {} 字符", fileContent.length());
+            // =================================================
+
             this.document = DocumentHelper.parseText(fileContent);
         } catch (Exception e) {
             throw new RuntimeException(e);

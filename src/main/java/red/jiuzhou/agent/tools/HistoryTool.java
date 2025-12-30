@@ -43,29 +43,30 @@ public class HistoryTool implements AgentTool {
 
     @Override
     public String getParameterSchema() {
-        return "{\n" +
-               "  \"type\": \"object\",\n" +
-               "  \"properties\": {\n" +
-               "    \"action\": {\n" +
-               "      \"type\": \"string\",\n" +
-               "      \"enum\": [\"list\", \"detail\", \"rollback\"],\n" +
-               "      \"description\": \"操作类型：list=列出历史, detail=查看详情, rollback=回滚\"\n" +
-               "    },\n" +
-               "    \"operation_id\": {\n" +
-               "      \"type\": \"string\",\n" +
-               "      \"description\": \"操作ID（detail和rollback时需要）\"\n" +
-               "    },\n" +
-               "    \"limit\": {\n" +
-               "      \"type\": \"integer\",\n" +
-               "      \"description\": \"返回记录数限制，默认20\"\n" +
-               "    },\n" +
-               "    \"since\": {\n" +
-               "      \"type\": \"string\",\n" +
-               "      \"description\": \"起始时间（格式：yyyy-MM-dd HH:mm:ss）\"\n" +
-               "    }\n" +
-               "  },\n" +
-               "  \"required\": [\"action\"]\n" +
-               "}";
+        return """
+            {
+              "type": "object",
+              "properties": {
+                "action": {
+                  "type": "string",
+                  "enum": ["list", "detail", "rollback"],
+                  "description": "操作类型：list=列出历史, detail=查看详情, rollback=回滚"
+                },
+                "operation_id": {
+                  "type": "string",
+                  "description": "操作ID（detail和rollback时需要）"
+                },
+                "limit": {
+                  "type": "integer",
+                  "description": "返回记录数限制，默认20"
+                },
+                "since": {
+                  "type": "string",
+                  "description": "起始时间（格式：yyyy-MM-dd HH:mm:ss）"
+                }
+              },
+              "required": ["action"]
+            }""";
     }
 
     @Override
@@ -89,16 +90,12 @@ public class HistoryTool implements AgentTool {
             return ToolResult.error("操作日志服务未配置");
         }
 
-        switch (action) {
-            case "list":
-                return listHistory(params);
-            case "detail":
-                return getDetail(params);
-            case "rollback":
-                return rollback(context, params);
-            default:
-                return ToolResult.error("未知操作类型: " + action);
-        }
+        return switch (action) {
+            case "list" -> listHistory(params);
+            case "detail" -> getDetail(params);
+            case "rollback" -> rollback(context, params);
+            default -> ToolResult.error("未知操作类型: " + action);
+        };
     }
 
     @Override

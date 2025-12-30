@@ -35,7 +35,7 @@ import java.util.stream.Collectors;
 @Slf4j
 public class EnhancedBatchRewriter {
 
-    private final ExecutorService executorService = Executors.newFixedThreadPool(8);
+    private final ExecutorService executorService = Executors.newVirtualThreadPerTaskExecutor();
     private final List<RewriteHistory> historyList = new ArrayList<>();
     private final Map<String, RewriteTemplate> templates = new HashMap<>();
     private final ObjectMapper objectMapper = new ObjectMapper();

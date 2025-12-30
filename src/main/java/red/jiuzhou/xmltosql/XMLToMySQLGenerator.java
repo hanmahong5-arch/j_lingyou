@@ -110,9 +110,9 @@ public class XMLToMySQLGenerator {
             });
             return sqlBuf.toString();
         } catch (Exception e) {
-            log.error("解析XML{}文件生成MySQL表失败", xmlFileName + ".xml", e);
+            log.error("解析XML{}文件生成MySQL表失败，文件: {}, 错误: {}", xmlFileName, xmlFileName + ".xml", e.getMessage(), e);
+            throw new RuntimeException("DDL生成失败: " + e.getMessage(), e);
         }
-        return null;
     }
 
     private static void parseElement(Element element,

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<client_itemcustomsets>
+  <client_itemcustomset>
+    <id/>
+    <name/>
+    <custom_enchant_value/>
+    <custom_option_slot_1/>
+    <custom_option_slot_2/>
+    <custom_option_slot_3/>
+    <custom_option_slot_4/>
+    <custom_option_slot_5/>
+    <custom_option_slot_6/>
+    <custom_authorize_value/>
+  </client_itemcustomset>
+</client_itemcustomsets>

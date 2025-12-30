@@ -80,29 +80,24 @@ public class AgentMessage {
     }
 
     /**
-     * 工具调用
+     * 工具调用（Record模式 - 不可变）
+     *
+     * @param toolName   工具名称
+     * @param parameters 参数JSON字符串
+     * @param callId     调用ID
      */
-    public static class ToolCall {
-        private String toolName;
-        private String parameters;
-        private String callId;
-
-        public ToolCall() {
-            this.callId = UUID.randomUUID().toString().substring(0, 8);
+    public record ToolCall(String toolName, String parameters, String callId) {
+        /**
+         * 创建工具调用（自动生成callId）
+         */
+        public static ToolCall of(String toolName, String parameters) {
+            return new ToolCall(toolName, parameters, UUID.randomUUID().toString().substring(0, 8));
         }
 
-        public ToolCall(String toolName, String parameters) {
-            this();
-            this.toolName = toolName;
-            this.parameters = parameters;
-        }
-
+        // 兼容性getter方法
         public String getToolName() { return toolName; }
-        public void setToolName(String toolName) { this.toolName = toolName; }
         public String getParameters() { return parameters; }
-        public void setParameters(String parameters) { this.parameters = parameters; }
         public String getCallId() { return callId; }
-        public void setCallId(String callId) { this.callId = callId; }
     }
 
     // ========== 静态工厂方法 ==========
@@ -154,7 +149,7 @@ public class AgentMessage {
         msg.id = UUID.randomUUID().toString();
         msg.role = Role.ASSISTANT;
         msg.type = MessageType.TOOL_CALL;
-        msg.toolCall = new ToolCall(toolName, parameters);
+        msg.toolCall = ToolCall.of(toolName, parameters);
         msg.content = String.format("调用工具: %s", toolName);
         msg.timestamp = LocalDateTime.now();
         return msg;

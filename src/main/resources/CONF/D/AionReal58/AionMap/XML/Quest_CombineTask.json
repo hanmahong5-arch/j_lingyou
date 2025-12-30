@@ -1,0 +1,8 @@
+{
+	"file_path":"D:\\AionReal58\\AionMap\\XML\\Quest_CombineTask.xml",
+	"xml_root_tag":"quest_combinetasks",
+	"list":[],
+	"xml_item_tag":"id",
+	"table_name":"Quest_CombineTask",
+	"sql":"select * from Quest_CombineTask order by CAST(dev_name AS UNSIGNED) ASC"
+}

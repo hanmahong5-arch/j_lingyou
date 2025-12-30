@@ -8,6 +8,10 @@ import red.jiuzhou.dbxml.TabConfLoad;
 import red.jiuzhou.dbxml.TableConf;
 import red.jiuzhou.dbxml.WorldXmlToDbGenerator;
 import red.jiuzhou.dbxml.XmlToDbGenerator;
+import red.jiuzhou.util.DatabaseUtil;
+import red.jiuzhou.xmltosql.XmlProcess;
+import red.jiuzhou.validation.BatchImportPreflightChecker;
+import red.jiuzhou.validation.PreflightReport;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -139,6 +143,29 @@ public class BatchXmlImporter {
                 String fileName = FileUtil.getName(xmlFilePath);
                 String tableName = fileName.substring(0, fileName.lastIndexOf('.'));
 
+                // ==================== 导入前自动建表（2025-12-29新增）====================
+                // 检查表是否存在，如果不存在则先执行DDL建表
+                try {
+                    boolean tableExists = DatabaseUtil.tableExists(tableName);
+                    if (!tableExists) {
+                        log.info("表 {} 不存在，开始自动生成DDL并建表...", tableName);
+
+                        // 生成DDL SQL脚本
+                        String sqlDdlFilePath = XmlProcess.parseXmlFile(xmlFilePath);
+                        log.info("DDL脚本已生成: {}", sqlDdlFilePath);
+
+                        // 执行DDL脚本建表
+                        DatabaseUtil.executeSqlScript(sqlDdlFilePath);
+                        log.info("✅ 自动建表成功: {}", tableName);
+                    } else {
+                        log.debug("表 {} 已存在，跳过DDL生成", tableName);
+                    }
+                } catch (Exception ddlException) {
+                    log.error("自动建表失败，表: {}", tableName, ddlException);
+                    throw new RuntimeException("自动建表失败: " + ddlException.getMessage(), ddlException);
+                }
+                // =======================================================================
+
                 // 判断是否为World类型
                 boolean isWorldType = isWorldTable(tableName);
                 String mapType = options != null ? options.getMapType() : null;
@@ -173,7 +200,7 @@ public class BatchXmlImporter {
     }
 
     /**
-     * 批量导入多个文件
+     * 批量导入多个文件（增强版 - 带预检查）
      *
      * @param xmlFiles XML文件列表
      * @param options 导入选项
@@ -186,31 +213,37 @@ public class BatchXmlImporter {
             ProgressCallback callback) {
 
         return CompletableFuture.supplyAsync(() -> {
+            // ===== 新增：预检查阶段 =====
+            log.info("========== 第1阶段：执行导入前预检查 ==========");
+            PreflightReport preflight = BatchImportPreflightChecker.check(xmlFiles);
+
+            // 打印预检查报告
+            preflight.printReport();
+
+            // 保存预检查报告到文件
+            preflight.saveToFile("batch_import_preflight.json");
+
+            // 获取可导入的文件列表（排除跳过和错误的）
+            List<File> importableFiles = preflight.getImportableFiles();
+            List<File> skippedFiles = preflight.getSkippedFileList();
+
+            log.info("预检查完成：可导入 {} 个，跳过 {} 个，错误 {} 个",
+                    importableFiles.size(), skippedFiles.size(), preflight.getErrorFiles());
+            log.info("========== 第2阶段：开始批量导入 ==========");
+
+            // ===== 原有逻辑：导入有效文件 =====
             BatchImportResult result = new BatchImportResult();
-            result.setTotal(xmlFiles.size());
+            result.setTotal(importableFiles.size());
+            result.setSkipped(skippedFiles.size());  // 预检查跳过的数量
 
             AtomicInteger processed = new AtomicInteger(0);
 
-            for (File file : xmlFiles) {
+            for (File file : importableFiles) {
                 String fileName = file.getName();
                 String filePath = file.getAbsolutePath();
 
                 try {
-                    // 跳过非XML文件
-                    if (!fileName.toLowerCase().endsWith(".xml")) {
-                        result.setSkipped(result.getSkipped() + 1);
-                        continue;
-                    }
-
-                    // 检查是否有对应的表配置
-                    String tableName = fileName.substring(0, fileName.lastIndexOf('.'));
-                    TableConf tableConf = TabConfLoad.getTale(tableName, filePath);
-                    if (tableConf == null) {
-                        log.warn("跳过（无表配置）: {}", fileName);
-                        result.setSkipped(result.getSkipped() + 1);
-                        continue;
-                    }
-
+                    // 预检查已过滤，这里直接导入
                     // 更新进度（UI线程）
                     int current = processed.incrementAndGet();
                     if (callback != null) {
@@ -224,12 +257,12 @@ public class BatchXmlImporter {
                     result.getSuccessFiles().add(filePath);
                     result.setSuccess(result.getSuccess() + 1);
 
-                    log.info("进度 [{}/{}] 导入成功: {}", current, result.getTotal(), fileName);
+                    log.info("✅ 进度 [{}/{}] 导入成功: {}", current, result.getTotal(), fileName);
 
                 } catch (Exception e) {
                     result.getFailedFiles().add(new FailedFile(filePath, e.getMessage()));
                     result.setFailed(result.getFailed() + 1);
-                    log.error("进度 [{}/{}] 导入失败: {}", processed.get(), result.getTotal(), fileName, e);
+                    log.error("❌ 进度 [{}/{}] 导入失败: {}", processed.get(), result.getTotal(), fileName, e);
                 }
             }
 
@@ -342,6 +375,49 @@ public class BatchXmlImporter {
     private static boolean isWorldTable(String tableName) {
         return WORLD_TABLES.stream()
             .anyMatch(wt -> tableName.toLowerCase().startsWith(wt.toLowerCase()));
+    }
+
+    /**
+     * 检查XML文件是否为空（只有根节点，无实际数据）
+     *
+     * @param xmlFile XML文件
+     * @return true 如果文件为空或只包含空的根节点
+     */
+    private static boolean isEmptyXmlFile(File xmlFile) {
+        try {
+            org.dom4j.Document doc = org.dom4j.io.SAXReader.createDefault()
+                .read(xmlFile);
+            org.dom4j.Element root = doc.getRootElement();
+
+            // 检查根节点是否有子元素
+            if (root.elements().isEmpty()) {
+                return true; // 没有子元素，视为空文件
+            }
+
+            // 检查第一个子元素是否包含数据
+            org.dom4j.Element firstChild = (org.dom4j.Element) root.elements().get(0);
+            if (firstChild.elements().isEmpty() && firstChild.getText().trim().isEmpty()) {
+                // 第一个子元素也是空的（没有子元素且没有文本），可能是模板
+                boolean hasData = false;
+                for (Object obj : root.elements()) {
+                    org.dom4j.Element elem = (org.dom4j.Element) obj;
+                    // 检查是否有任何非空的子元素或属性
+                    if (!elem.elements().isEmpty() ||
+                        !elem.attributes().isEmpty() ||
+                        !elem.getText().trim().isEmpty()) {
+                        hasData = true;
+                        break;
+                    }
+                }
+                return !hasData;
+            }
+
+            return false; // 有数据
+
+        } catch (Exception e) {
+            log.warn("检查XML文件是否为空时出错: {}, 错误: {}", xmlFile.getName(), e.getMessage());
+            return false; // 出错时不跳过，让后续处理决定
+        }
     }
 
     /**

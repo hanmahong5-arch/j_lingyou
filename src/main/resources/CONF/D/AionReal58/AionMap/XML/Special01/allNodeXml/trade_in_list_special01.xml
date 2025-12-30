@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<trade_in_lists>
+  <trade_in_list>
+    <id/>
+    <name/>
+    <desc/>
+    <use_category/>
+    <goods_list>
+      <data>
+        <item/>
+      </data>
+    </goods_list>
+  </trade_in_list>
+</trade_in_lists>

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<infinity_indun_rewards>
+  <infinity_indun_reward>
+    <id/>
+    <name/>
+    <floor/>
+    <exp/>
+    <gold/>
+    <reward_ap/>
+    <reward_gp/>
+    <reward_item1_name/>
+    <reward_item1_count/>
+    <reward_item2_name/>
+    <reward_item2_count/>
+    <reward_item3_name/>
+    <reward_item3_count/>
+    <reward_item4_name/>
+    <reward_item4_count/>
+    <reward_item5_name/>
+    <reward_item5_count/>
+    <reward_item6_name/>
+    <reward_item6_count/>
+  </infinity_indun_reward>
+</infinity_indun_rewards>

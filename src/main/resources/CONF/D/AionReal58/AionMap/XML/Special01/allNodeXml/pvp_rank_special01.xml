@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<pvp_ranks>
+  <pvp_rank>
+    <id/>
+    <name/>
+    <desc/>
+    <title_desc/>
+    <rank/>
+    <require_point/>
+    <require_order/>
+  </pvp_rank>
+</pvp_ranks>

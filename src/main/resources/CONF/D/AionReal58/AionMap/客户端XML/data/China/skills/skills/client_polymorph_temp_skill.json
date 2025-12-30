@@ -1,0 +1,8 @@
+{
+	"file_path":"D:\\AionReal58\\AionMap\\客户端XML\\data\\China\\skills\\skills\\client_polymorph_temp_skill.xml",
+	"xml_root_tag":"polymorph_temp_skills",
+	"list":[],
+	"xml_item_tag":"id",
+	"table_name":"client_polymorph_temp_skill",
+	"sql":"select * from client_polymorph_temp_skill order by CAST(desc AS UNSIGNED) ASC"
+}

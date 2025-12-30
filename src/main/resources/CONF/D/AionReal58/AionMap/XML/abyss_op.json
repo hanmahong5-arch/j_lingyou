@@ -1,0 +1,8 @@
+{
+	"file_path":"D:\\AionReal58\\AionMap\\XML\\abyss_op.xml",
+	"xml_root_tag":"abyss_ops",
+	"list":[],
+	"xml_item_tag":"abyss_op",
+	"table_name":"abyss_op",
+	"sql":"select * from abyss_op order by CAST(id AS UNSIGNED) ASC"
+}

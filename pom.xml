@@ -6,219 +6,426 @@
 
     <groupId>red.jiuzhou</groupId>
     <artifactId>dbxmlTool</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>2.0.0</version>
+    <packaging>jar</packaging>
+
+    <name>DbXmlTool</name>
+    <description>游戏配置数据管理工具 - MySQL与XML双向转换</description>
 
     <properties>
-        <maven.compiler.source>8</maven.compiler.source>
-        <maven.compiler.target>8</maven.compiler.target>
+        <!-- ==================== 核心版本 ==================== -->
+        <java.version>25</java.version>
+        <maven.compiler.release>${java.version}</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+        <!-- ==================== 框架版本 ==================== -->
+        <!-- OpenJFX 25 LTS - 来自 https://github.com/openjdk/jfx -->
+        <javafx.version>25.0.1</javafx.version>
+        <!-- Spring Boot 4.0.x 基于 Spring Framework 7，完整支持 Java 25 -->
+        <spring-boot.version>4.0.1</spring-boot.version>
+
+        <!-- ==================== 依赖版本 ==================== -->
+        <jfoenix.version>9.0.10</jfoenix.version>
+        <controlsfx.version>11.2.1</controlsfx.version>
+        <mysql.version>9.1.0</mysql.version>
+        <mssql.version>12.8.1.jre11</mssql.version>
+        <dom4j.version>2.1.4</dom4j.version>
+        <fastjson.version>2.0.53</fastjson.version>
+        <hutool.version>5.8.32</hutool.version>
+        <snakeyaml.version>2.3</snakeyaml.version>
+        <jackson.version>2.18.2</jackson.version>
+        <!-- Lombok已移除，改用手动生成代码 -->
+        <!-- <lombok.version>edge-SNAPSHOT</lombok.version> -->
+        <dashscope.version>2.21.0</dashscope.version>
+        <volcengine.version>0.2.48</volcengine.version>
+        <slf4j.version>2.0.16</slf4j.version>
+        <junit.version>5.11.3</junit.version>
     </properties>
+
     <dependencies>
+        <!-- ==================== JavaFX 25 LTS (OpenJFX) ==================== -->
+        <!-- 来源: https://github.com/openjdk/jfx -->
+        <!-- 文档: https://openjfx.io/ -->
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-controls</artifactId>
+            <version>${javafx.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-fxml</artifactId>
+            <version>${javafx.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-graphics</artifactId>
+            <version>${javafx.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-base</artifactId>
+            <version>${javafx.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-web</artifactId>
+            <version>${javafx.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-swing</artifactId>
+            <version>${javafx.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-media</artifactId>
+            <version>${javafx.version}</version>
+        </dependency>
+
+        <!-- ==================== JavaFX 增强库 ==================== -->
+        <!-- JFoenix: Material Design 组件库 -->
+        <dependency>
+            <groupId>com.jfoenix</groupId>
+            <artifactId>jfoenix</artifactId>
+            <version>${jfoenix.version}</version>
+        </dependency>
+        <!-- ControlsFX: 额外的 UI 控件 -->
+        <dependency>
+            <groupId>org.controlsfx</groupId>
+            <artifactId>controlsfx</artifactId>
+            <version>${controlsfx.version}</version>
+        </dependency>
+
+        <!-- ==================== Spring Boot ==================== -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-jdbc</artifactId>
-            <version>2.7.18</version>
+            <version>${spring-boot.version}</version>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-configuration-processor</artifactId>
-            <version>2.7.18</version>
+            <version>${spring-boot.version}</version>
+            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
-            <version>2.7.18</version>
+            <version>${spring-boot.version}</version>
         </dependency>
 
+        <!-- ==================== 数据库驱动 ==================== -->
+        <dependency>
+            <groupId>com.mysql</groupId>
+            <artifactId>mysql-connector-j</artifactId>
+            <version>${mysql.version}</version>
+        </dependency>
         <dependency>
             <groupId>com.microsoft.sqlserver</groupId>
             <artifactId>mssql-jdbc</artifactId>
-            <version>7.4.1.jre8</version>
+            <version>${mssql.version}</version>
         </dependency>
-        <dependency>
-            <groupId>mysql</groupId>
-            <artifactId>mysql-connector-java</artifactId>
-            <version>8.0.29</version>
-        </dependency>
+
+        <!-- ==================== XML/JSON/YAML 处理 ==================== -->
         <dependency>
             <groupId>org.dom4j</groupId>
             <artifactId>dom4j</artifactId>
-            <version>2.1.3</version>
+            <version>${dom4j.version}</version>
         </dependency>
+        <dependency>
+            <groupId>com.alibaba.fastjson2</groupId>
+            <artifactId>fastjson2</artifactId>
+            <version>${fastjson.version}</version>
+        </dependency>
+        <!-- Fastjson1 兼容层：提供 com.alibaba.fastjson.* API -->
         <dependency>
             <groupId>com.alibaba</groupId>
             <artifactId>fastjson</artifactId>
             <version>1.2.83</version>
         </dependency>
+        <!-- Jakarta Validation API -->
+        <dependency>
+            <groupId>jakarta.validation</groupId>
+            <artifactId>jakarta.validation-api</artifactId>
+            <version>3.1.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.yaml</groupId>
+            <artifactId>snakeyaml</artifactId>
+            <version>${snakeyaml.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.dataformat</groupId>
+            <artifactId>jackson-dataformat-yaml</artifactId>
+            <version>${jackson.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+            <version>${jackson.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>${jackson.version}</version>
+        </dependency>
+
+        <!-- ==================== 工具库 ==================== -->
         <dependency>
             <groupId>cn.hutool</groupId>
             <artifactId>hutool-all</artifactId>
-            <version>5.3.9</version>
+            <version>${hutool.version}</version>
         </dependency>
-        <!-- https://mvnrepository.com/artifact/com.aliyun/alimt20181012 -->
+        <!-- Lombok已移除 -->
+        <!--
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>${lombok.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        -->
+
+        <!-- ==================== 阿里云服务 ==================== -->
         <dependency>
             <groupId>com.aliyun</groupId>
             <artifactId>alimt20181012</artifactId>
             <version>1.4.0</version>
         </dependency>
-
-        <!-- https://mvnrepository.com/artifact/com.aliyun/tea-openapi -->
         <dependency>
             <groupId>com.aliyun</groupId>
             <artifactId>tea-openapi</artifactId>
             <version>0.3.7</version>
         </dependency>
-<!--        <dependency>-->
-<!--            <groupId>io.github.palexdev</groupId>-->
-<!--            <artifactId>materialfx</artifactId>-->
-<!--            <version>11.16.1</version>-->
-<!--        </dependency>-->
-<!--        <dependency>-->
-<!--            <groupId>org.glavo.materialfx</groupId>-->
-<!--            <artifactId>materialfx</artifactId>-->
-<!--            <version>11.13.5</version>-->
-<!--        </dependency>-->
-        <dependency>
-            <groupId>com.jfoenix</groupId>
-            <artifactId>jfoenix</artifactId>
-            <version>8.0.10</version>
-        </dependency>
-        <dependency>
-            <groupId>org.yaml</groupId>
-            <artifactId>snakeyaml</artifactId>
-            <version>2.0</version>
-        </dependency>
-        <!-- Jackson YAML support -->
-        <dependency>
-            <groupId>com.fasterxml.jackson.dataformat</groupId>
-            <artifactId>jackson-dataformat-yaml</artifactId>
-            <version>2.13.5</version>
-        </dependency>
-        <!-- Jackson Java 8 time support -->
-        <dependency>
-            <groupId>com.fasterxml.jackson.datatype</groupId>
-            <artifactId>jackson-datatype-jsr310</artifactId>
-            <version>2.13.5</version>
-        </dependency>
-        <!-- JUnit 5 核心依赖 -->
-        <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter-api</artifactId>
-            <version>5.9.3</version> <!-- 可更换为最新版本 -->
-            <scope>test</scope>
-        </dependency>
 
-        <!-- JUnit 5 运行环境 -->
-        <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter-engine</artifactId>
-            <version>5.9.3</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>junit</groupId>
-            <artifactId>junit</artifactId>
-            <version>4.13.1</version>
-            <scope>compile</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.controlsfx</groupId>
-            <artifactId>controlsfx</artifactId>
-            <version>8.40.12</version>
-        </dependency>
-        <dependency>
-            <groupId>org.projectlombok</groupId>
-            <artifactId>lombok</artifactId>
-            <version>1.18.36</version>
-            <scope>provided</scope>
-        </dependency>
+        <!-- ==================== AI 服务 ==================== -->
         <dependency>
             <groupId>com.alibaba</groupId>
             <artifactId>dashscope-sdk-java</artifactId>
-            <version>2.21.0</version>
+            <version>${dashscope.version}</version>
         </dependency>
         <dependency>
             <groupId>com.volcengine</groupId>
             <artifactId>volcengine-java-sdk-ark-runtime</artifactId>
-            <version>0.2.48</version>
+            <version>${volcengine.version}</version>
+        </dependency>
+
+        <!-- ==================== 日志 ==================== -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>${slf4j.version}</version>
+        </dependency>
+
+        <!-- ==================== 测试 ==================== -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>${junit.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <version>${spring-boot.version}</version>
+            <scope>test</scope>
         </dependency>
     </dependencies>
-    <dependencyManagement>
-        <dependencies>
-            <dependency>
-                <groupId>org.slf4j</groupId>
-                <artifactId>slf4j-api</artifactId>
-                <version>1.7.36</version>
-            </dependency>
-        </dependencies>
-    </dependencyManagement>
+
     <build>
         <plugins>
-<!--            <plugin>-->
-<!--                <groupId>org.apache.maven.plugins</groupId>-->
-<!--                <artifactId>maven-assembly-plugin</artifactId>-->
-<!--                <version>3.1.0</version>-->
-<!--                <executions>-->
-<!--                    <execution>-->
-<!--                        <phase>package</phase>-->
-<!--                        <goals>-->
-<!--                            <goal>single</goal>-->
-<!--                        </goals>-->
-<!--                        <configuration>-->
-<!--                            <archive>-->
-<!--                                <manifest>-->
-<!--                                    <mainClass>red.jiuzhou.ui.Dbxmltool</mainClass> &lt;!&ndash; 你的入口类 &ndash;&gt;-->
-<!--                                </manifest>-->
-<!--                            </archive>-->
-<!--                            <descriptorRefs>-->
-<!--                                <descriptorRef>jar-with-dependencies</descriptorRef>-->
-<!--                            </descriptorRefs>-->
-<!--                        </configuration>-->
-<!--                    </execution>-->
-<!--                </executions>-->
-<!--            </plugin>-->
-            <!--<plugin>
+            <!-- Maven 编译器插件 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.14.0</version>
+                <configuration>
+                    <release>${java.version}</release>
+                    <encoding>UTF-8</encoding>
+                    <!-- 临时排除使用Lombok的文件 -->
+                    <excludes>
+                        <exclude>**/rewrite/EnhancedBatchRewriter.java</exclude>
+                        <exclude>**/safety/DataSafetyManager.java</exclude>
+                        <exclude>**/search/GlobalSearchEngine.java</exclude>
+                        <!-- MechanismOverrideConfig 已修复，移除 Lombok -->
+                        <!-- <exclude>**/analysis/aion/MechanismOverrideConfig.java</exclude> -->
+                        <exclude>**/validation/DataConsistencyValidator.java</exclude>
+                        <exclude>**/api/common/CommonResult.java</exclude>
+                        <exclude>**/api/common/ErrorCode.java</exclude>
+                        <exclude>**/api/common/ServiceException.java</exclude>
+                        <exclude>**/api/common/GlobalErrorCodeConstants.java</exclude>
+                        <exclude>**/api/common/GlobalExceptionHandler.java</exclude>
+                        <exclude>**/ui/BatchRewriteDialog.java</exclude>
+                        <exclude>**/ui/BackupManagerDialog.java</exclude>
+                        <exclude>**/ui/EmergencyRecoveryDialog.java</exclude>
+                        <exclude>**/ui/OperationMonitorPanel.java</exclude>
+                        <!-- MechanismOverrideEditorDialog 已修复,移除 Lombok -->
+                        <!-- <exclude>**/ui/MechanismOverrideEditorDialog.java</exclude> -->
+                        <exclude>**/ui/SearchReplaceDialog.java</exclude>
+                        <exclude>**/ui/DataValidationDialog.java</exclude>
+                        <exclude>**/ui/SafetyConfirmDialog.java</exclude>
+                        <!-- SearchableTreeView 和 MenuTabPaneExample 不使用 Lombok，可以编译 -->
+                        <!-- <exclude>**/ui/components/SearchableTreeView.java</exclude> -->
+                        <!-- <exclude>**/ui/MenuTabPaneExample.java</exclude> -->
+                        <exclude>**/analysis/aion/AionMechanismDetector.java</exclude>
+                        <exclude>**/ai/AiTest.java</exclude>
+                        <exclude>**/test/**/*.java</exclude>
+                        <!-- DashScopeBatchHelper、PathUtil 和 DoubaoClient 已修复,移除 Lombok -->
+                        <!-- <exclude>**/ai/DashScopeBatchHelper.java</exclude> -->
+                        <!-- <exclude>**/ai/DoubaoClient.java</exclude> -->
+                        <!-- <exclude>**/util/PathUtil.java</exclude> -->
+                        <exclude>**/util/IncrementalMenuJsonGenerator.java</exclude>
+                        <!-- 排除其他引用IncrementalMenuJsonGenerator的Dbxmltool变体 -->
+                        <exclude>**/ui/RobustDbxmltool.java</exclude>
+                        <exclude>**/ui/MenuTabPaneExampleExtensions.java</exclude>
+                        <exclude>**/ui/EnhancedDbxmltool.java</exclude>
+                        <exclude>**/ui/CompatibleDbxmltool.java</exclude>
+                        <!-- Dbxmltool是主类，必须编译 -->
+                    </excludes>
+                    <compilerArgs>
+                        <arg>-parameters</arg>
+                        <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED</arg>
+                        <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED</arg>
+                        <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED</arg>
+                        <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED</arg>
+                        <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.model=ALL-UNNAMED</arg>
+                        <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED</arg>
+                        <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.processing=ALL-UNNAMED</arg>
+                        <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED</arg>
+                        <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED</arg>
+                    </compilerArgs>
+                    <!-- Lombok注解处理器已移除 -->
+                    <!--
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>${lombok.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
+                    -->
+                </configuration>
+            </plugin>
+
+            <!-- JavaFX Maven 插件 - 主要运行方式 -->
+            <plugin>
                 <groupId>org.openjfx</groupId>
                 <artifactId>javafx-maven-plugin</artifactId>
                 <version>0.0.8</version>
                 <configuration>
-                    <mainClass>red.jiuzhou.ui.Dbxmltool</mainClass> &lt;!&ndash; 替换为你的 Application 类 &ndash;&gt;
-                </configuration>
-            </plugin>-->
-            <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>exec-maven-plugin</artifactId>
-                <version>3.1.0</version>
-                <configuration>
+                    <!-- 主程序入口 -->
                     <mainClass>red.jiuzhou.ui.Dbxmltool</mainClass>
+                    <options>
+                        <!-- 忽略模块系统问题，允许加载非模块化的 JAR -->
+                        <option>--add-reads=ALL-UNNAMED=ALL-UNNAMED</option>
+                        <option>--illegal-access=permit</option>
+                        <option>--add-opens=javafx.graphics/javafx.scene=ALL-UNNAMED</option>
+                        <option>--add-opens=javafx.graphics/com.sun.javafx.scene=ALL-UNNAMED</option>
+                        <option>--add-opens=javafx.graphics/com.sun.glass.ui=ALL-UNNAMED</option>
+                        <option>--add-opens=javafx.base/com.sun.javafx.runtime=ALL-UNNAMED</option>
+                        <option>--add-exports=javafx.controls/com.sun.javafx.scene.control.behavior=ALL-UNNAMED</option>
+                        <option>--add-exports=javafx.controls/com.sun.javafx.scene.control=ALL-UNNAMED</option>
+                        <option>--add-exports=javafx.base/com.sun.javafx.binding=ALL-UNNAMED</option>
+                        <option>--add-exports=javafx.graphics/com.sun.javafx.stage=ALL-UNNAMED</option>
+                        <option>--add-exports=javafx.base/com.sun.javafx.event=ALL-UNNAMED</option>
+                    </options>
                 </configuration>
             </plugin>
 
+            <!-- exec-maven-plugin 备用运行方式 -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.1.1</version>
+                <configuration>
+                    <mainClass>red.jiuzhou.ui.Dbxmltool</mainClass>
+                    <arguments>
+                        <argument>--add-opens=javafx.graphics/javafx.scene=ALL-UNNAMED</argument>
+                        <argument>--add-opens=javafx.graphics/com.sun.javafx.scene=ALL-UNNAMED</argument>
+                        <argument>--add-opens=javafx.base/com.sun.javafx.runtime=ALL-UNNAMED</argument>
+                    </arguments>
+                </configuration>
+            </plugin>
+
+            <!-- 资源插件 -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-assembly-plugin</artifactId>
-                <version>3.1.0</version>
+                <artifactId>maven-resources-plugin</artifactId>
+                <version>3.3.1</version>
+                <configuration>
+                    <encoding>UTF-8</encoding>
+                </configuration>
+            </plugin>
+
+            <!-- 打包插件 - 生成可执行 JAR -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.3.0</version>
+                <configuration>
+                    <archive>
+                        <manifest>
+                            <mainClass>red.jiuzhou.ui.Dbxmltool</mainClass>
+                            <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
+                        </manifest>
+                    </archive>
+                </configuration>
+            </plugin>
+
+            <!-- Shade 插件 - 打包 Fat JAR -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>3.5.1</version>
                 <executions>
                     <execution>
-                        <id>make-assembly</id>
                         <phase>package</phase>
                         <goals>
-                            <goal>single</goal>
+                            <goal>shade</goal>
                         </goals>
                         <configuration>
-                            <archive>
-                                <manifest>
-                                    <mainClass>red.jiuzhou.ui.Dbxmltool</mainClass> <!-- 你的应用入口类 -->
-                                </manifest>
-                            </archive>
-                            <descriptorRefs>
-                                <descriptorRef>jar-with-dependencies</descriptorRef>
-                            </descriptorRefs>
+                            <transformers>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <mainClass>red.jiuzhou.SimplifiedLauncher</mainClass>
+                                </transformer>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                            </transformers>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
                         </configuration>
                     </execution>
                 </executions>
             </plugin>
 
+            <!-- 测试插件 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.2.3</version>
+                <configuration>
+                    <argLine>
+                        --add-opens=java.base/java.lang=ALL-UNNAMED
+                        --add-opens=java.base/java.util=ALL-UNNAMED
+                    </argLine>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
+
+    <!-- 仓库配置 -->
+    <repositories>
+        <repository>
+            <id>central</id>
+            <url>https://repo.maven.apache.org/maven2</url>
+        </repository>
+    </repositories>
 </project>

@@ -1,0 +1,8 @@
+{
+	"file_path":"D:\\AionReal58\\AionMap\\XML\\Special01\\hidden_fatigue_special01.xml",
+	"xml_root_tag":"hidden_fatigues",
+	"list":[],
+	"xml_item_tag":"hidden_fatigue_level",
+	"table_name":"hidden_fatigue_special01",
+	"sql":"select * from hidden_fatigue_special01 order by CAST(name AS UNSIGNED) ASC"
+}

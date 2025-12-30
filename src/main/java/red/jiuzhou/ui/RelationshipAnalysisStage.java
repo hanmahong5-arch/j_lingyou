@@ -7,15 +7,20 @@ import javafx.collections.ObservableList;
 import javafx.collections.transformation.FilteredList;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.geometry.Side;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.Tab;
+import javafx.scene.control.TabPane;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
 import javafx.scene.control.ToolBar;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
@@ -32,34 +37,110 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * A lightweight stage that visualises relationships detected by {@link XmlRelationshipAnalyzer}.
+ * 关系分析窗口
+ *
+ * <p>提供两种关联分析功能：
+ * <ul>
+ *   <li>Name字段关联 - 基于值匹配的Name字段关系检测</li>
+ *   <li>ID引用分析 - 基于字段名模式的ID引用链检测</li>
+ * </ul>
  */
 public class RelationshipAnalysisStage extends Stage {
 
     private final TableView<RelationshipRow> tableView = new TableView<>();
-    private final FilteredList<RelationshipRow> filteredRows;
+    private FilteredList<RelationshipRow> filteredRows;
     private final Label tallyLabel = new Label();
 
+    /**
+     * 创建带Name字段关联数据的窗口
+     */
     public RelationshipAnalysisStage(XmlRelationshipAnalyzer.RelationshipReport report) {
-        setTitle("Name字段关联分析 - 游戏配置对照");
+        setTitle("关联分析 - 游戏配置数据关系");
         initModality(Modality.NONE);
 
+        // 创建TabPane
+        TabPane tabPane = new TabPane();
+        tabPane.setSide(Side.TOP);
+        tabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
+
+        // Tab1: Name字段关联
+        Tab nameTab = new Tab("Name字段关联");
+        nameTab.setContent(createNameRelationshipPane(report));
+
+        // Tab2: ID引用分析
+        Tab idTab = new Tab("ID引用分析");
+        idTab.setContent(new IdReferenceAnalysisPanel());
+
+        tabPane.getTabs().addAll(nameTab, idTab);
+
+        // 根容器
+        BorderPane root = new BorderPane();
+        root.setCenter(tabPane);
+        root.setPadding(new Insets(8));
+
+        Scene scene = new Scene(root, 1200, 750);
+        setScene(scene);
+    }
+
+    /**
+     * 创建仅显示ID引用分析的窗口（无Name字段数据时使用）
+     */
+    public RelationshipAnalysisStage() {
+        setTitle("ID引用分析 - 游戏配置数据关系");
+        initModality(Modality.NONE);
+
+        // 创建TabPane
+        TabPane tabPane = new TabPane();
+        tabPane.setSide(Side.TOP);
+        tabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
+
+        // Tab1: ID引用分析（默认选中）
+        Tab idTab = new Tab("ID引用分析");
+        idTab.setContent(new IdReferenceAnalysisPanel());
+
+        // Tab2: Name字段关联（提示需要先分析）
+        Tab nameTab = new Tab("Name字段关联");
+        Label placeholder = new Label("请先在机制浏览器中执行「关联分析」来生成Name字段关联数据");
+        placeholder.setStyle("-fx-text-fill: #999; -fx-font-size: 14px;");
+        BorderPane placeholderPane = new BorderPane(placeholder);
+        placeholderPane.setPadding(new Insets(50));
+        nameTab.setContent(placeholderPane);
+
+        tabPane.getTabs().addAll(idTab, nameTab);
+
+        // 根容器
+        BorderPane root = new BorderPane();
+        root.setCenter(tabPane);
+        root.setPadding(new Insets(8));
+
+        Scene scene = new Scene(root, 1200, 750);
+        setScene(scene);
+    }
+
+    /**
+     * 创建Name字段关联面板
+     */
+    private BorderPane createNameRelationshipPane(XmlRelationshipAnalyzer.RelationshipReport report) {
         List<RelationshipRow> rowData = report.getRelationshipSnapshots().stream()
             .map(RelationshipRow::new)
             .collect(Collectors.toList());
         ObservableList<RelationshipRow> rows = FXCollections.<RelationshipRow>observableArrayList();
         rows.addAll(rowData);
-        filteredRows = new FilteredList<>(rows, r -> true);
+        FilteredList<RelationshipRow> filtered = new FilteredList<>(rows, r -> true);
 
-        tableView.setItems(filteredRows);
-        tableView.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
-        tableView.setRowFactory(tv -> createStyledTableRow());
-        buildColumns();
+        TableView<RelationshipRow> table = new TableView<>();
+        table.setItems(filtered);
+        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        table.setRowFactory(tv -> createStyledTableRow());
+        buildColumnsFor(table);
+
+        // 初始化类成员变量（为了兼容现有代码）
+        tableView.setItems(filtered);
 
         // 增强的过滤和操作栏
         TextField filterField = new TextField();
         filterField.setPromptText("输入文件或name字段关键字过滤");
-        filterField.textProperty().addListener((obs, oldVal, newVal) -> applyFilter(newVal));
+        filterField.textProperty().addListener((obs, oldVal, newVal) -> applyFilterTo(filtered, newVal));
         filterField.setPrefWidth(280);
 
         Button revealButton = new Button("打开结果");
@@ -69,10 +150,10 @@ public class RelationshipAnalysisStage extends Stage {
         exportButton.setOnAction(event -> exportToExcel(report));
 
         Button copyButton = new Button("复制选中");
-        copyButton.setOnAction(event -> copySelectedRows());
+        copyButton.setOnAction(event -> copySelectedRowsFrom(table));
         copyButton.setDisable(true);
 
-        tableView.getSelectionModel().selectedItemProperty().addListener((obs, old, selected) -> {
+        table.getSelectionModel().selectedItemProperty().addListener((obs, old, selected) -> {
             copyButton.setDisable(selected == null);
         });
 
@@ -82,7 +163,8 @@ public class RelationshipAnalysisStage extends Stage {
 
         // 增强的统计信息
         Label statsLabel = buildStatsLabel(rowData);
-        HBox header = new HBox(12, new Label("命中关系:"), tallyLabel, new Label("|"), statsLabel);
+        Label tally = new Label(filtered.size() + " / " + rows.size());
+        HBox header = new HBox(12, new Label("命中关系:"), tally, new Label("|"), statsLabel);
         header.setAlignment(Pos.CENTER_LEFT);
         header.setPadding(new Insets(4, 0, 6, 0));
 
@@ -92,14 +174,12 @@ public class RelationshipAnalysisStage extends Stage {
         VBox topBox = new VBox(4, header, toolBar, insightBox);
         topBox.setPadding(new Insets(0, 8, 8, 8));
 
-        BorderPane root = new BorderPane();
-        root.setTop(topBox);
-        root.setCenter(tableView);
-        root.setPadding(new Insets(8));
+        BorderPane pane = new BorderPane();
+        pane.setTop(topBox);
+        pane.setCenter(table);
+        pane.setPadding(new Insets(8));
 
-        updateTally();
-        Scene scene = new Scene(root, 1200, 700);
-        setScene(scene);
+        return pane;
     }
 
     private javafx.scene.control.TableRow<RelationshipRow> createStyledTableRow() {
@@ -233,6 +313,10 @@ public class RelationshipAnalysisStage extends Stage {
     }
 
     private void buildColumns() {
+        buildColumnsFor(tableView);
+    }
+
+    private void buildColumnsFor(TableView<RelationshipRow> table) {
         TableColumn<RelationshipRow, String> sourceFileCol = new TableColumn<>("源文件");
         sourceFileCol.setCellValueFactory(param -> param.getValue().sourceFile);
         sourceFileCol.setPrefWidth(220);
@@ -273,7 +357,7 @@ public class RelationshipAnalysisStage extends Stage {
         sampleCol.setCellValueFactory(param -> param.getValue().sampleValues);
         sampleCol.setPrefWidth(240);
 
-        tableView.getColumns().addAll(
+        table.getColumns().addAll(
             sourceFileCol,
             sourceColumnCol,
             targetFileCol,
@@ -288,11 +372,16 @@ public class RelationshipAnalysisStage extends Stage {
     }
 
     private void applyFilter(String keyword) {
+        applyFilterTo(filteredRows, keyword);
+        updateTally();
+    }
+
+    private void applyFilterTo(FilteredList<RelationshipRow> filtered, String keyword) {
         if (keyword == null || keyword.trim().isEmpty()) {
-            filteredRows.setPredicate(r -> true);
+            filtered.setPredicate(r -> true);
         } else {
             String lower = keyword.trim().toLowerCase(Locale.ROOT);
-            filteredRows.setPredicate(row ->
+            filtered.setPredicate(row ->
                 row.sourceFile.get().toLowerCase(Locale.ROOT).contains(lower)
                     || row.sourceColumn.get().toLowerCase(Locale.ROOT).contains(lower)
                     || row.targetFile.get().toLowerCase(Locale.ROOT).contains(lower)
@@ -300,7 +389,23 @@ public class RelationshipAnalysisStage extends Stage {
                     || row.sampleValues.get().toLowerCase(Locale.ROOT).contains(lower)
             );
         }
-        updateTally();
+    }
+
+    private void copySelectedRowsFrom(TableView<RelationshipRow> table) {
+        RelationshipRow selected = table.getSelectionModel().getSelectedItem();
+        if (selected != null) {
+            String text = String.format("%s.%s -> %s.%s (匹配:%s, 置信度:%s)",
+                selected.sourceFile.get(),
+                selected.sourceColumn.get(),
+                selected.targetFile.get(),
+                selected.targetColumn.get(),
+                selected.matchCount.get(),
+                selected.confidence.get());
+
+            javafx.scene.input.ClipboardContent content = new javafx.scene.input.ClipboardContent();
+            content.putString(text);
+            javafx.scene.input.Clipboard.getSystemClipboard().setContent(content);
+        }
     }
 
     private void updateTally() {

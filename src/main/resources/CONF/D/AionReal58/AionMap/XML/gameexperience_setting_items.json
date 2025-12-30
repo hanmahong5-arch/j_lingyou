@@ -1,0 +1,8 @@
+{
+	"file_path":"D:\\AionReal58\\AionMap\\XML\\gameexperience_setting_items.xml",
+	"xml_root_tag":"player_types",
+	"list":[],
+	"xml_item_tag":"id",
+	"table_name":"gameexperience_setting_items",
+	"sql":"select * from gameexperience_setting_items order by CAST(item_nameid AS UNSIGNED) ASC"
+}

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<quest_combinetasks>
+  <id id="5000">
+    <dev_name/>
+    <task_npc/>
+    <combineskill/>
+    <combine_skillpoint/>
+    <recipe_name/>
+    <product/>
+    <give_component1/>
+    <give_component2/>
+  </id>
+</quest_combinetasks>

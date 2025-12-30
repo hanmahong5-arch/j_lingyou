@@ -1,0 +1,8 @@
+{
+	"file_path":"D:\\AionReal58\\AionMap\\XML\\Special01\\vip_grade_exp_special01.xml",
+	"xml_root_tag":"vip_grade_exps",
+	"list":[],
+	"xml_item_tag":"vip_lv",
+	"table_name":"vip_grade_exp_special01",
+	"sql":"select * from vip_grade_exp_special01 order by CAST(grade AS UNSIGNED) ASC"
+}

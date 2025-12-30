@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<pc_level_func_restricts>
+  <level level="1">
+    <sellgold_limit/>
+    <trial_sellgold_limit/>
+    <trial_tradegold_limit/>
+    <trial_decompose_limit/>
+    <trial_gather_limit/>
+    <trial_extract_gather_limit/>
+  </level>
+</pc_level_func_restricts>

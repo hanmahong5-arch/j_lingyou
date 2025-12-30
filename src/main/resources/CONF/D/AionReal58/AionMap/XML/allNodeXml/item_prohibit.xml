@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<item_prohibits>
+  <id ID="1">
+    <limit_item/>
+    <allow_item/>
+    <ban_item1/>
+    <ban_item2/>
+    <ban_item3/>
+    <ban_item4/>
+  </id>
+</item_prohibits>

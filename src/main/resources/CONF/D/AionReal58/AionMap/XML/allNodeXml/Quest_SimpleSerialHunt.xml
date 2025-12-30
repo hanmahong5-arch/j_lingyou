@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<quest_simpleserialhunts>
+  <id id="9622">
+    <dev_name/>
+    <acquired_npc_name/>
+    <talk_npc1/>
+    <talk_npc2/>
+    <talk_npc3/>
+    <count_first/>
+    <monster_first/>
+    <count_second/>
+    <monster_second/>
+    <count_third/>
+    <monster_third/>
+    <count_fourth/>
+    <monster_fourth/>
+    <count_fifth/>
+    <monster_fifth/>
+    <reward_npc_name/>
+  </id>
+</quest_simpleserialhunts>

@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component;
 import red.jiuzhou.ai.AiModelClient;
 import red.jiuzhou.ai.AiModelFactory;
 
-import javax.annotation.PreDestroy;
+import jakarta.annotation.PreDestroy;
 import java.io.File;
 import java.time.Duration;
 import java.time.Instant;
@@ -21,8 +21,6 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 /**
@@ -64,22 +62,8 @@ public class AIAssistant {
     /** 默认兜底AI模型 */
     private static final String FALLBACK_MODEL = "qwen";
 
-    /** 线程池大小：最小2，最大8，基于CPU核心数 */
-    private static final int EXECUTOR_SIZE = Math.min(8, Math.max(2, Runtime.getRuntime().availableProcessors()));
-
-    /** AI线程计数器 */
-    private static final AtomicInteger THREAD_COUNTER = new AtomicInteger(1);
-
-    /** AI线程工厂：创建守护线程，自定义命名 */
-    private static final ThreadFactory AI_THREAD_FACTORY = runnable -> {
-        Thread thread = new Thread(runnable);
-        thread.setName("ai-assistant-" + THREAD_COUNTER.getAndIncrement());
-        thread.setDaemon(true);
-        return thread;
-    };
-
-    /** AI任务执行线程池 */
-    private final ExecutorService aiExecutor = Executors.newFixedThreadPool(EXECUTOR_SIZE, AI_THREAD_FACTORY);
+    /** AI任务执行器（Java 21+ 虚拟线程：轻量级、自动伸缩） */
+    private final ExecutorService aiExecutor = Executors.newVirtualThreadPerTaskExecutor();
 
     /**
      * 优化类型枚举 - 定义各种AI文本处理模式

@@ -1,0 +1,8 @@
+{
+	"file_path":"D:\\AionReal58\\AionMap\\XML\\Quest_SimpleItemPlay.xml",
+	"xml_root_tag":"quest_simpleitemplays",
+	"list":[],
+	"xml_item_tag":"id",
+	"table_name":"Quest_SimpleItemPlay",
+	"sql":"select * from Quest_SimpleItemPlay order by CAST(dev_name AS UNSIGNED) ASC"
+}

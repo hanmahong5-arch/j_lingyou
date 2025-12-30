@@ -33,8 +33,8 @@ import java.util.stream.Collectors;
 @Slf4j
 public class GlobalSearchEngine {
 
-    private static final int THREAD_POOL_SIZE = 8;
-    private final ExecutorService executorService = Executors.newFixedThreadPool(THREAD_POOL_SIZE);
+    // 虚拟线程执行器（Java 21+）
+    private final ExecutorService executorService = Executors.newVirtualThreadPerTaskExecutor();
     private final Map<String, List<String>> relationshipMap = new HashMap<>();
 
     // 搜索模式枚举

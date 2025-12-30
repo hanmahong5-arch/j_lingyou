@@ -1,0 +1,17 @@
+{
+	"file_path":"D:\\AionReal58\\AionMap\\XML\\data_driven_quest.xml",
+	"xml_root_tag":"quest_data_drivens",
+	"list":[
+		{
+			"addDataNode":"progress_info",
+			"associatedFiled":"id",
+			"xml_tag":"data",
+			"db_column":"data",
+			"table_name":"data_driven_quest__progress_info__data",
+			"sql":"select * from data_driven_quest__progress_info__data where id = '#associated_filed' order by CAST(id AS UNSIGNED) ASC"
+		}
+	],
+	"xml_item_tag":"quest_data_driven",
+	"table_name":"data_driven_quest",
+	"sql":"select * from data_driven_quest order by CAST(id AS UNSIGNED) ASC"
+}

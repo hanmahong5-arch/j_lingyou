@@ -1,0 +1,17 @@
+{
+	"file_path":"D:\\AionReal58\\AionMap\\客户端XML\\data\\China\\items\\items\\client_item_upgrade.xml",
+	"xml_root_tag":"client_item_upgrades",
+	"list":[
+		{
+			"addDataNode":"upgrade_list",
+			"associatedFiled":"id",
+			"xml_tag":"data",
+			"db_column":"data",
+			"table_name":"client_item_upgrade__upgrade_list__data",
+			"sql":"select * from client_item_upgrade__upgrade_list__data where id = '#associated_filed' order by CAST(id AS UNSIGNED) ASC"
+		}
+	],
+	"xml_item_tag":"client_item_upgrade",
+	"table_name":"client_item_upgrade",
+	"sql":"select * from client_item_upgrade order by CAST(id AS UNSIGNED) ASC"
+}

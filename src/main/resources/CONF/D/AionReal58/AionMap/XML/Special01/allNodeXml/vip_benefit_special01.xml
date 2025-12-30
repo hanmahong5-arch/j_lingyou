@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<vip_benefits>
+  <vip_benefit>
+    <id/>
+    <name/>
+    <name_str/>
+    <base_check/>
+    <apply/>
+    <grade1/>
+    <grade2/>
+    <grade3/>
+    <grade4/>
+    <grade5/>
+    <grade6/>
+  </vip_benefit>
+</vip_benefits>

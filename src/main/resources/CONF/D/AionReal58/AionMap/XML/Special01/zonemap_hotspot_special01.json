@@ -1,0 +1,8 @@
+{
+	"file_path":"D:\\AionReal58\\AionMap\\XML\\Special01\\zonemap_hotspot_special01.xml",
+	"xml_root_tag":"zonemap_hotspots",
+	"list":[],
+	"xml_item_tag":"zonemap_hotspot",
+	"table_name":"zonemap_hotspot_special01",
+	"sql":"select * from zonemap_hotspot_special01 order by CAST(id AS UNSIGNED) ASC"
+}

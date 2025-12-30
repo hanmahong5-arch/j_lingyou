@@ -5,7 +5,8 @@ import com.volcengine.ark.runtime.model.completion.chat.ChatCompletionRequest;
 import com.volcengine.ark.runtime.model.completion.chat.ChatMessage;
 import com.volcengine.ark.runtime.model.completion.chat.ChatMessageRole;
 import com.volcengine.ark.runtime.service.ArkService;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import okhttp3.ConnectionPool;
 import okhttp3.Dispatcher;
 import red.jiuzhou.util.YamlUtils;
@@ -14,8 +15,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-@Slf4j
 public class DoubaoClient implements AiModelClient {
+    private static final Logger log = LoggerFactory.getLogger(DoubaoClient.class);
 
     private static final String BASE_URL = "https://ark.cn-beijing.volces.com/api/v3";
     private static final String MODEL_ID = YamlUtils.getProperty("ai.doubao.model");

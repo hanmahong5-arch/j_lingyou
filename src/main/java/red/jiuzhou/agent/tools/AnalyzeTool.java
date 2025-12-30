@@ -30,27 +30,31 @@ public class AnalyzeTool implements AgentTool {
         return "分析游戏数据分布、统计和平衡性，给出建议。";
     }
 
+    /** 参数 Schema（文本块） */
+    private static final String PARAMETER_SCHEMA = """
+        {
+          "type": "object",
+          "properties": {
+            "table": {
+              "type": "string",
+              "description": "要分析的表名"
+            },
+            "field": {
+              "type": "string",
+              "description": "要分析的字段名（可选）"
+            },
+            "type": {
+              "type": "string",
+              "enum": ["distribution", "stats", "balance", "overview"],
+              "description": "分析类型：distribution=分布, stats=统计, balance=平衡性, overview=概览"
+            }
+          },
+          "required": ["table"]
+        }""";
+
     @Override
     public String getParameterSchema() {
-        return "{\n" +
-               "  \"type\": \"object\",\n" +
-               "  \"properties\": {\n" +
-               "    \"table\": {\n" +
-               "      \"type\": \"string\",\n" +
-               "      \"description\": \"要分析的表名\"\n" +
-               "    },\n" +
-               "    \"field\": {\n" +
-               "      \"type\": \"string\",\n" +
-               "      \"description\": \"要分析的字段名（可选）\"\n" +
-               "    },\n" +
-               "    \"type\": {\n" +
-               "      \"type\": \"string\",\n" +
-               "      \"enum\": [\"distribution\", \"stats\", \"balance\", \"overview\"],\n" +
-               "      \"description\": \"分析类型：distribution=分布, stats=统计, balance=平衡性, overview=概览\"\n" +
-               "    }\n" +
-               "  },\n" +
-               "  \"required\": [\"table\"]\n" +
-               "}";
+        return PARAMETER_SCHEMA;
     }
 
     @Override
@@ -82,24 +86,15 @@ public class AnalyzeTool implements AgentTool {
         }
 
         try {
-            String report;
             Map<String, Object> extraData = new HashMap<>();
 
-            switch (analysisType) {
-                case "distribution":
-                    report = analyzeDistribution(context, tableName, fieldName, extraData);
-                    break;
-                case "stats":
-                    report = analyzeStats(context, tableName, fieldName, extraData);
-                    break;
-                case "balance":
-                    report = analyzeBalance(context, tableName, extraData);
-                    break;
-                case "overview":
-                default:
-                    report = analyzeOverview(context, tableName, extraData);
-                    break;
-            }
+            // Switch 表达式（Java 25）
+            String report = switch (analysisType) {
+                case "distribution" -> analyzeDistribution(context, tableName, fieldName, extraData);
+                case "stats" -> analyzeStats(context, tableName, fieldName, extraData);
+                case "balance" -> analyzeBalance(context, tableName, extraData);
+                default -> analyzeOverview(context, tableName, extraData);
+            };
 
             return ToolResult.analysis(report, extraData);
 

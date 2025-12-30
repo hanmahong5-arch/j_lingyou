@@ -1,0 +1,17 @@
+{
+	"file_path":"D:\\AionReal58\\AionMap\\XML\\stigma_hiddenskill.xml",
+	"xml_root_tag":"stigma_hiddenskills",
+	"list":[
+		{
+			"addDataNode":"condition_skill",
+			"associatedFiled":"id",
+			"xml_tag":"data",
+			"db_column":"data",
+			"table_name":"stigma_hiddenskill__condition_skill__data",
+			"sql":"select * from stigma_hiddenskill__condition_skill__data where id = '#associated_filed' order by CAST(id AS UNSIGNED) ASC"
+		}
+	],
+	"xml_item_tag":"stigma_hiddenskill",
+	"table_name":"stigma_hiddenskill",
+	"sql":"select * from stigma_hiddenskill order by CAST(id AS UNSIGNED) ASC"
+}

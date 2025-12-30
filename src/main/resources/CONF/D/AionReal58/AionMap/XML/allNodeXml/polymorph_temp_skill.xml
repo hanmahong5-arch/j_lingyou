@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<polymorph_temp_skills>
+  <id ID="1">
+    <desc/>
+    <temp_skill_name1/>
+    <temp_skill_level1/>
+    <temp_skill_name2/>
+    <temp_skill_level2/>
+    <temp_skill_name3/>
+    <temp_skill_level3/>
+    <temp_skill_name4/>
+    <temp_skill_level4/>
+    <temp_skill_name5/>
+    <temp_skill_level5/>
+  </id>
+</polymorph_temp_skills>

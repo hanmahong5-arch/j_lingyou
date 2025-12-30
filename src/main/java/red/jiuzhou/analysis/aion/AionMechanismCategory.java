@@ -203,77 +203,79 @@ public enum AionMechanismCategory {
      * 获取分类的图标（Emoji图标，用于UI显示）
      *
      * 使用Emoji图标代替字母，更直观且无重复问题
+     * 使用 Switch 表达式（Java 25）
      */
     public String getIcon() {
-        switch (this) {
-            case ABYSS: return "⚔️";          // 深渊/战斗
-            case SKILL: return "✨";          // 技能/魔法
-            case ITEM: return "🎒";           // 物品/背包
-            case NPC: return "👤";            // NPC角色
-            case NPC_AI: return "🤖";         // AI系统
-            case QUEST: return "📜";          // 任务/卷轴
-            case INSTANCE: return "🏰";       // 副本/城堡
-            case SHOP: return "🛒";           // 商店
-            case LUNA: return "🌙";           // Luna月亮
-            case HOUSING: return "🏠";        // 房屋
-            case PET: return "🐾";            // 宠物
-            case CRAFT: return "🔨";          // 制作/锻造
-            case DROP: return "💎";           // 掉落/宝石
-            case ENCHANT: return "⚡";        // 强化/闪电
-            case STIGMA_TRANSFORM: return "🔮"; // 烙印/变身
-            case PLAYER_GROWTH: return "📈";  // 成长/图表
-            case TITLE: return "🏆";          // 称号/奖杯
-            case LEGION: return "🛡️";         // 军团/盾牌
-            case PVP_RANKING: return "🥇";    // 排名/奖牌
-            case PORTAL: return "🌀";         // 传送门
-            case TIME_EVENT: return "⏰";     // 时间事件
-            case CLIENT_STRINGS: return "📝"; // 字符串/文本
-            case ANIMATION: return "🎬";      // 动画
-            case ANIMATION_MARKERS: return "🎯"; // 动画标记
-            case CHARACTER_PRESET: return "👔"; // 角色预设
-            case SUBZONE: return "🗺️";        // 区域地图
-            case ID_MAPPING: return "🔢";     // ID映射
-            case GAME_CONFIG: return "⚙️";    // 配置/齿轮
-            case GOTCHA: return "🎰";         // 抽卡/老虎机
-            default: return "📄";             // 其他/文档
-        }
+        return switch (this) {
+            case ABYSS -> "⚔️";               // 深渊/战斗
+            case SKILL -> "✨";               // 技能/魔法
+            case ITEM -> "🎒";                // 物品/背包
+            case NPC -> "👤";                 // NPC角色
+            case NPC_AI -> "🤖";              // AI系统
+            case QUEST -> "📜";               // 任务/卷轴
+            case INSTANCE -> "🏰";            // 副本/城堡
+            case SHOP -> "🛒";                // 商店
+            case LUNA -> "🌙";                // Luna月亮
+            case HOUSING -> "🏠";             // 房屋
+            case PET -> "🐾";                 // 宠物
+            case CRAFT -> "🔨";               // 制作/锻造
+            case DROP -> "💎";                // 掉落/宝石
+            case ENCHANT -> "⚡";             // 强化/闪电
+            case STIGMA_TRANSFORM -> "🔮";    // 烙印/变身
+            case PLAYER_GROWTH -> "📈";       // 成长/图表
+            case TITLE -> "🏆";               // 称号/奖杯
+            case LEGION -> "🛡️";              // 军团/盾牌
+            case PVP_RANKING -> "🥇";         // 排名/奖牌
+            case PORTAL -> "🌀";              // 传送门
+            case TIME_EVENT -> "⏰";          // 时间事件
+            case CLIENT_STRINGS -> "📝";      // 字符串/文本
+            case ANIMATION -> "🎬";           // 动画
+            case ANIMATION_MARKERS -> "🎯";   // 动画标记
+            case CHARACTER_PRESET -> "👔";    // 角色预设
+            case SUBZONE -> "🗺️";             // 区域地图
+            case ID_MAPPING -> "🔢";          // ID映射
+            case GAME_CONFIG -> "⚙️";         // 配置/齿轮
+            case GOTCHA -> "🎰";              // 抽卡/老虎机
+            case OTHER -> "📄";               // 其他/文档
+        };
     }
 
     /**
      * 获取分类的颜色（用于UI显示，返回CSS颜色值）
+     * 使用 Switch 表达式（Java 25）
      */
     public String getColor() {
-        switch (this) {
-            case ABYSS: return "#8B0000";        // 深红色 - 深渊
-            case SKILL: return "#4169E1";        // 皇家蓝 - 技能
-            case ITEM: return "#DAA520";         // 金色 - 物品
-            case NPC: return "#228B22";          // 森林绿 - NPC
-            case NPC_AI: return "#006400";       // 深绿色 - AI
-            case QUEST: return "#FF8C00";        // 深橙色 - 任务
-            case INSTANCE: return "#800080";     // 紫色 - 副本
-            case SHOP: return "#FFD700";         // 金色 - 商店
-            case LUNA: return "#E6E6FA";         // 淡紫色 - Luna
-            case HOUSING: return "#8B4513";      // 棕色 - 房屋
-            case PET: return "#FF69B4";          // 粉色 - 宠物
-            case CRAFT: return "#CD853F";        // 秘鲁色 - 制作
-            case DROP: return "#32CD32";         // 酸橙绿 - 掉落
-            case ENCHANT: return "#00CED1";      // 深青色 - 强化
-            case STIGMA_TRANSFORM: return "#9400D3"; // 深紫色 - 烙印变身
-            case PLAYER_GROWTH: return "#00FF7F"; // 春绿色 - 成长
-            case TITLE: return "#FFB6C1";        // 浅粉色 - 称号
-            case LEGION: return "#4682B4";       // 钢蓝色 - 军团
-            case PVP_RANKING: return "#DC143C";  // 猩红色 - PVP
-            case PORTAL: return "#00BFFF";       // 深天蓝 - 传送
-            case TIME_EVENT: return "#FF4500";   // 橙红色 - 时间事件
-            case CLIENT_STRINGS: return "#708090"; // 石板灰 - 字符串
-            case ANIMATION: return "#9370DB";    // 中紫色 - 动画
-            case ANIMATION_MARKERS: return "#BA55D3"; // 中兰花紫 - 动画标记
-            case CHARACTER_PRESET: return "#DDA0DD"; // 梅红色 - 预设
-            case SUBZONE: return "#20B2AA";      // 浅海绿 - 副本区域
-            case ID_MAPPING: return "#778899";   // 浅石板灰 - ID映射
-            case GAME_CONFIG: return "#696969";  // 暗灰色 - 配置
-            case GOTCHA: return "#FF1493";       // 深粉色 - 抽卡
-            default: return "#A9A9A9";           // 深灰色 - 其他
-        }
+        return switch (this) {
+            case ABYSS -> "#8B0000";              // 深红色 - 深渊
+            case SKILL -> "#4169E1";              // 皇家蓝 - 技能
+            case ITEM -> "#DAA520";               // 金色 - 物品
+            case NPC -> "#228B22";                // 森林绿 - NPC
+            case NPC_AI -> "#006400";             // 深绿色 - AI
+            case QUEST -> "#FF8C00";              // 深橙色 - 任务
+            case INSTANCE -> "#800080";           // 紫色 - 副本
+            case SHOP -> "#FFD700";               // 金色 - 商店
+            case LUNA -> "#E6E6FA";               // 淡紫色 - Luna
+            case HOUSING -> "#8B4513";            // 棕色 - 房屋
+            case PET -> "#FF69B4";                // 粉色 - 宠物
+            case CRAFT -> "#CD853F";              // 秘鲁色 - 制作
+            case DROP -> "#32CD32";               // 酸橙绿 - 掉落
+            case ENCHANT -> "#00CED1";            // 深青色 - 强化
+            case STIGMA_TRANSFORM -> "#9400D3";   // 深紫色 - 烙印变身
+            case PLAYER_GROWTH -> "#00FF7F";      // 春绿色 - 成长
+            case TITLE -> "#FFB6C1";              // 浅粉色 - 称号
+            case LEGION -> "#4682B4";             // 钢蓝色 - 军团
+            case PVP_RANKING -> "#DC143C";        // 猩红色 - PVP
+            case PORTAL -> "#00BFFF";             // 深天蓝 - 传送
+            case TIME_EVENT -> "#FF4500";         // 橙红色 - 时间事件
+            case CLIENT_STRINGS -> "#708090";     // 石板灰 - 字符串
+            case ANIMATION -> "#9370DB";          // 中紫色 - 动画
+            case ANIMATION_MARKERS -> "#BA55D3";  // 中兰花紫 - 动画标记
+            case CHARACTER_PRESET -> "#DDA0DD";   // 梅红色 - 预设
+            case SUBZONE -> "#20B2AA";            // 浅海绿 - 副本区域
+            case ID_MAPPING -> "#778899";         // 浅石板灰 - ID映射
+            case GAME_CONFIG -> "#696969";        // 暗灰色 - 配置
+            case GOTCHA -> "#FF1493";             // 深粉色 - 抽卡
+            case OTHER -> "#A9A9A9";              // 深灰色 - 其他
+        };
     }
 }

@@ -1,0 +1,8 @@
+{
+	"file_path":"D:\\AionReal58\\AionMap\\客户端XML\\data\\China\\skills\\skills\\client_skill_charge.xml",
+	"xml_root_tag":"skill_charge_clients",
+	"list":[],
+	"xml_item_tag":"skill_charge_client",
+	"table_name":"client_skill_charge",
+	"sql":"select * from client_skill_charge order by CAST(id AS UNSIGNED) ASC"
+}

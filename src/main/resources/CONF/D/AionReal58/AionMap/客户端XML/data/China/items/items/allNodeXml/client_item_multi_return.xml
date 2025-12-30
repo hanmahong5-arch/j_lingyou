@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<client_item_multi_returns>
+  <client_item_multi_return>
+    <id/>
+    <name/>
+    <return_loc_list>
+      <data>
+        <return_alias/>
+        <return_worldid/>
+        <return_desc/>
+      </data>
+    </return_loc_list>
+  </client_item_multi_return>
+</client_item_multi_returns>

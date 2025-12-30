@@ -116,8 +116,8 @@ public class DataOperationCenterStage extends Stage {
     private ComboBox<TableSyncService.SyncDirection> syncDirectionCombo;
     private ComboBox<TableSyncService.ConflictResolution> conflictResolutionCombo;
 
-    // 状态
-    private final ExecutorService executor = Executors.newSingleThreadExecutor();
+    // 状态（虚拟线程）
+    private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
     private Task<?> currentTask;
     private final Stage ownerStage;
 

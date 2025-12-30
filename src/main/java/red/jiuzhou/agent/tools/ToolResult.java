@@ -4,49 +4,35 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 工具执行结果
+ * 工具执行结果（Record）
  *
- * 封装Agent工具执行后的返回数据
- * 支持多种结果类型：文本、表格、JSON等
+ * <p>封装Agent工具执行后的返回数据，支持多种结果类型
  *
- * @author yanxq
- * @date 2025-01-13
+ * @param success             执行是否成功
+ * @param type                结果类型
+ * @param message             文本消息
+ * @param tableData           表格数据
+ * @param columns             表头信息
+ * @param affectedRows        影响行数
+ * @param generatedSql        生成的SQL语句
+ * @param pendingConfirmation 是否需要确认
+ * @param previewData         预览数据
+ * @param extraData           额外数据
+ * @param operationId         操作ID
  */
-public class ToolResult {
-
-    /** 执行是否成功 */
-    private boolean success;
-
-    /** 结果类型 */
-    private ResultType type;
-
-    /** 文本消息（用于简单结果或错误信息） */
-    private String message;
-
-    /** 表格数据（用于查询结果） */
-    private List<Map<String, Object>> tableData;
-
-    /** 表头信息 */
-    private List<String> columns;
-
-    /** 影响行数（用于修改操作） */
-    private int affectedRows;
-
-    /** 生成的SQL语句 */
-    private String generatedSql;
-
-    /** 是否需要确认 */
-    private boolean pendingConfirmation;
-
-    /** 预览数据（修改前的数据快照） */
-    private List<Map<String, Object>> previewData;
-
-    /** 额外数据（灵活存储其他信息） */
-    private Map<String, Object> extraData;
-
-    /** 操作ID（用于后续确认或回滚） */
-    private String operationId;
-
+public record ToolResult(
+    boolean success,
+    ResultType type,
+    String message,
+    List<Map<String, Object>> tableData,
+    List<String> columns,
+    int affectedRows,
+    String generatedSql,
+    boolean pendingConfirmation,
+    List<Map<String, Object>> previewData,
+    Map<String, Object> extraData,
+    String operationId
+) {
     /**
      * 结果类型枚举
      */
@@ -71,35 +57,25 @@ public class ToolResult {
      * 创建成功的文本结果
      */
     public static ToolResult text(String message) {
-        ToolResult result = new ToolResult();
-        result.success = true;
-        result.type = ResultType.TEXT;
-        result.message = message;
-        return result;
+        return new ToolResult(true, ResultType.TEXT, message,
+            null, null, 0, null, false, null, null, null);
     }
 
     /**
      * 创建错误结果
      */
     public static ToolResult error(String errorMessage) {
-        ToolResult result = new ToolResult();
-        result.success = false;
-        result.type = ResultType.ERROR;
-        result.message = errorMessage;
-        return result;
+        return new ToolResult(false, ResultType.ERROR, errorMessage,
+            null, null, 0, null, false, null, null, null);
     }
 
     /**
      * 创建表格结果
      */
     public static ToolResult table(List<Map<String, Object>> data, List<String> columns) {
-        ToolResult result = new ToolResult();
-        result.success = true;
-        result.type = ResultType.TABLE;
-        result.tableData = data;
-        result.columns = columns;
-        result.message = String.format("查询返回 %d 条记录", data != null ? data.size() : 0);
-        return result;
+        String message = "查询返回 %d 条记录".formatted(data != null ? data.size() : 0);
+        return new ToolResult(true, ResultType.TABLE, message,
+            data, columns, 0, null, false, null, null, null);
     }
 
     /**
@@ -107,123 +83,76 @@ public class ToolResult {
      */
     public static ToolResult pendingConfirmation(String sql, List<Map<String, Object>> previewData,
                                                   int estimatedRows, String operationId) {
-        ToolResult result = new ToolResult();
-        result.success = true;
-        result.type = ResultType.PENDING_CONFIRMATION;
-        result.pendingConfirmation = true;
-        result.generatedSql = sql;
-        result.previewData = previewData;
-        result.affectedRows = estimatedRows;
-        result.operationId = operationId;
-        result.message = String.format("将影响 %d 行数据，请确认是否执行", estimatedRows);
-        return result;
+        String message = "将影响 %d 行数据，请确认是否执行".formatted(estimatedRows);
+        return new ToolResult(true, ResultType.PENDING_CONFIRMATION, message,
+            null, null, estimatedRows, sql, true, previewData, null, operationId);
+    }
+
+    /**
+     * 创建带自定义消息的待确认结果
+     */
+    public static ToolResult pendingConfirmation(String sql, List<Map<String, Object>> previewData,
+                                                  int estimatedRows, String operationId, String customMessage) {
+        return new ToolResult(true, ResultType.PENDING_CONFIRMATION, customMessage,
+            null, null, estimatedRows, sql, true, previewData, null, operationId);
     }
 
     /**
      * 创建分析报告结果
      */
     public static ToolResult analysis(String report, Map<String, Object> extraData) {
-        ToolResult result = new ToolResult();
-        result.success = true;
-        result.type = ResultType.ANALYSIS;
-        result.message = report;
-        result.extraData = extraData;
-        return result;
+        return new ToolResult(true, ResultType.ANALYSIS, report,
+            null, null, 0, null, false, null, extraData, null);
     }
 
-    // ========== Getter/Setter ==========
+    // ========== 兼容性方法（getter别名）==========
 
     public boolean isSuccess() {
         return success;
-    }
-
-    public void setSuccess(boolean success) {
-        this.success = success;
     }
 
     public ResultType getType() {
         return type;
     }
 
-    public void setType(ResultType type) {
-        this.type = type;
-    }
-
     public String getMessage() {
         return message;
-    }
-
-    public void setMessage(String message) {
-        this.message = message;
     }
 
     public List<Map<String, Object>> getTableData() {
         return tableData;
     }
 
-    public void setTableData(List<Map<String, Object>> tableData) {
-        this.tableData = tableData;
-    }
-
     public List<String> getColumns() {
         return columns;
-    }
-
-    public void setColumns(List<String> columns) {
-        this.columns = columns;
     }
 
     public int getAffectedRows() {
         return affectedRows;
     }
 
-    public void setAffectedRows(int affectedRows) {
-        this.affectedRows = affectedRows;
-    }
-
     public String getGeneratedSql() {
         return generatedSql;
-    }
-
-    public void setGeneratedSql(String generatedSql) {
-        this.generatedSql = generatedSql;
     }
 
     public boolean isPendingConfirmation() {
         return pendingConfirmation;
     }
 
-    public void setPendingConfirmation(boolean pendingConfirmation) {
-        this.pendingConfirmation = pendingConfirmation;
-    }
-
     public List<Map<String, Object>> getPreviewData() {
         return previewData;
-    }
-
-    public void setPreviewData(List<Map<String, Object>> previewData) {
-        this.previewData = previewData;
     }
 
     public Map<String, Object> getExtraData() {
         return extraData;
     }
 
-    public void setExtraData(Map<String, Object> extraData) {
-        this.extraData = extraData;
-    }
-
     public String getOperationId() {
         return operationId;
     }
 
-    public void setOperationId(String operationId) {
-        this.operationId = operationId;
-    }
-
     @Override
     public String toString() {
-        return String.format("ToolResult{success=%s, type=%s, message='%s'}",
-                success, type, message);
+        return "ToolResult{success=%s, type=%s, message='%s'}".formatted(success, type, message);
     }
 }

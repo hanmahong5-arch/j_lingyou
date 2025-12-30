@@ -1,0 +1,8 @@
+{
+	"file_path":"D:\\AionReal58\\AionMap\\XML\\Special01\\under_control_items_special01.xml",
+	"xml_root_tag":"under_control_items",
+	"list":[],
+	"xml_item_tag":"under_control_item",
+	"table_name":"under_control_items_special01",
+	"sql":"select * from under_control_items_special01 order by CAST(id AS UNSIGNED) ASC"
+}

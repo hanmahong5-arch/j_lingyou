@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<item_skill_enhances>
+  <item_skill_enhance>
+    <id/>
+    <name/>
+    <enchant_prob_list>
+      <data>
+        <enchant_prob/>
+      </data>
+    </enchant_prob_list>
+    <enchant_skill_list>
+      <data>
+        <skill_group_name/>
+        <skill_prob/>
+      </data>
+    </enchant_skill_list>
+  </item_skill_enhance>
+</item_skill_enhances>

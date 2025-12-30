@@ -1,0 +1,8 @@
+{
+	"file_path":"D:\\AionReal58\\AionMap\\XML\\item_standard_price.xml",
+	"xml_root_tag":"item_standard_prices",
+	"list":[],
+	"xml_item_tag":"level",
+	"table_name":"item_standard_price",
+	"sql":"select * from item_standard_price order by CAST(price AS UNSIGNED) ASC"
+}

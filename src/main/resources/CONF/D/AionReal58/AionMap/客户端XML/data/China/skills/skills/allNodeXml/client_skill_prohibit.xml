@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<skill_prohibits>
+  <id ID="1">
+    <desc/>
+    <limit_type/>
+    <allow_skill/>
+    <ban_skill/>
+    <clear_in_skill/>
+    <clear_out_skill/>
+  </id>
+</skill_prohibits>

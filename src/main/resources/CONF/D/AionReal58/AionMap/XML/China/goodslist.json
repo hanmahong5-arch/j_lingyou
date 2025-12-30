@@ -1,0 +1,17 @@
+{
+	"file_path":"D:\\AionReal58\\AionMap\\XML\\China\\goodslist.xml",
+	"xml_root_tag":"goodslists",
+	"list":[
+		{
+			"addDataNode":"goods_list",
+			"associatedFiled":"id",
+			"xml_tag":"data",
+			"db_column":"data",
+			"table_name":"goodslist__goods_list__data",
+			"sql":"select * from goodslist__goods_list__data where id = '#associated_filed' order by CAST(id AS UNSIGNED) ASC"
+		}
+	],
+	"xml_item_tag":"goodslist",
+	"table_name":"goodslist",
+	"sql":"select * from goodslist order by CAST(id AS UNSIGNED) ASC"
+}

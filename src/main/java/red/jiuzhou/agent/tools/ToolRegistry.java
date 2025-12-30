@@ -6,36 +6,27 @@ import org.slf4j.LoggerFactory;
 import java.util.*;
 
 /**
- * 工具注册中心
+ * 工具注册中心（枚举单例模式 - Java最佳实践）
  *
- * 管理所有可用的Agent工具
- * 提供工具查找和列表功能
+ * <p>管理所有可用的Agent工具，提供工具查找和列表功能。
+ * <p>使用枚举单例模式确保线程安全且防止反射攻击。
  *
  * @author yanxq
  * @date 2025-01-13
  */
-public class ToolRegistry {
+public enum ToolRegistry {
+    INSTANCE;
 
     private static final Logger log = LoggerFactory.getLogger(ToolRegistry.class);
 
     /** 工具映射表：名称 -> 工具实例 */
     private final Map<String, AgentTool> tools = new LinkedHashMap<>();
 
-    /** 单例实例 */
-    private static ToolRegistry instance;
-
-    private ToolRegistry() {
-        // 私有构造函数
-    }
-
     /**
-     * 获取单例实例
+     * 获取单例实例（兼容性方法）
      */
-    public static synchronized ToolRegistry getInstance() {
-        if (instance == null) {
-            instance = new ToolRegistry();
-        }
-        return instance;
+    public static ToolRegistry getInstance() {
+        return INSTANCE;
     }
 
     /**

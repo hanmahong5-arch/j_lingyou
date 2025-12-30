@@ -1,0 +1,8 @@
+{
+	"file_path":"D:\\AionReal58\\AionMap\\XML\\exceed_skillset.xml",
+	"xml_root_tag":"exceed_skillsets",
+	"list":[],
+	"xml_item_tag":"exceed_skillset",
+	"table_name":"exceed_skillset",
+	"sql":"select * from exceed_skillset order by CAST(id AS UNSIGNED) ASC"
+}

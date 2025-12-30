@@ -69,8 +69,8 @@ public class SearchableTreeView<T> extends VBox {
     private List<TreeItem<T>> matchedItems = new ArrayList<>();
     private int currentMatchIndex = -1;
 
-    // 线程池
-    private final ExecutorService searchExecutor = Executors.newSingleThreadExecutor();
+    // 搜索执行器（虚拟线程）
+    private final ExecutorService searchExecutor = Executors.newVirtualThreadPerTaskExecutor();
 
     // 回调
     private Consumer<TreeItem<T>> onItemSelected;
@@ -863,27 +863,178 @@ public class SearchableTreeView<T> extends VBox {
     }
 
     /**
-     * 展开所有节点
+     * 展开所有节点（异步分批优化版本）
      */
     public void expandAll() {
-        expandRecursively(treeView.getRoot(), true);
+        expandOrCollapseAllAsync(true);
     }
 
     /**
-     * 折叠所有节点
+     * 折叠所有节点（异步分批优化版本）
      */
     public void collapseAll() {
-        expandRecursively(treeView.getRoot(), false);
+        expandOrCollapseAllAsync(false);
     }
 
     /**
-     * 递归展开/折叠
+     * 异步分批展开/折叠所有节点
+     * 避免大量节点时阻塞UI线程
+     */
+    private void expandOrCollapseAllAsync(boolean expand) {
+        TreeItem<T> root = treeView.getRoot();
+        if (root == null) return;
+
+        // 禁用展开/折叠按钮，防止重复点击
+        expandAllBtn.setDisable(true);
+        collapseAllBtn.setDisable(true);
+
+        // 收集所有节点
+        javafx.concurrent.Task<List<TreeItem<T>>> collectTask = new javafx.concurrent.Task<>() {
+            @Override
+            protected List<TreeItem<T>> call() {
+                List<TreeItem<T>> allItems = new ArrayList<>();
+                collectItemsRecursively(root, allItems);
+                return allItems;
+            }
+
+            @Override
+            protected void succeeded() {
+                List<TreeItem<T>> allItems = getValue();
+                int totalItems = allItems.size();
+
+                if (totalItems == 0) {
+                    javafx.application.Platform.runLater(() -> {
+                        expandAllBtn.setDisable(false);
+                        collapseAllBtn.setDisable(false);
+                    });
+                    return;
+                }
+
+                // 更新状态
+                String operation = expand ? "展开" : "折叠";
+                javafx.application.Platform.runLater(() -> {
+                    statsLabel.setText(String.format("正在%s节点... 0/%d", operation, totalItems));
+                    statsLabel.setStyle("-fx-text-fill: #007bff; -fx-font-size: 11px;");
+                });
+
+                // 分批处理节点（每批50个）
+                int batchSize = 50;
+                int[] processed = {0};
+
+                javafx.concurrent.Task<Void> expandTask = new javafx.concurrent.Task<>() {
+                    @Override
+                    protected Void call() throws Exception {
+                        for (int i = 0; i < allItems.size(); i += batchSize) {
+                            final int start = i;
+                            final int end = Math.min(i + batchSize, allItems.size());
+                            final List<TreeItem<T>> batch = allItems.subList(start, end);
+
+                            // 在UI线程中更新节点展开状态
+                            javafx.application.Platform.runLater(() -> {
+                                for (TreeItem<T> item : batch) {
+                                    item.setExpanded(expand);
+                                }
+
+                                processed[0] += batch.size();
+                                statsLabel.setText(String.format("正在%s节点... %d/%d (%.1f%%)",
+                                        operation, processed[0], totalItems,
+                                        (processed[0] * 100.0 / totalItems)));
+                            });
+
+                            // 短暂休眠，让UI有时间响应
+                            Thread.sleep(10);
+                        }
+                        return null;
+                    }
+
+                    @Override
+                    protected void succeeded() {
+                        javafx.application.Platform.runLater(() -> {
+                            statsLabel.setText(String.format("%s完成！共 %,d 个节点", operation, totalItems));
+                            statsLabel.setStyle("-fx-text-fill: #28a745; -fx-font-size: 11px;");
+
+                            // 恢复按钮状态
+                            expandAllBtn.setDisable(false);
+                            collapseAllBtn.setDisable(false);
+
+                            // 3秒后恢复默认状态文本
+                            new java.util.Timer().schedule(new java.util.TimerTask() {
+                                @Override
+                                public void run() {
+                                    javafx.application.Platform.runLater(() -> {
+                                        statsLabel.setText("就绪");
+                                        statsLabel.setStyle("-fx-text-fill: #6c757d; -fx-font-size: 11px;");
+                                    });
+                                }
+                            }, 3000);
+                        });
+                    }
+
+                    @Override
+                    protected void failed() {
+                        Throwable ex = getException();
+                        log.error("节点{}失败: {}", operation, ex.getMessage(), ex);
+
+                        javafx.application.Platform.runLater(() -> {
+                            statsLabel.setText(operation + "失败: " + ex.getMessage());
+                            statsLabel.setStyle("-fx-text-fill: #dc3545; -fx-font-size: 11px;");
+
+                            expandAllBtn.setDisable(false);
+                            collapseAllBtn.setDisable(false);
+                        });
+                    }
+                };
+
+                // 启动展开/折叠任务
+                Thread expandThread = new Thread(expandTask);
+                expandThread.setDaemon(true);
+                expandThread.start();
+            }
+
+            @Override
+            protected void failed() {
+                Throwable ex = getException();
+                log.error("收集节点失败: {}", ex.getMessage(), ex);
+
+                javafx.application.Platform.runLater(() -> {
+                    statsLabel.setText("操作失败");
+                    statsLabel.setStyle("-fx-text-fill: #dc3545; -fx-font-size: 11px;");
+                    expandAllBtn.setDisable(false);
+                    collapseAllBtn.setDisable(false);
+                });
+            }
+        };
+
+        // 启动收集任务
+        Thread collectThread = new Thread(collectTask);
+        collectThread.setDaemon(true);
+        collectThread.start();
+    }
+
+    /**
+     * 递归收集所有TreeItem（用于分批处理）
+     */
+    private void collectItemsRecursively(TreeItem<T> item, List<TreeItem<T>> result) {
+        if (item == null) return;
+        result.add(item);
+        for (TreeItem<T> child : item.getChildren()) {
+            collectItemsRecursively(child, result);
+        }
+    }
+
+    /**
+     * 递归展开/折叠单个节点及其子节点（同步版本，用于右键菜单）
      */
     private void expandRecursively(TreeItem<T> item, boolean expand) {
         if (item == null) return;
-        item.setExpanded(expand);
-        for (TreeItem<T> child : item.getChildren()) {
-            expandRecursively(child, expand);
+
+        // 收集所有子节点
+        List<TreeItem<T>> allItems = new ArrayList<>();
+        collectItemsRecursively(item, allItems);
+
+        // 同步展开/折叠（因为通常是单个文件夹，节点不多）
+        for (TreeItem<T> treeItem : allItems) {
+            treeItem.setExpanded(expand);
         }
     }
 

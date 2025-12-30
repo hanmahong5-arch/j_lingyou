@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<rankings>
+  <ranking>
+    <id/>
+    <name/>
+    <rank_id/>
+    <rank_type/>
+    <point_calc_type/>
+    <rank_ui_type/>
+    <rank_name/>
+    <period_list>
+      <data>
+        <rank_period_no/>
+        <rank_period_start/>
+        <rank_period_end/>
+      </data>
+    </period_list>
+    <reward_type/>
+    <rank_list>
+      <data>
+        <rank/>
+        <value/>
+        <gold/>
+        <ap/>
+        <gp/>
+        <reward_item1_name/>
+        <reward_item1_count/>
+        <reward_item2_name/>
+        <reward_item2_count/>
+      </data>
+    </rank_list>
+    <rate_id/>
+  </ranking>
+</rankings>

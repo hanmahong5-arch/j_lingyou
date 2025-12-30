@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<housing_object_place_tags>
+  <housing_object_place_tag>
+    <id/>
+    <name/>
+    <personal_types_max/>
+    <personal_typea_max/>
+    <personal_typeb_max/>
+    <personal_typec_max/>
+    <personal_typed_max/>
+    <trial_personal_types_max/>
+    <trial_personal_typea_max/>
+    <trial_personal_typeb_max/>
+    <trial_personal_typec_max/>
+    <trial_personal_typed_max/>
+  </housing_object_place_tag>
+</housing_object_place_tags>

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<housing_buildings>
+  <housing_building>
+    <id/>
+    <name/>
+    <desc/>
+    <category/>
+    <type/>
+    <size/>
+    <tag/>
+    <default_roof/>
+    <default_outwall/>
+    <default_frame/>
+    <default_door/>
+    <default_inwall/>
+    <default_infloor/>
+    <default_garden/>
+    <default_fence/>
+  </housing_building>
+</housing_buildings>

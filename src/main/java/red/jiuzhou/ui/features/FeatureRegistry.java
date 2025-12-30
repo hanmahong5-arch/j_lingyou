@@ -4,10 +4,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 import red.jiuzhou.agent.ui.AgentChatStage;
+import red.jiuzhou.pattern.rule.ui.DesignRuleStage;
 import red.jiuzhou.ui.AionMechanismExplorerStage;
+import red.jiuzhou.ui.ConfigEditorStage;
 import red.jiuzhou.ui.DesignerInsightStage;
 import red.jiuzhou.ui.GameToolsStage;
 import red.jiuzhou.ui.MechanismRelationshipStage;
+import red.jiuzhou.ui.ServerKnowledgeStage;
 import red.jiuzhou.ui.ThemeStudioStage;
 
 /**
@@ -70,6 +73,38 @@ public final class FeatureRegistry {
                 "地图刷怪浏览与规划：浏览World目录刷怪配置、生成刷怪点坐标、概率模拟验证",
                 FeatureCategory.GAME_TOOLS,
                 new StageFeatureLauncher(GameToolsStage::new)
+        ));
+
+        features.add(new FeatureDescriptor(
+                "design-rule",
+                "设计规则",
+                "意图驱动的批量数据修改：定义规则自动应用到所有匹配记录，支持预览和回滚",
+                FeatureCategory.DESIGN_SYSTEM,
+                new StageFeatureLauncher(DesignRuleStage::new)
+        ));
+
+        features.add(new FeatureDescriptor(
+                "config-editor",
+                "配置管理",
+                "可视化查看和编辑应用配置文件（YAML、JSON），支持自动备份和格式验证",
+                FeatureCategory.DESIGN_SYSTEM,
+                new StageFeatureLauncher(ConfigEditorStage::new)
+        ));
+
+        features.add(new FeatureDescriptor(
+                "game-feature-wizard",
+                "游戏功能向导",
+                "基于模板创建副本、任务、活动等游戏功能，智能表单自动识别字段类型，从现有数据克隆生成新内容",
+                FeatureCategory.DESIGN_SYSTEM,
+                new StageFeatureLauncher(red.jiuzhou.ui.wizard.GameFeatureWizard::new)
+        ));
+
+        features.add(new FeatureDescriptor(
+                "server-knowledge",
+                "服务器知识浏览器",
+                "从102,825行服务器日志中提取的宝贵知识：49个黑名单字段、10条字段值修正规则、双服务器交叉验证结果",
+                FeatureCategory.ANALYTICS,
+                new StageFeatureLauncher(ServerKnowledgeStage::new)
         ));
 
         // TODO: 以下特性暂未实现，待添加对应的Stage类

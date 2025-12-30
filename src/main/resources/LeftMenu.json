@@ -24405,14 +24405,6 @@
 					"name":"NpcAIPatterns_Test_Bemaniax"
 				},
 				{
-					"path":"D:\\AionReal58\\AionMap\\XML\\NpcAIPatterns_Test_CYS.xml",
-					"name":"NpcAIPatterns_Test_CYS"
-				},
-				{
-					"path":"D:\\AionReal58\\AionMap\\XML\\NpcAIPatterns_TEST_GHB.xml",
-					"name":"NpcAIPatterns_TEST_GHB"
-				},
-				{
 					"path":"D:\\AionReal58\\AionMap\\XML\\NpcAIPatterns_TEST_hue.xml",
 					"name":"NpcAIPatterns_TEST_hue"
 				},
@@ -24441,10 +24433,6 @@
 					"name":"NpcAIPatterns_TEST_kdg"
 				},
 				{
-					"path":"D:\\AionReal58\\AionMap\\XML\\NpcAIPatterns_TEST_kgw.xml",
-					"name":"NpcAIPatterns_TEST_kgw"
-				},
-				{
 					"path":"D:\\AionReal58\\AionMap\\XML\\NpcAIPatterns_Test_KJH.xml",
 					"name":"NpcAIPatterns_Test_KJH"
 				},
@@ -24461,24 +24449,8 @@
 					"name":"NPCAIPatterns_Test_ksg"
 				},
 				{
-					"path":"D:\\AionReal58\\AionMap\\XML\\NpcAIPatterns_TEST_ksj0927_01.xml",
-					"name":"NpcAIPatterns_TEST_ksj0927_01"
-				},
-				{
 					"path":"D:\\AionReal58\\AionMap\\XML\\NpcAIPatterns_Test_KTW.xml",
 					"name":"NpcAIPatterns_Test_KTW"
-				},
-				{
-					"path":"D:\\AionReal58\\AionMap\\XML\\NpcAIPatterns_TEST_KYJ.xml",
-					"name":"NpcAIPatterns_TEST_KYJ"
-				},
-				{
-					"path":"D:\\AionReal58\\AionMap\\XML\\NpcAIPatterns_TEST_LHJ.xml",
-					"name":"NpcAIPatterns_TEST_LHJ"
-				},
-				{
-					"path":"D:\\AionReal58\\AionMap\\XML\\NpcAIPatterns_TEST_lswoo.xml",
-					"name":"NpcAIPatterns_TEST_lswoo"
 				},
 				{
 					"path":"D:\\AionReal58\\AionMap\\XML\\NpcAIPatterns_TEST_MJ.xml",
@@ -24489,10 +24461,6 @@
 					"name":"NpcAIPatterns_Test_PYJ"
 				},
 				{
-					"path":"D:\\AionReal58\\AionMap\\XML\\NpcAIPatterns_TEST_SNR.xml",
-					"name":"NpcAIPatterns_TEST_SNR"
-				},
-				{
 					"path":"D:\\AionReal58\\AionMap\\XML\\NpcAIPatterns_TEST_SSH.xml",
 					"name":"NpcAIPatterns_TEST_SSH"
 				},
@@ -24501,32 +24469,12 @@
 					"name":"NpcAIPatterns_TEST_sunflare"
 				},
 				{
-					"path":"D:\\AionReal58\\AionMap\\XML\\NpcAIPatterns_TEST_SYSTEM1.xml",
-					"name":"NpcAIPatterns_TEST_SYSTEM1"
-				},
-				{
-					"path":"D:\\AionReal58\\AionMap\\XML\\NpcAIPatterns_TEST_TAIKEN.xml",
-					"name":"NpcAIPatterns_TEST_TAIKEN"
-				},
-				{
-					"path":"D:\\AionReal58\\AionMap\\XML\\NpcAIPatterns_TEST_worldevent.xml",
-					"name":"NpcAIPatterns_TEST_worldevent"
-				},
-				{
-					"path":"D:\\AionReal58\\AionMap\\XML\\NpcAIPatterns_Test_WSY.xml",
-					"name":"NpcAIPatterns_Test_WSY"
-				},
-				{
 					"path":"D:\\AionReal58\\AionMap\\XML\\NpcAIPatterns_Test_YJH.xml",
 					"name":"NpcAIPatterns_Test_YJH"
 				},
 				{
 					"path":"D:\\AionReal58\\AionMap\\XML\\NpcAIPatterns_Test_YZH.xml",
 					"name":"NpcAIPatterns_Test_YZH"
-				},
-				{
-					"path":"D:\\AionReal58\\AionMap\\XML\\NpcAIPatterns_TiamatHard_SSH.xml",
-					"name":"NpcAIPatterns_TiamatHard_SSH"
 				},
 				{
 					"path":"D:\\AionReal58\\AionMap\\XML\\NpcAIPatterns_Tiamat_hue.xml",

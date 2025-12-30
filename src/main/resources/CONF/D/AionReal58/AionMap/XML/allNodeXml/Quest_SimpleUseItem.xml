@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<quest_simpleuseitems>
+  <id id="1107">
+    <dev_name/>
+    <use_item_name/>
+    <reward_npc_name/>
+    <talk_npc1/>
+    <talk_npc2/>
+    <talk_npc3/>
+    <give_item3/>
+    <remove_item3/>
+    <remove_item2/>
+    <give_item1/>
+    <remove_item1/>
+    <give_item2/>
+    <con_quest/>
+    <item_check/>
+  </id>
+</quest_simpleuseitems>

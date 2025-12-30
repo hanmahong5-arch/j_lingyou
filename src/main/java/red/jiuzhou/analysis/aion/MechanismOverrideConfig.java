@@ -1,6 +1,7 @@
 package red.jiuzhou.analysis.aion;
 
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
 
 import java.io.File;
@@ -25,8 +26,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * @author Claude Sonnet 4.5
  * @date 2025-12-21
  */
-@Slf4j
 public class MechanismOverrideConfig {
+    private static final Logger log = LoggerFactory.getLogger(MechanismOverrideConfig.class);
 
     /** 配置文件路径 */
     private static final String CONFIG_FILE = "mechanism_manual_overrides.yml";

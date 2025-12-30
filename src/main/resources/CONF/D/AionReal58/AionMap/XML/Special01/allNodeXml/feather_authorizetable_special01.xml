@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<feather_authorizetables generated_time="2015/04/27 17:37:55">
+  <feather_authorizetable>
+    <id/>
+    <name/>
+    <tshirt_attr_list>
+      <data>
+        <index/>
+        <attr_name/>
+        <attr_value/>
+        <random_authorize/>
+        <random_range/>
+        <random_prob/>
+      </data>
+    </tshirt_attr_list>
+  </feather_authorizetable>
+</feather_authorizetables>

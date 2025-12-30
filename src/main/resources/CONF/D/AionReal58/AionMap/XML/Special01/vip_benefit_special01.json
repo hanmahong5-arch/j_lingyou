@@ -1,0 +1,8 @@
+{
+	"file_path":"D:\\AionReal58\\AionMap\\XML\\Special01\\vip_benefit_special01.xml",
+	"xml_root_tag":"vip_benefits",
+	"list":[],
+	"xml_item_tag":"vip_benefit",
+	"table_name":"vip_benefit_special01",
+	"sql":"select * from vip_benefit_special01 order by CAST(id AS UNSIGNED) ASC"
+}
