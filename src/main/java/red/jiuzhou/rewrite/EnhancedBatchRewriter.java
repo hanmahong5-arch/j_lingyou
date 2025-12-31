@@ -4,7 +4,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.w3c.dom.*;
-import red.jiuzhou.ai.*;
+import dev.langchain4j.model.chat.ChatLanguageModel;
+import red.jiuzhou.langchain.LangChainModelFactory;
+import red.jiuzhou.util.SpringContextHolder;
 import red.jiuzhou.search.GlobalSearchEngine;
 
 import javax.xml.parsers.DocumentBuilder;
@@ -306,24 +308,24 @@ public class EnhancedBatchRewriter {
     }
 
     /**
-     * 执行AI改写
+     * 执行AI改写（使用 LangChain4j）
      */
     private String performAIRewrite(String original, RewriteOptions options) throws Exception {
         if (options.getAiPrompt() == null || options.getAiPrompt().isEmpty()) {
             return original;
         }
 
-        // 获取AI客户端
-        AiModelClient aiClient = AiModelFactory.getClient(options.getAiModel());
-        if (aiClient == null) {
+        // 获取 LangChain4j 模型
+        ChatLanguageModel chatModel = getModelFactory().getModel(options.getAiModel());
+        if (chatModel == null) {
             throw new IllegalArgumentException("Unknown AI model: " + options.getAiModel());
         }
 
         // 构建完整提示词
         String fullPrompt = options.getAiPrompt() + "\n\n原始内容：\n" + original;
 
-        // 调用AI
-        String result = aiClient.chat(fullPrompt);
+        // 调用 LangChain4j
+        String result = chatModel.generate(fullPrompt);
 
         // 如果需要缓存，保存结果
         if (options.isCacheAI()) {
@@ -331,6 +333,13 @@ public class EnhancedBatchRewriter {
         }
 
         return result;
+    }
+
+    /**
+     * 获取模型工厂
+     */
+    private LangChainModelFactory getModelFactory() {
+        return SpringContextHolder.getBean(LangChainModelFactory.class);
     }
 
     /**

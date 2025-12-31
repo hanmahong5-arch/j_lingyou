@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<quest_data_drivens>
+  <quest_data_driven>
+    <id/>
+    <name/>
+    <dev_name/>
+    <category_acquire_/>
+    <value0_acquire_/>
+    <reward_npc_name/>
+    <progress_info>
+      <data>
+        <category_progress_/>
+        <value0_progress_/>
+        <value1_progress_/>
+        <value2_progress_/>
+        <value3_progress_/>
+        <value5_progress_/>
+        <value4_progress_/>
+        <value7_progress_/>
+        <value9_progress_/>
+        <value8_progress_/>
+        <value6_progress_/>
+        <value10_progress_/>
+      </data>
+    </progress_info>
+    <value1_acquire_/>
+    <con_quest/>
+    <value4_acquire_/>
+    <value3_acquire_/>
+    <value10_acquire_/>
+    <con_quest_list/>
+  </quest_data_driven>
+</quest_data_drivens>

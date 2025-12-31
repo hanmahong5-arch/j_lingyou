@@ -2,8 +2,9 @@ package red.jiuzhou.analysis.enhanced;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import red.jiuzhou.ai.AiModelClient;
-import red.jiuzhou.ai.AiModelFactory;
+import dev.langchain4j.model.chat.ChatLanguageModel;
+import red.jiuzhou.langchain.LangChainModelFactory;
+import red.jiuzhou.util.SpringContextHolder;
 import red.jiuzhou.util.YamlUtils;
 
 import java.time.LocalDateTime;
@@ -20,13 +21,20 @@ public class SmartInsightEngine {
 
     private static final Logger log = LoggerFactory.getLogger(SmartInsightEngine.class);
 
-    private final AiModelClient aiClient;
+    private final ChatLanguageModel chatModel;
     private final boolean aiEnabled;
 
     public SmartInsightEngine() {
         this.aiEnabled = "true".equalsIgnoreCase(YamlUtils.getProperty("ai.insight.enabled"));
-        this.aiClient = aiEnabled ? AiModelFactory.getClient("qwen") : null;
-        log.info("智能洞察引擎初始化完成，AI增强: {}", aiEnabled ? "启用" : "禁用");
+        this.chatModel = aiEnabled ? getModelFactory().getModel("qwen") : null;
+        log.info("智能洞察引擎初始化完成 (LangChain4j)，AI增强: {}", aiEnabled ? "启用" : "禁用");
+    }
+
+    /**
+     * 获取模型工厂
+     */
+    private static LangChainModelFactory getModelFactory() {
+        return SpringContextHolder.getBean(LangChainModelFactory.class);
     }
 
     /**
@@ -591,8 +599,8 @@ public class SmartInsightEngine {
             // 构建AI分析提示
             String prompt = buildAIPrompt(context, existingInsights);
 
-            log.debug("发送AI分析请求...");
-            String aiResponse = aiClient.chat(prompt);
+            log.debug("发送AI分析请求 (LangChain4j)...");
+            String aiResponse = chatModel.generate(prompt);
 
             // 解析AI响应并生成洞察
             SmartInsight aiInsight = parseAIResponse(aiResponse, context);

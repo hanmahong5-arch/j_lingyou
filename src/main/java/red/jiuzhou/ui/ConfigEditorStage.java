@@ -30,6 +30,10 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.function.Predicate;
+import javafx.animation.KeyFrame;
+import javafx.animation.KeyValue;
+import javafx.animation.Timeline;
+import javafx.util.Duration;
 
 /**
  * 配置文件编辑器 v2.0
@@ -1912,6 +1916,259 @@ public class ConfigEditorStage extends Stage {
             return ConfigFileEntry.ConfigCategory.MENU;
         }
         return ConfigFileEntry.ConfigCategory.OTHER;
+    }
+
+    // ==================== 导航和高亮方法 (世界级错误处理系统) ====================
+
+    /**
+     * 导航到指定的配置键
+     * @param configKey 配置键，如 "ai.qwen.apikey"
+     */
+    public void navigateToKey(String configKey) {
+        if (configKey == null || configKey.isEmpty()) return;
+
+        // 首先确保加载了 application.yml
+        loadApplicationYml();
+
+        Platform.runLater(() -> {
+            String content = editorArea.getText();
+            int lineNum = findConfigKeyLine(content, configKey);
+
+            if (lineNum > 0) {
+                gotoLine(lineNum);
+                highlightLine(lineNum);
+                log.info("导航到配置键: {} (第{}行)", configKey, lineNum);
+            } else {
+                log.warn("未找到配置键: {}", configKey);
+                setStatus("未找到配置项: " + configKey, true);
+            }
+        });
+    }
+
+    /**
+     * 加载 application.yml 文件
+     */
+    private void loadApplicationYml() {
+        // 查找 application.yml 配置项
+        for (ConfigFileEntry entry : configService.discoverConfigFiles()) {
+            if (entry.getFileName().equals("application.yml")) {
+                loadConfigFile(entry);
+                break;
+            }
+        }
+    }
+
+    /**
+     * 跳转到指定行号
+     * @param lineNum 行号 (1-based)
+     */
+    public void gotoLine(int lineNum) {
+        if (lineNum <= 0) return;
+
+        Platform.runLater(() -> {
+            String text = editorArea.getText();
+            String[] lines = text.split("\n", -1);
+
+            if (lineNum > lines.length) {
+                lineNum = lines.length;
+            }
+
+            // 计算目标位置
+            int targetPos = 0;
+            for (int i = 0; i < lineNum - 1 && i < lines.length; i++) {
+                targetPos += lines[i].length() + 1;
+            }
+
+            // 设置光标位置
+            editorArea.positionCaret(targetPos);
+            editorArea.requestFocus();
+
+            // 选中整行
+            int lineEnd = targetPos + (lineNum <= lines.length ? lines[lineNum - 1].length() : 0);
+            editorArea.selectRange(targetPos, lineEnd);
+
+            // 滚动到可见区域
+            scrollToLine(lineNum);
+        });
+    }
+
+    /**
+     * 高亮指定行
+     * @param lineNum 行号
+     */
+    public void highlightLine(int lineNum) {
+        Platform.runLater(() -> {
+            // 更新行号面板高亮
+            updateLineNumberHighlight(lineNum);
+
+            // 闪烁动画
+            animateHighlight();
+        });
+    }
+
+    /**
+     * 高亮指定范围
+     * @param startLine 起始行
+     * @param startCol 起始列
+     * @param endLine 结束行
+     * @param endCol 结束列
+     */
+    public void highlightRange(int startLine, int startCol, int endLine, int endCol) {
+        Platform.runLater(() -> {
+            String text = editorArea.getText();
+            String[] lines = text.split("\n", -1);
+
+            // 计算起始位置
+            int startPos = 0;
+            for (int i = 0; i < startLine - 1 && i < lines.length; i++) {
+                startPos += lines[i].length() + 1;
+            }
+            startPos += Math.max(0, startCol - 1);
+
+            // 计算结束位置
+            int endPos = 0;
+            for (int i = 0; i < endLine - 1 && i < lines.length; i++) {
+                endPos += lines[i].length() + 1;
+            }
+            endPos += endCol;
+
+            // 选中范围
+            editorArea.selectRange(startPos, endPos);
+            editorArea.requestFocus();
+
+            // 闪烁动画
+            animateHighlight();
+        });
+    }
+
+    /**
+     * 滚动到指定行
+     */
+    private void scrollToLine(int lineNum) {
+        String text = editorArea.getText();
+        int totalLines = text.split("\n", -1).length;
+
+        if (totalLines > 0) {
+            double scrollPos = (double) (lineNum - 1) / totalLines;
+            scrollPos = Math.max(0, Math.min(1, scrollPos - 0.1)); // 稍微往上一点
+            editorScrollPane.setVvalue(scrollPos);
+        }
+    }
+
+    /**
+     * 更新行号高亮
+     */
+    private void updateLineNumberHighlight(int highlightLine) {
+        for (int i = 0; i < lineNumberPane.getChildren().size(); i++) {
+            Node node = lineNumberPane.getChildren().get(i);
+            if (node instanceof Label) {
+                Label label = (Label) node;
+                if (i == highlightLine - 1) {
+                    label.setStyle("-fx-background-color: #fff3e0; -fx-text-fill: #e65100; " +
+                        "-fx-font-weight: bold; -fx-padding: 0 5;");
+                } else {
+                    label.setStyle("-fx-text-fill: #858585; -fx-padding: 0 5;");
+                }
+            }
+        }
+    }
+
+    /**
+     * 高亮闪烁动画
+     */
+    private void animateHighlight() {
+        String originalStyle = editorArea.getStyle();
+        String highlightStyle = originalStyle +
+            " -fx-border-color: #ff9800; -fx-border-width: 2;";
+
+        Timeline timeline = new Timeline(
+            new KeyFrame(Duration.ZERO,
+                new KeyValue(editorArea.styleProperty(), highlightStyle)),
+            new KeyFrame(Duration.millis(200)),
+            new KeyFrame(Duration.millis(400),
+                new KeyValue(editorArea.styleProperty(), originalStyle)),
+            new KeyFrame(Duration.millis(600),
+                new KeyValue(editorArea.styleProperty(), highlightStyle)),
+            new KeyFrame(Duration.millis(800),
+                new KeyValue(editorArea.styleProperty(), originalStyle))
+        );
+
+        timeline.play();
+    }
+
+    /**
+     * 查找配置键所在的行号
+     * @return 行号 (1-based)，未找到返回 -1
+     */
+    private int findConfigKeyLine(String content, String configKey) {
+        if (content == null || configKey == null) return -1;
+
+        String[] lines = content.split("\n");
+        String[] keyParts = configKey.split("\\.");
+
+        int currentIndent = -1;
+        int targetPartIndex = 0;
+
+        for (int i = 0; i < lines.length; i++) {
+            String line = lines[i];
+            int indent = countLeadingSpaces(line);
+            String trimmed = line.trim();
+
+            // 跳过空行和注释
+            if (trimmed.isEmpty() || trimmed.startsWith("#")) {
+                continue;
+            }
+
+            // 检查当前层级的键
+            String currentKey = keyParts[targetPartIndex];
+            if (trimmed.startsWith(currentKey + ":") ||
+                trimmed.startsWith(currentKey + " :")) {
+
+                if (targetPartIndex == keyParts.length - 1) {
+                    return i + 1; // 找到目标行
+                }
+
+                // 进入下一层
+                currentIndent = indent;
+                targetPartIndex++;
+            } else if (indent <= currentIndent && targetPartIndex > 0) {
+                // 缩进变小，说明离开了当前层级，重置搜索
+                targetPartIndex = 0;
+                currentIndent = -1;
+
+                // 重新检查当前行
+                if (trimmed.startsWith(keyParts[0] + ":") ||
+                    trimmed.startsWith(keyParts[0] + " :")) {
+                    currentIndent = indent;
+                    targetPartIndex = 1;
+                }
+            }
+        }
+
+        return -1;
+    }
+
+    /**
+     * 计算前导空格数
+     */
+    private int countLeadingSpaces(String line) {
+        int count = 0;
+        for (char c : line.toCharArray()) {
+            if (c == ' ') count++;
+            else if (c == '\t') count += 2; // tab算2个空格
+            else break;
+        }
+        return count;
+    }
+
+    /**
+     * 设置状态消息
+     */
+    private void setStatus(String message, boolean isError) {
+        Platform.runLater(() -> {
+            statusLabel.setText(message);
+            statusLabel.setStyle("-fx-text-fill: " + (isError ? "#d32f2f" : "#666") + ";");
+        });
     }
 
     // ==================== 自定义单元格 ====================

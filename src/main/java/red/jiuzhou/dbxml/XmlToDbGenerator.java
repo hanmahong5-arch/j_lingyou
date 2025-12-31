@@ -9,7 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.TransactionStatus;
-import red.jiuzhou.ai.DashScopeBatchHelper;
+import red.jiuzhou.langchain.tools.LangChainBatchHelper;
 import red.jiuzhou.util.AliyunTranslateUtil;
 import red.jiuzhou.util.DatabaseUtil;
 import red.jiuzhou.util.YamlUtils;
@@ -162,7 +162,7 @@ public class XmlToDbGenerator {
         if(selectedColumns != null){
             log.info("selectedColumns：{}", selectedColumns.toString());
             selectedColumns.forEach(column -> {
-                DashScopeBatchHelper.rewriteField(mainTabList, table.getTableName(), column, aiModule);
+                LangChainBatchHelper.rewriteField(mainTabList, table.getTableName(), column, aiModule);
 
                 int[] len = {DatabaseUtil.getColumnLength(table.getTableName(), column)};
                 mainTabList.forEach(itemMap -> {

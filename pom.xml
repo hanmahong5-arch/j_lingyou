@@ -41,6 +41,9 @@
         <volcengine.version>0.2.48</volcengine.version>
         <slf4j.version>2.0.16</slf4j.version>
         <junit.version>5.11.3</junit.version>
+
+        <!-- LangChain4j 版本 -->
+        <langchain4j.version>1.0.0-beta1</langchain4j.version>
     </properties>
 
     <dependencies>
@@ -209,6 +212,32 @@
             <groupId>com.volcengine</groupId>
             <artifactId>volcengine-java-sdk-ark-runtime</artifactId>
             <version>${volcengine.version}</version>
+        </dependency>
+
+        <!-- ==================== LangChain4j 框架 ==================== -->
+        <!-- LangChain4j 核心 -->
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j</artifactId>
+            <version>${langchain4j.version}</version>
+        </dependency>
+        <!-- 通义千问 DashScope 官方支持 -->
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j-community-dashscope</artifactId>
+            <version>${langchain4j.version}</version>
+        </dependency>
+        <!-- OpenAI 兼容模型 (DeepSeek/Kimi等) -->
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j-open-ai</artifactId>
+            <version>${langchain4j.version}</version>
+        </dependency>
+        <!-- RAG: 内存向量存储和嵌入支持 -->
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j-easy-rag</artifactId>
+            <version>${langchain4j.version}</version>
         </dependency>
 
         <!-- ==================== 日志 ==================== -->

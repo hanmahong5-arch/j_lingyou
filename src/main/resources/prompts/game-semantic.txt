@@ -1,0 +1,69 @@
+# 游戏语义映射
+
+## 装备品质
+| 游戏术语 | 数据库字段 | 值 |
+|---------|-----------|-----|
+| 白色/普通 | quality | 1 |
+| 绿色/优秀 | quality | 2 |
+| 蓝色/稀有 | quality | 3 |
+| 紫色/史诗/紫装 | quality | 4 |
+| 橙色/传说/金装 | quality | 5 |
+| 红色/神器 | quality | 6 |
+
+## 装备类型
+| 游戏术语 | 数据库字段 | 值 |
+|---------|-----------|-----|
+| 武器 | equipment_type | 1 |
+| 防具/盔甲 | equipment_type | 2 |
+| 饰品/首饰 | equipment_type | 3 |
+
+## 物品类型
+| 游戏术语 | 数据库字段 | 值 |
+|---------|-----------|-----|
+| 消耗品 | item_type | consumable |
+| 材料 | item_type | material |
+| 装备 | item_type | equipment |
+| 任务物品 | item_type | quest |
+
+## NPC 类型
+| 游戏术语 | 数据库字段 | 值 |
+|---------|-----------|-----|
+| BOSS/首领 | npc_type | boss |
+| 精英怪 | npc_type | elite |
+| 普通怪 | npc_type | normal |
+| 友好NPC | is_hostile | 0 |
+| 敌对NPC | is_hostile | 1 |
+
+## 技能类型
+| 游戏术语 | 数据库字段 | 值 |
+|---------|-----------|-----|
+| 主动技能 | skill_type | active |
+| 被动技能 | skill_type | passive |
+| 天赋技能 | skill_type | talent |
+
+## 任务类型
+| 游戏术语 | 数据库字段 | 值 |
+|---------|-----------|-----|
+| 主线任务 | quest_type | main |
+| 支线任务 | quest_type | side |
+| 日常任务 | quest_type | daily |
+| 周常任务 | quest_type | weekly |
+
+## 等级相关
+| 游戏术语 | 数据库字段 |
+|---------|-----------|
+| 物品等级 | level |
+| 等级需求 | require_level |
+| 最低等级 | min_level |
+| 最高等级 | max_level |
+
+## 数值字段
+| 游戏术语 | 数据库字段 |
+|---------|-----------|
+| 攻击力 | attack, atk |
+| 防御力 | defense, def |
+| 生命值 | hp, health |
+| 魔法值 | mp, mana |
+| 冷却时间 | cooldown, cd |
+| 持续时间 | duration |
+| 伤害值 | damage |

@@ -28,6 +28,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.util.StringUtils;
 import red.jiuzhou.analysis.aion.IdNameResolver;
 import red.jiuzhou.dbxml.*;
+import red.jiuzhou.agent.context.ContextCollector;
+import red.jiuzhou.agent.context.DesignContext;
 import red.jiuzhou.ui.components.OperationLogPanel;
 import red.jiuzhou.util.DatabaseUtil;
 import red.jiuzhou.util.JSONRecord;
@@ -48,6 +50,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 /**
  * @className: red.jiuzhou.ui.PaginatedTable.java
@@ -79,6 +82,12 @@ public class PaginatedTable{
 
     // 操作日志面板
     private OperationLogPanel logPanel;
+
+    // AI操作回调（用于集成AI助手）
+    private BiConsumer<DesignContext, String> onAiOperation;
+
+    // 上下文收集器
+    private final ContextCollector contextCollector = new ContextCollector();
 
     public VBox createVbox(TabPane tabPane, Tab tab) {
         long startTime = System.currentTimeMillis();
@@ -129,6 +138,9 @@ public class PaginatedTable{
                     Clipboard.getSystemClipboard().setContent(clipboardContent);
                 }
             });
+
+            // 设置行工厂，支持右键菜单（包含AI操作）
+            setupRowContextMenu();
 
             createColumns();
 
@@ -1388,6 +1400,139 @@ public class PaginatedTable{
         Thread countThread = new Thread(countTask);
         countThread.setDaemon(true);
         countThread.start();
+    }
+
+    /**
+     * 设置行右键菜单（包含AI操作）
+     */
+    private void setupRowContextMenu() {
+        tableView.setRowFactory(tv -> {
+            TableRow<Map<String, Object>> row = new TableRow<>();
+
+            // 创建右键菜单
+            ContextMenu contextMenu = new ContextMenu();
+
+            // 复制菜单项
+            MenuItem copyItem = new MenuItem("复制选中数据");
+            copyItem.setOnAction(e -> {
+                Map<String, Object> item = row.getItem();
+                if (item != null) {
+                    StringBuilder sb = new StringBuilder();
+                    item.forEach((k, v) -> sb.append(k).append(": ").append(v).append("\n"));
+                    ClipboardContent content = new ClipboardContent();
+                    content.putString(sb.toString());
+                    Clipboard.getSystemClipboard().setContent(content);
+                    if (logPanel != null) logPanel.info("已复制到剪贴板");
+                }
+            });
+
+            // ==================== AI 助手菜单（按设计师意图分类） ====================
+            Menu aiMenu = new Menu("🤖 问问AI");
+
+            // 一、我想了解...（认知/学习）
+            Menu understandMenu = new Menu("🤔 我想了解...");
+            MenuItem whatIsThis = new MenuItem("这是什么？有什么用？");
+            whatIsThis.setOnAction(e -> triggerAiOperation(row.getItem(), "what_is_this"));
+            MenuItem whatDoNumbersMean = new MenuItem("这些数值代表什么？");
+            whatDoNumbersMean.setOnAction(e -> triggerAiOperation(row.getItem(), "explain_numbers"));
+            MenuItem whatRelated = new MenuItem("它关联了哪些数据？");
+            whatRelated.setOnAction(e -> triggerAiOperation(row.getItem(), "show_relations"));
+            understandMenu.getItems().addAll(whatIsThis, whatDoNumbersMean, whatRelated);
+
+            // 二、帮我评估...（判断/决策）
+            Menu evaluateMenu = new Menu("⚖️ 帮我评估...");
+            MenuItem isBalanced = new MenuItem("数值平衡吗？");
+            isBalanced.setOnAction(e -> triggerAiOperation(row.getItem(), "check_balance"));
+            MenuItem compareWithOthers = new MenuItem("跟同类比怎么样？");
+            compareWithOthers.setOnAction(e -> triggerAiOperation(row.getItem(), "compare_similar"));
+            MenuItem playerExperience = new MenuItem("玩家体验会如何？");
+            playerExperience.setOnAction(e -> triggerAiOperation(row.getItem(), "predict_experience"));
+            evaluateMenu.getItems().addAll(isBalanced, compareWithOthers, playerExperience);
+
+            // 三、帮我找...（搜索/发现）
+            Menu findMenu = new Menu("🔍 帮我找...");
+            MenuItem findSimilar = new MenuItem("类似的配置");
+            findSimilar.setOnAction(e -> triggerAiOperation(row.getItem(), "find_similar"));
+            MenuItem findRelated = new MenuItem("相关的数据");
+            findRelated.setOnAction(e -> triggerAiOperation(row.getItem(), "find_related"));
+            findMenu.getItems().addAll(findSimilar, findRelated);
+
+            // 四、帮我改进...（优化/生成）
+            Menu improveMenu = new Menu("✨ 帮我改进...");
+            MenuItem giveSuggestions = new MenuItem("给点优化建议");
+            giveSuggestions.setOnAction(e -> triggerAiOperation(row.getItem(), "suggest_improvements"));
+            MenuItem createVariant = new MenuItem("生成一个变体");
+            createVariant.setOnAction(e -> triggerAiOperation(row.getItem(), "generate_variant"));
+            improveMenu.getItems().addAll(giveSuggestions, createVariant);
+
+            aiMenu.getItems().addAll(understandMenu, evaluateMenu, findMenu, improveMenu);
+
+            // 分隔线
+            SeparatorMenuItem separator = new SeparatorMenuItem();
+
+            contextMenu.getItems().addAll(copyItem, separator, aiMenu);
+
+            // 仅在有数据的行上显示菜单
+            row.contextMenuProperty().bind(
+                javafx.beans.binding.Bindings.when(row.emptyProperty())
+                    .then((ContextMenu) null)
+                    .otherwise(contextMenu)
+            );
+
+            return row;
+        });
+    }
+
+    /**
+     * 触发AI操作
+     */
+    private void triggerAiOperation(Map<String, Object> rowData, String operationType) {
+        if (onAiOperation == null) {
+            log.warn("AI操作回调未设置");
+            if (logPanel != null) {
+                logPanel.warning("AI助手未启用，请先配置AI服务");
+            }
+            return;
+        }
+
+        if (rowData == null || rowData.isEmpty()) {
+            if (logPanel != null) {
+                logPanel.warning("请先选择一行数据");
+            }
+            return;
+        }
+
+        // 收集上下文
+        DesignContext context = contextCollector.collectFromTableRow(tabName, rowData);
+        log.info("触发AI操作: {} - 表: {} - 行数据: {}", operationType, tabName, rowData);
+
+        // 调用回调
+        onAiOperation.accept(context, operationType);
+    }
+
+    // ==================== AI 操作支持 ====================
+
+    /**
+     * 设置AI操作回调
+     *
+     * @param onAiOperation AI操作回调函数
+     */
+    public void setOnAiOperation(BiConsumer<DesignContext, String> onAiOperation) {
+        this.onAiOperation = onAiOperation;
+    }
+
+    /**
+     * 获取当前表名
+     */
+    public String getTabName() {
+        return tabName;
+    }
+
+    /**
+     * 获取表格视图（用于外部集成）
+     */
+    public TableView<Map<String, Object>> getTableView() {
+        return tableView;
     }
 }
 

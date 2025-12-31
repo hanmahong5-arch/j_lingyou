@@ -3,8 +3,9 @@ package red.jiuzhou.agent.tools;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
-import red.jiuzhou.ai.AiModelClient;
-import red.jiuzhou.ai.AiModelFactory;
+import dev.langchain4j.model.chat.ChatLanguageModel;
+import red.jiuzhou.langchain.LangChainModelFactory;
+import red.jiuzhou.util.SpringContextHolder;
 import red.jiuzhou.util.DatabaseUtil;
 
 import java.util.*;
@@ -31,7 +32,8 @@ public class SqlExecutionTool {
     private final JdbcTemplate jdbcTemplate;
     private final DatabaseSchemaProvider schemaProvider;
     private final ConfigBasedSchemaProvider configProvider;
-    private final AiModelClient aiClient;
+    private final ChatLanguageModel chatModel;
+    private LangChainModelFactory modelFactory;
 
     /** 危险操作关键字(禁止执行) */
     private static final Set<String> DANGEROUS_KEYWORDS = new HashSet<>(Arrays.asList(
@@ -148,13 +150,23 @@ public class SqlExecutionTool {
         this.schemaProvider = new DatabaseSchemaProvider(jdbcTemplate);
         this.configProvider = new ConfigBasedSchemaProvider(jdbcTemplate);
 
-        // 初始化AI客户端
+        // 使用 LangChain4j 初始化 AI 模型
         if (aiModel == null || aiModel.isEmpty()) {
             aiModel = "qwen"; // 默认使用通义千问
         }
-        this.aiClient = AiModelFactory.getClient(aiModel);
+        this.chatModel = getModelFactory().getModel(aiModel);
 
-        log.info("SqlExecutionTool 初始化完成, AI模型: {}, 配置驱动Schema: enabled", aiModel);
+        log.info("SqlExecutionTool 初始化完成 (LangChain4j), AI模型: {}, 配置驱动Schema: enabled", aiModel);
+    }
+
+    /**
+     * 获取模型工厂（延迟初始化）
+     */
+    private LangChainModelFactory getModelFactory() {
+        if (modelFactory == null) {
+            modelFactory = SpringContextHolder.getBean(LangChainModelFactory.class);
+        }
+        return modelFactory;
     }
 
     /**
@@ -181,9 +193,9 @@ public class SqlExecutionTool {
             // 构建Prompt
             String prompt = buildSqlGenerationPrompt(naturalLanguageQuery, relatedTables);
 
-            // 调用AI生成SQL
+            // 调用 LangChain4j 生成SQL
             long startTime = System.currentTimeMillis();
-            String response = aiClient.chat(prompt);
+            String response = chatModel.generate(prompt);
             long aiTime = System.currentTimeMillis() - startTime;
 
             log.info("AI生成耗时: {} ms", aiTime);
@@ -379,7 +391,7 @@ public class SqlExecutionTool {
             String prompt = "请解释以下SQL语句的作用:\n\n```sql\n" + sql + "\n```\n\n" +
                            "用简洁的中文说明这个SQL在做什么,查询了哪些表,有什么筛选条件。";
 
-            return aiClient.chat(prompt);
+            return chatModel.generate(prompt);
 
         } catch (Exception e) {
             log.error("解释SQL失败", e);
@@ -405,7 +417,7 @@ public class SqlExecutionTool {
                            "2. 优化建议(如索引、JOIN方式等)\n" +
                            "3. 优化后的SQL(如果有)\n";
 
-            return aiClient.chat(prompt);
+            return chatModel.generate(prompt);
 
         } catch (Exception e) {
             log.error("优化SQL失败", e);

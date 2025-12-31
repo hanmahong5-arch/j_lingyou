@@ -20,6 +20,7 @@ import red.jiuzhou.server.model.ServerConfigFile;
 import red.jiuzhou.server.service.ServerLogAnalyzer;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
@@ -30,8 +31,8 @@ import java.util.concurrent.CompletableFuture;
 public class ServerConfigFileManagerStage extends Stage {
     private static final Logger log = LoggerFactory.getLogger(ServerConfigFileManagerStage.class);
 
-    private final ServerConfigFileDao dao;
-    private final ServerLogAnalyzer analyzer;
+    private ServerConfigFileDao dao;
+    private ServerLogAnalyzer analyzer;
 
     private TableView<ServerConfigFile> tableView;
     private ObservableList<ServerConfigFile> configFiles;
@@ -39,19 +40,61 @@ public class ServerConfigFileManagerStage extends Stage {
     private Label statusLabel;
     private ComboBox<String> filterComboBox;
 
+    private boolean initError = false;
+    private String initErrorMessage = "";
+
     public ServerConfigFileManagerStage() {
-        this.dao = new ServerConfigFileDao();
-        this.analyzer = new ServerLogAnalyzer(dao);
+        log.info("开始创建 ServerConfigFileManagerStage");
+
+        try {
+            this.dao = new ServerConfigFileDao();
+            log.info("ServerConfigFileDao 创建成功");
+        } catch (Exception e) {
+            log.error("创建 ServerConfigFileDao 失败", e);
+            initError = true;
+            initErrorMessage = "数据库连接失败: " + e.getMessage();
+        }
+
+        try {
+            this.analyzer = new ServerLogAnalyzer(dao);
+            log.info("ServerLogAnalyzer 创建成功");
+        } catch (Exception e) {
+            log.error("创建 ServerLogAnalyzer 失败", e);
+            if (!initError) {
+                initError = true;
+                initErrorMessage = "日志分析器初始化失败: " + e.getMessage();
+            }
+        }
 
         setTitle("服务器配置文件清单 - 文件层的唯一真理");
         setWidth(1200);
         setHeight(700);
 
-        VBox root = createContent();
-        Scene scene = new Scene(root);
-        setScene(scene);
+        try {
+            VBox root = createContent();
+            Scene scene = new Scene(root);
+            setScene(scene);
+            log.info("UI 创建成功");
+        } catch (Exception e) {
+            log.error("创建 UI 失败", e);
+            // 创建一个错误提示界面
+            VBox errorRoot = new VBox(20);
+            errorRoot.setAlignment(Pos.CENTER);
+            errorRoot.setPadding(new Insets(50));
+            Label errorLabel = new Label("界面初始化失败:\n" + e.getMessage());
+            errorLabel.setStyle("-fx-text-fill: red; -fx-font-size: 14px;");
+            errorRoot.getChildren().add(errorLabel);
+            setScene(new Scene(errorRoot));
+        }
 
-        loadConfigFiles();
+        // 如果初始化有错误，显示错误信息
+        if (initError) {
+            Platform.runLater(() -> {
+                updateStatus("初始化错误: " + initErrorMessage);
+            });
+        } else {
+            loadConfigFiles();
+        }
     }
 
     private VBox createContent() {
@@ -60,15 +103,19 @@ public class ServerConfigFileManagerStage extends Stage {
 
         // 顶部工具栏
         HBox toolbar = createToolbar();
+        log.info("工具栏创建成功");
 
         // 过滤栏
         HBox filterBar = createFilterBar();
+        log.info("过滤栏创建成功");
 
         // 表格
         tableView = createTableView();
+        log.info("表格创建成功");
 
         // 底部状态栏
         HBox statusBar = createStatusBar();
+        log.info("状态栏创建成功");
 
         root.getChildren().addAll(toolbar, filterBar, tableView, statusBar);
         VBox.setVgrow(tableView, Priority.ALWAYS);
@@ -79,21 +126,25 @@ public class ServerConfigFileManagerStage extends Stage {
     private HBox createToolbar() {
         HBox toolbar = new HBox(10);
         toolbar.setAlignment(Pos.CENTER_LEFT);
+        toolbar.setPadding(new Insets(5));
 
         // 分析日志按钮
         Button analyzeButton = new Button("📊 分析服务器日志");
+        analyzeButton.setStyle("-fx-font-size: 13px;");
         analyzeButton.setOnAction(e -> analyzeServerLogs());
 
         // 刷新按钮
         Button refreshButton = new Button("🔄 刷新");
+        refreshButton.setStyle("-fx-font-size: 13px;");
         refreshButton.setOnAction(e -> loadConfigFiles());
 
         // 导出清单按钮
         Button exportButton = new Button("📤 导出清单");
+        exportButton.setStyle("-fx-font-size: 13px;");
         exportButton.setOnAction(e -> exportFileList());
 
         // 统计信息标签
-        Label statsLabel = new Label();
+        Label statsLabel = new Label("工具栏已加载");
         HBox.setHgrow(statsLabel, Priority.ALWAYS);
 
         toolbar.getChildren().addAll(
@@ -108,6 +159,7 @@ public class ServerConfigFileManagerStage extends Stage {
     private HBox createFilterBar() {
         HBox filterBar = new HBox(10);
         filterBar.setAlignment(Pos.CENTER_LEFT);
+        filterBar.setPadding(new Insets(5));
 
         Label filterLabel = new Label("筛选:");
 
@@ -122,12 +174,13 @@ public class ServerConfigFileManagerStage extends Stage {
                 "🧑 NPC配置",
                 "🗺️ 世界配置"
         );
-        filterComboBox.setValue("✅ 服务器已加载");
+        filterComboBox.setValue("全部文件");
         filterComboBox.setOnAction(e -> applyFilter());
 
         // 搜索框
         TextField searchField = new TextField();
         searchField.setPromptText("搜索文件名...");
+        searchField.setPrefWidth(200);
         searchField.textProperty().addListener((obs, old, newVal) -> applySearch(newVal));
 
         filterBar.getChildren().addAll(filterLabel, filterComboBox, searchField);
@@ -151,16 +204,17 @@ public class ServerConfigFileManagerStage extends Stage {
         // 服务器加载列
         TableColumn<ServerConfigFile, String> loadedCol = new TableColumn<>("服务器加载");
         loadedCol.setCellValueFactory(cellData -> {
-            boolean loaded = cellData.getValue().getIsServerLoaded();
-            return new SimpleStringProperty(loaded ? "✅ 是" : "❌ 否");
+            Boolean loaded = cellData.getValue().getIsServerLoaded();
+            return new SimpleStringProperty(Boolean.TRUE.equals(loaded) ? "✅ 是" : "❌ 否");
         });
         loadedCol.setPrefWidth(100);
 
         // 优先级列
         TableColumn<ServerConfigFile, String> priorityCol = new TableColumn<>("优先级");
         priorityCol.setCellValueFactory(cellData -> {
-            int priority = cellData.getValue().getLoadPriority();
-            String text = switch (priority) {
+            Integer priority = cellData.getValue().getLoadPriority();
+            int p = priority != null ? priority : 3;
+            String text = switch (p) {
                 case 1 -> "🔥 核心";
                 case 2 -> "⚠️ 重要";
                 default -> "📄 一般";
@@ -176,14 +230,18 @@ public class ServerConfigFileManagerStage extends Stage {
 
         // 导入次数列
         TableColumn<ServerConfigFile, Integer> importCountCol = new TableColumn<>("导入次数");
-        importCountCol.setCellValueFactory(cellData ->
-                new SimpleIntegerProperty(cellData.getValue().getImportCount()).asObject());
+        importCountCol.setCellValueFactory(cellData -> {
+            Integer count = cellData.getValue().getImportCount();
+            return new SimpleIntegerProperty(count != null ? count : 0).asObject();
+        });
         importCountCol.setPrefWidth(80);
 
         // 导出次数列
         TableColumn<ServerConfigFile, Integer> exportCountCol = new TableColumn<>("导出次数");
-        exportCountCol.setCellValueFactory(cellData ->
-                new SimpleIntegerProperty(cellData.getValue().getExportCount()).asObject());
+        exportCountCol.setCellValueFactory(cellData -> {
+            Integer count = cellData.getValue().getExportCount();
+            return new SimpleIntegerProperty(count != null ? count : 0).asObject();
+        });
         exportCountCol.setPrefWidth(80);
 
         // 验证状态列
@@ -216,6 +274,9 @@ public class ServerConfigFileManagerStage extends Stage {
             return row;
         });
 
+        // 设置占位符
+        table.setPlaceholder(new Label("暂无数据，请点击「📊 分析服务器日志」加载数据"));
+
         return table;
     }
 
@@ -236,13 +297,41 @@ public class ServerConfigFileManagerStage extends Stage {
      * 加载配置文件列表
      */
     private void loadConfigFiles() {
+        if (dao == null) {
+            updateStatus("错误：数据库连接未初始化");
+            return;
+        }
+
+        updateStatus("正在加载配置文件...");
+        log.info("开始加载配置文件列表");
+
         CompletableFuture.runAsync(() -> {
-            List<ServerConfigFile> files = dao.findAll();
-            Platform.runLater(() -> {
-                configFiles = FXCollections.observableArrayList(files);
-                tableView.setItems(configFiles);
-                updateStatus("共 " + files.size() + " 个配置文件");
-            });
+            try {
+                List<ServerConfigFile> files = dao.findAll();
+                log.info("从数据库加载了 {} 个配置文件", files.size());
+
+                Platform.runLater(() -> {
+                    configFiles = FXCollections.observableArrayList(files);
+                    tableView.setItems(configFiles);
+                    updateStatus("共 " + files.size() + " 个配置文件");
+                });
+            } catch (Exception e) {
+                log.error("加载配置文件失败", e);
+                Platform.runLater(() -> {
+                    configFiles = FXCollections.observableArrayList(new ArrayList<>());
+                    tableView.setItems(configFiles);
+                    updateStatus("加载失败: " + e.getMessage());
+
+                    // 显示详细错误
+                    showError("加载配置文件失败",
+                            "错误信息: " + e.getMessage() +
+                            "\n\n可能的原因:\n" +
+                            "1. 数据库表 server_config_files 不存在\n" +
+                            "2. 数据库连接失败\n" +
+                            "3. 表结构不匹配\n\n" +
+                            "请检查数据库配置。");
+                });
+            }
         });
     }
 
@@ -250,12 +339,19 @@ public class ServerConfigFileManagerStage extends Stage {
      * 分析服务器日志
      */
     private void analyzeServerLogs() {
+        log.info("用户点击了分析服务器日志按钮");
+
         DirectoryChooser chooser = new DirectoryChooser();
         chooser.setTitle("选择服务器日志目录");
-        chooser.setInitialDirectory(new File("d:/AionReal58/AionServer/MainServer/log"));
+
+        File defaultDir = new File("d:/AionReal58/AionServer/MainServer/log");
+        if (defaultDir.exists()) {
+            chooser.setInitialDirectory(defaultDir);
+        }
 
         File selectedDir = chooser.showDialog(this);
         if (selectedDir == null) {
+            log.info("用户取消了目录选择");
             return;
         }
 
@@ -297,34 +393,46 @@ public class ServerConfigFileManagerStage extends Stage {
      * 应用过滤器
      */
     private void applyFilter() {
+        if (dao == null) {
+            return;
+        }
+
         String filter = filterComboBox.getValue();
+        updateStatus("正在筛选...");
 
         CompletableFuture.runAsync(() -> {
-            List<ServerConfigFile> files;
+            try {
+                List<ServerConfigFile> files;
 
-            if (filter.contains("服务器已加载")) {
-                files = dao.findServerLoaded();
-            } else if (filter.contains("核心配置")) {
-                files = dao.findCriticalFiles();
-            } else if (filter.contains("物品配置")) {
-                files = dao.findByCategory("items");
-            } else if (filter.contains("技能配置")) {
-                files = dao.findByCategory("skills");
-            } else if (filter.contains("任务配置")) {
-                files = dao.findByCategory("quests");
-            } else if (filter.contains("NPC配置")) {
-                files = dao.findByCategory("npcs");
-            } else if (filter.contains("世界配置")) {
-                files = dao.findByCategory("worlds");
-            } else {
-                files = dao.findAll();
+                if (filter.contains("服务器已加载")) {
+                    files = dao.findServerLoaded();
+                } else if (filter.contains("核心配置")) {
+                    files = dao.findCriticalFiles();
+                } else if (filter.contains("物品配置")) {
+                    files = dao.findByCategory("items");
+                } else if (filter.contains("技能配置")) {
+                    files = dao.findByCategory("skills");
+                } else if (filter.contains("任务配置")) {
+                    files = dao.findByCategory("quests");
+                } else if (filter.contains("NPC配置")) {
+                    files = dao.findByCategory("npcs");
+                } else if (filter.contains("世界配置")) {
+                    files = dao.findByCategory("worlds");
+                } else {
+                    files = dao.findAll();
+                }
+
+                Platform.runLater(() -> {
+                    configFiles = FXCollections.observableArrayList(files);
+                    tableView.setItems(configFiles);
+                    updateStatus("筛选结果: " + files.size() + " 个文件");
+                });
+            } catch (Exception e) {
+                log.error("筛选失败", e);
+                Platform.runLater(() -> {
+                    updateStatus("筛选失败: " + e.getMessage());
+                });
             }
-
-            Platform.runLater(() -> {
-                configFiles = FXCollections.observableArrayList(files);
-                tableView.setItems(configFiles);
-                updateStatus("筛选结果: " + files.size() + " 个文件");
-            });
         });
     }
 
@@ -332,6 +440,10 @@ public class ServerConfigFileManagerStage extends Stage {
      * 应用搜索
      */
     private void applySearch(String searchText) {
+        if (configFiles == null) {
+            return;
+        }
+
         if (searchText == null || searchText.trim().isEmpty()) {
             tableView.setItems(configFiles);
             return;
@@ -357,10 +469,10 @@ public class ServerConfigFileManagerStage extends Stage {
         StringBuilder content = new StringBuilder();
         content.append("文件名: ").append(file.getFileName()).append("\n");
         content.append("表名: ").append(file.getTableName()).append("\n");
-        content.append("服务器加载: ").append(file.getIsServerLoaded() ? "是" : "否").append("\n");
+        content.append("服务器加载: ").append(Boolean.TRUE.equals(file.getIsServerLoaded()) ? "是" : "否").append("\n");
         content.append("优先级: ").append(file.getLoadPriority()).append("\n");
         content.append("分类: ").append(file.getFileCategory()).append("\n");
-        content.append("是否核心: ").append(file.getIsCritical() ? "是" : "否").append("\n");
+        content.append("是否核心: ").append(Boolean.TRUE.equals(file.getIsCritical()) ? "是" : "否").append("\n");
         content.append("导入次数: ").append(file.getImportCount()).append("\n");
         content.append("导出次数: ").append(file.getExportCount()).append("\n");
 
@@ -381,7 +493,11 @@ public class ServerConfigFileManagerStage extends Stage {
 
     private void updateStatus(String message) {
         if (statusLabel != null) {
-            statusLabel.setText(message);
+            if (Platform.isFxApplicationThread()) {
+                statusLabel.setText(message);
+            } else {
+                Platform.runLater(() -> statusLabel.setText(message));
+            }
         }
     }
 

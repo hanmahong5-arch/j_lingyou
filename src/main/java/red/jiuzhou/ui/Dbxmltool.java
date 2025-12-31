@@ -40,12 +40,18 @@ import red.jiuzhou.util.IncrementalMenuJsonGenerator;
 import red.jiuzhou.util.YamlUtils;
 import red.jiuzhou.util.YmlConfigUtil;
 import red.jiuzhou.ui.components.EnhancedStatusBar;
+import red.jiuzhou.ui.components.FileStatusPanel;
 import red.jiuzhou.ui.components.HotkeyManager;
 import red.jiuzhou.ui.components.SearchableTreeView;
 import red.jiuzhou.agent.ui.AgentChatStage;
+import red.jiuzhou.agent.ui.AiOperationHandler;
+import red.jiuzhou.config.validation.ConfigValidationService;
 import red.jiuzhou.pattern.rule.ui.DesignRuleStage;
 import red.jiuzhou.ui.GameToolsStage;
 import red.jiuzhou.ui.ServerKnowledgeStage;
+import red.jiuzhou.ui.error.engine.ErrorDiagnosticsEngine;
+import red.jiuzhou.ui.error.structured.StructuredError;
+import red.jiuzhou.ui.guide.ConfigGuideDialog;
 
 import java.io.File;
 import java.nio.file.Path;
@@ -72,7 +78,8 @@ import java.util.concurrent.atomic.AtomicReference;
     "red.jiuzhou.agent",
     "red.jiuzhou.ai",
     "red.jiuzhou.analysis",
-    "red.jiuzhou.config"
+    "red.jiuzhou.config",
+    "red.jiuzhou.ui.error"
 })
 public class Dbxmltool extends Application {
     private ConfigurableApplicationContext springContext;
@@ -84,6 +91,9 @@ public class Dbxmltool extends Application {
     // 增强组件
     private EnhancedStatusBar statusBar;
     private HotkeyManager hotkeyManager;
+    private AiOperationHandler aiOperationHandler;  // AI操作处理器
+    private FileStatusPanel fileStatusPanel;        // 文件状态面板
+
     @Override
     public void init() {
         // 初始化 Spring 上下文
@@ -99,6 +109,16 @@ public class Dbxmltool extends Application {
         // 清理状态栏资源
         if (statusBar != null) {
             statusBar.dispose();
+        }
+        // 清理AI操作处理器资源
+        if (aiOperationHandler != null) {
+            aiOperationHandler.dispose();
+            aiOperationHandler = null;
+        }
+        // 清理文件状态面板资源
+        if (fileStatusPanel != null) {
+            fileStatusPanel.dispose();
+            fileStatusPanel = null;
         }
     }
     public static void main(String[] args) {
@@ -121,6 +141,44 @@ public class Dbxmltool extends Application {
     @Override
     public void start(Stage primaryStage) {
         log.info("应用程序启动,当前数据库: {}", DatabaseUtil.getDbName());
+
+        // ========== 启动时配置验证 ==========
+        // 检查必填配置项，如果有致命错误则显示配置引导对话框
+        try {
+            ConfigValidationService configValidation = springContext.getBean(ConfigValidationService.class);
+            List<StructuredError> configErrors = configValidation.validateAll();
+
+            // 检查是否有必填配置缺失
+            if (!configValidation.canStartApplication()) {
+                log.warn("检测到配置问题，显示配置引导对话框");
+
+                // 显示配置引导对话框
+                ConfigGuideDialog guideDialog = new ConfigGuideDialog(configValidation);
+                guideDialog.showAndWait();
+
+                // 如果用户没有选择编辑且仍然无法启动，则退出
+                if (!guideDialog.isUserChoseToEdit() && !configValidation.canStartApplication()) {
+                    log.error("必填配置缺失，应用程序无法启动");
+                    Platform.exit();
+                    return;
+                }
+            } else if (!configErrors.isEmpty()) {
+                // 有警告但可以启动，记录日志
+                log.info("配置验证完成，发现 {} 个警告", configErrors.size());
+            }
+
+            // 初始化错误诊断引擎
+            try {
+                ErrorDiagnosticsEngine diagnosticsEngine = springContext.getBean(ErrorDiagnosticsEngine.class);
+                log.info("错误诊断引擎初始化成功");
+            } catch (Exception e) {
+                log.debug("错误诊断引擎未配置: {}", e.getMessage());
+            }
+
+        } catch (Exception e) {
+            log.warn("配置验证服务未就绪: {}", e.getMessage());
+            // 配置验证服务未就绪时继续启动，不阻塞
+        }
 
         // ========== 性能优化：异步加载菜单配置（避免启动卡顿）==========
         // 当前选中的Tab名称
@@ -220,16 +278,44 @@ public class Dbxmltool extends Application {
             searchableMenu.enableMechanismFilter(true);
         }
 
+        // ==================== 连接AI操作处理器 ====================
+        // 创建AI操作处理器，连接菜单树的AI右键菜单到AI助手
+        aiOperationHandler = new AiOperationHandler(primaryStage);
+        aiOperationHandler.setOnOperationStart(() -> {
+            if (statusBar != null) {
+                statusBar.info("🤖 AI正在处理...");
+            }
+        });
+        aiOperationHandler.setOnOperationEnd(() -> {
+            if (statusBar != null) {
+                statusBar.success("AI操作完成");
+            }
+        });
+
+        // 将AI操作处理器连接到菜单树
+        searchableMenu.setOnAiOperation(aiOperationHandler);
+        log.info("AI操作处理器已连接到菜单树");
+
         // 组装左侧面板
         leftControl.getChildren().add(searchableMenu);  // 使用可搜索菜单树
         // 让菜单树占满可用空间
         VBox.setVgrow(searchableMenu, Priority.ALWAYS);
 
+        // ==================== 创建文件状态面板 ====================
+        fileStatusPanel = new FileStatusPanel();
+
+        // 连接菜单树选择事件到文件状态面板
+        searchableMenu.setOnFileSelected(filePath -> {
+            if (filePath != null && filePath.toLowerCase().endsWith(".xml")) {
+                fileStatusPanel.updateFile(filePath);
+            }
+        });
+
         // ==================== 组装主界面 ====================
-        // 添加左右分割面板
-        splitPane.getItems().addAll(leftControl, rightControl);
-        // 设置分割比例: 左侧30% / 右侧70%
-        splitPane.setDividerPositions(0.3);
+        // 添加三栏分割面板：左侧菜单 | 中间数据 | 右侧状态
+        splitPane.getItems().addAll(leftControl, rightControl, fileStatusPanel);
+        // 设置分割比例: 左侧25% / 中间55% / 右侧20%
+        splitPane.setDividerPositions(0.25, 0.80);
         // 让分割面板占满剩余空间
         VBox.setVgrow(splitPane, Priority.ALWAYS);
         root.getChildren().add(splitPane);
@@ -385,6 +471,12 @@ public class Dbxmltool extends Application {
         // 创建新的分页表格组件
         // 根据选中的Tab加载对应的数据并展示
         PaginatedTable paginatedTable = new PaginatedTable();
+
+        // 连接AI操作回调（如果已初始化）
+        if (aiOperationHandler != null) {
+            paginatedTable.setOnAiOperation(aiOperationHandler);
+            log.debug("表格 {} 已连接AI操作处理器", newTab.getText());
+        }
 
         // 让表格组件占满所有可用空间
         VBox.setVgrow(rightControl, Priority.ALWAYS);

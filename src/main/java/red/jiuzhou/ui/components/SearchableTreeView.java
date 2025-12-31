@@ -15,6 +15,8 @@ import javafx.util.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import red.jiuzhou.agent.context.ContextCollector;
+import red.jiuzhou.agent.context.DesignContext;
 import red.jiuzhou.analysis.aion.AionMechanismCategory;
 import red.jiuzhou.analysis.aion.MechanismFileMapper;
 import red.jiuzhou.analysis.aion.MechanismOverrideConfig;
@@ -80,6 +82,13 @@ public class SearchableTreeView<T> extends VBox {
     private Runnable onRefresh;
     private Consumer<String> onBatchGenerateDdl;  // 批量生成DDL回调
     private Consumer<String> onBatchImportXml;    // 批量导入XML回调
+
+    // AI 操作回调
+    private java.util.function.BiConsumer<DesignContext, String> onAiOperation;  // AI操作回调 (上下文, 操作类型)
+    private ContextCollector contextCollector;  // 上下文收集器
+
+    // 文件选择回调（用于状态面板联动）
+    private Consumer<String> onFileSelected;
 
     // 机制过滤
     private MechanismTagBar mechanismTagBar;
@@ -439,13 +448,41 @@ public class SearchableTreeView<T> extends VBox {
         MenuItem manageAllItem = new MenuItem("⚙️ 管理所有机制分类...");
         manageAllItem.setOnAction(e -> openMechanismManager());
 
-        // 组装菜单（优化结构：核心数据操作前置）
+        // ==================== AI 问问菜单（按设计师意图分类） ====================
+        Menu aiMenu = new Menu("🤖 问问AI");
+
+        // 一、我想了解...
+        Menu aiUnderstandMenu = new Menu("🤔 我想了解...");
+        MenuItem aiWhatIsThis = new MenuItem("这个表是干什么用的？");
+        aiWhatIsThis.setOnAction(e -> triggerAiOperationForSelected("analyze"));
+        MenuItem aiExplainFields = new MenuItem("里面有哪些重要字段？");
+        aiExplainFields.setOnAction(e -> triggerAiOperationForSelected("explain"));
+        aiUnderstandMenu.getItems().addAll(aiWhatIsThis, aiExplainFields);
+
+        // 二、帮我检查...
+        Menu aiCheckMenu = new Menu("🔍 帮我检查...");
+        MenuItem aiCheckRefs = new MenuItem("引用的数据都存在吗？");
+        aiCheckRefs.setOnAction(e -> triggerAiOperationForSelected("check_refs"));
+        aiCheckMenu.getItems().add(aiCheckRefs);
+
+        // 三、帮我生成...
+        Menu aiGenerateMenu = new Menu("✨ 帮我生成...");
+        MenuItem aiGenerate = new MenuItem("一条示例数据");
+        aiGenerate.setOnAction(e -> triggerAiOperationForSelected("generate"));
+        aiGenerateMenu.getItems().add(aiGenerate);
+
+        aiMenu.getItems().addAll(aiUnderstandMenu, aiCheckMenu, aiGenerateMenu);
+
+        // 组装菜单（优化结构：AI操作前置，数据操作次之）
         contextMenu.getItems().addAll(
             openItem,
             openFolderItem,
             openExternalItem,
             new SeparatorMenuItem(),
-            generateDdlItem,     // 数据操作前置
+            // AI 问问菜单（层级结构，减少认知负担）
+            aiMenu,
+            new SeparatorMenuItem(),
+            generateDdlItem,     // 数据操作
             importXmlItem,
             new SeparatorMenuItem(),
             expandItem,
@@ -501,6 +538,12 @@ public class SearchableTreeView<T> extends VBox {
             generateDdlItem.setDisable(!hasPath || onBatchGenerateDdl == null);
             importXmlItem.setDisable(!hasPath || onBatchImportXml == null);
             refreshItem.setDisable(onRefresh == null);
+
+            // AI菜单控制：仅对XML文件启用
+            boolean isXmlFile = isLeaf && hasPath && pathResolver.apply(selected)
+                    .toLowerCase().endsWith(".xml");
+            boolean aiEnabled = isXmlFile && onAiOperation != null;
+            aiMenu.setDisable(!aiEnabled);
         });
 
         treeView.setContextMenu(contextMenu);
@@ -597,6 +640,13 @@ public class SearchableTreeView<T> extends VBox {
         treeView.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
             if (onItemSelected != null && newVal != null) {
                 onItemSelected.accept(newVal);
+            }
+            // 通知文件状态面板
+            if (onFileSelected != null && newVal != null && pathResolver != null) {
+                String filePath = pathResolver.apply(newVal);
+                if (filePath != null && !filePath.isEmpty()) {
+                    onFileSelected.accept(filePath);
+                }
             }
         });
 
@@ -1124,6 +1174,91 @@ public class SearchableTreeView<T> extends VBox {
      */
     public void setOnBatchImportXml(Consumer<String> handler) {
         this.onBatchImportXml = handler;
+    }
+
+    /**
+     * 设置AI操作回调
+     *
+     * @param handler 回调函数，接收 (DesignContext 上下文, String 操作类型)
+     *                操作类型: "analyze" | "explain" | "generate" | "check_refs"
+     */
+    public void setOnAiOperation(java.util.function.BiConsumer<DesignContext, String> handler) {
+        this.onAiOperation = handler;
+        // 延迟初始化上下文收集器
+        if (handler != null && this.contextCollector == null) {
+            this.contextCollector = new ContextCollector();
+        }
+    }
+
+    /**
+     * 设置文件选择回调（用于状态面板联动）
+     *
+     * @param handler 文件路径回调
+     */
+    public void setOnFileSelected(Consumer<String> handler) {
+        this.onFileSelected = handler;
+    }
+
+    /**
+     * 触发AI操作
+     *
+     * @param selected 选中的树节点
+     * @param operationType 操作类型
+     */
+    private void triggerAiOperation(TreeItem<T> selected, String operationType) {
+        if (onAiOperation == null || pathResolver == null) {
+            log.warn("AI操作未配置或路径解析器未设置");
+            return;
+        }
+
+        String filePath = pathResolver.apply(selected);
+        if (filePath == null || filePath.isEmpty()) {
+            log.warn("无法获取文件路径");
+            return;
+        }
+
+        log.info("触发AI操作: {} - 文件: {}", operationType, filePath);
+
+        // 异步收集上下文（避免阻塞UI）
+        searchExecutor.submit(() -> {
+            try {
+                // 确保收集器已初始化
+                if (contextCollector == null) {
+                    contextCollector = new ContextCollector();
+                }
+
+                // 收集上下文
+                DesignContext context = contextCollector.collectFromTreeItem(
+                    selected,
+                    item -> pathResolver.apply(item)
+                );
+
+                log.info("已收集上下文: {}", context.getSummary());
+
+                // 在UI线程中回调
+                Platform.runLater(() -> onAiOperation.accept(context, operationType));
+
+            } catch (Exception e) {
+                log.error("收集上下文失败: {}", e.getMessage(), e);
+                Platform.runLater(() -> {
+                    Alert alert = new Alert(Alert.AlertType.ERROR);
+                    alert.setTitle("AI操作失败");
+                    alert.setHeaderText("无法收集上下文信息");
+                    alert.setContentText(e.getMessage());
+                    alert.showAndWait();
+                });
+            }
+        });
+    }
+
+    /**
+     * 便捷方法：对当前选中项触发AI操作
+     */
+    private void triggerAiOperationForSelected(String operationType) {
+        TreeItem<T> selected = treeView.getSelectionModel().getSelectedItem();
+        if (selected != null && pathResolver != null) {
+            triggerAiOperation(selected, operationType);
+        }
     }
 
     /**

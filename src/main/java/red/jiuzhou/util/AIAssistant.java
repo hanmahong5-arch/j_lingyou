@@ -2,11 +2,11 @@ package red.jiuzhou.util;
 
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.StrUtil;
+import dev.langchain4j.model.chat.ChatLanguageModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-import red.jiuzhou.ai.AiModelClient;
-import red.jiuzhou.ai.AiModelFactory;
+import red.jiuzhou.langchain.LangChainModelFactory;
 
 import jakarta.annotation.PreDestroy;
 import java.io.File;
@@ -64,6 +64,9 @@ public class AIAssistant {
 
     /** AI任务执行器（Java 21+ 虚拟线程：轻量级、自动伸缩） */
     private final ExecutorService aiExecutor = Executors.newVirtualThreadPerTaskExecutor();
+
+    /** LangChain4j 模型工厂 */
+    private LangChainModelFactory modelFactory;
 
     /**
      * 优化类型枚举 - 定义各种AI文本处理模式
@@ -279,8 +282,8 @@ public class AIAssistant {
         for (String modelName : candidates) {
             Instant start = Instant.now();
             try {
-                AiModelClient client = AiModelFactory.getClient(modelName);
-                String response = client.chat(prompt);
+                ChatLanguageModel model = getModelFactory().getModel(modelName);
+                String response = model.generate(prompt);
                 if (StrUtil.isBlank(response)) {
                     throw new IllegalStateException("AI模型返回空响应");
                 }
@@ -310,6 +313,18 @@ public class AIAssistant {
         throw new RuntimeException("无法调用任何可用的AI模型: " + detail);
     }
 
+    private LangChainModelFactory getModelFactory() {
+        if (modelFactory == null) {
+            // 延迟初始化，从 Spring 容器获取
+            modelFactory = SpringContextHolder.getBean(LangChainModelFactory.class);
+        }
+        return modelFactory;
+    }
+
+    public void setModelFactory(LangChainModelFactory modelFactory) {
+        this.modelFactory = modelFactory;
+    }
+
     private List<String> resolveCandidateModels() {
         LinkedHashSet<String> rawCandidates = new LinkedHashSet<>();
         addCandidate(rawCandidates, System.getenv("AI_MODEL"));
@@ -319,20 +334,35 @@ public class AIAssistant {
         rawCandidates.addAll(YamlUtils.loadAiModelKeys("application.yml"));
         rawCandidates.add(FALLBACK_MODEL);
 
+        // 使用 LangChain4j 支持的模型名称
         LinkedHashSet<String> ordered = new LinkedHashSet<>();
         for (String candidate : rawCandidates) {
-            try {
-                ordered.add(AiModelFactory.canonicalName(candidate));
-            } catch (IllegalArgumentException ex) {
-                log.debug("忽略未支持的AI模型: {}", candidate);
+            String normalized = normalizeModelName(candidate);
+            if (normalized != null) {
+                ordered.add(normalized);
             }
         }
 
-        for (String model : AiModelFactory.supportedModels()) {
-            ordered.add(model);
-        }
+        // 添加默认支持的模型
+        ordered.add("qwen");
+        ordered.add("deepseek");
+        ordered.add("kimi");
 
         return new ArrayList<>(ordered);
+    }
+
+    private String normalizeModelName(String name) {
+        if (StrUtil.isBlank(name)) return null;
+        String lower = name.toLowerCase().trim();
+        return switch (lower) {
+            case "qwen", "tongyi", "dashscope" -> "qwen";
+            case "deepseek" -> "deepseek";
+            case "kimi", "moonshot" -> "kimi";
+            default -> {
+                log.debug("忽略未支持的AI模型: {}", name);
+                yield null;
+            }
+        };
     }
 
     private void addCandidate(LinkedHashSet<String> target, String raw) {
@@ -507,10 +537,13 @@ public class AIAssistant {
      */
     public String transform(String text, String prompt, String model) {
         String fullPrompt = prompt + "\n\n" + text;
-        String modelName = AiModelFactory.canonicalName(model);
+        String modelName = normalizeModelName(model);
+        if (modelName == null) {
+            modelName = FALLBACK_MODEL;
+        }
         try {
-            AiModelClient client = AiModelFactory.getClient(modelName);
-            String response = client.chat(fullPrompt);
+            ChatLanguageModel chatModel = getModelFactory().getModel(modelName);
+            String response = chatModel.generate(fullPrompt);
             return StrUtil.isBlank(response) ? text : response.trim();
         } catch (Exception e) {
             log.error("AI转换失败，模型: {}", modelName, e);

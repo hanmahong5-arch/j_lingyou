@@ -12,14 +12,19 @@ import javafx.stage.Stage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
+import red.jiuzhou.agent.context.DesignContext;
 import red.jiuzhou.agent.core.AgentMessage;
-import red.jiuzhou.agent.core.GameDataAgent;
+import red.jiuzhou.langchain.LangChainGameDataAgent;
+import red.jiuzhou.util.SpringContextHolder;
 import red.jiuzhou.agent.tools.SqlExecutionTool;
+import red.jiuzhou.agent.ui.components.*;
+import red.jiuzhou.agent.workflow.*;
 import red.jiuzhou.util.DatabaseUtil;
 
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * AI Agent 对话窗口
@@ -33,7 +38,7 @@ public class AgentChatStage extends Stage {
 
     private static final Logger log = LoggerFactory.getLogger(AgentChatStage.class);
 
-    private GameDataAgent agent;
+    private LangChainGameDataAgent agent;
     private JdbcTemplate jdbcTemplate;
     private SqlExecutionTool sqlTool;
 
@@ -47,6 +52,17 @@ public class AgentChatStage extends Stage {
     private ProgressIndicator loadingIndicator;
     private ToggleButton sqlModeToggle;
     private TabPane resultTabPane;
+
+    // 协作式工作流组件
+    private CollaborativeWorkflowEngine workflowEngine;
+    private WorkflowProgressBar workflowProgressBar;
+    private ContextTransparencyPanel contextPanel;
+    private AiCapabilityGuide capabilityGuide;
+    private ToggleButton workflowModeToggle;
+
+    // 追溯和撤销组件
+    private WorkflowHistoryPanel historyPanel;
+    private Button undoButton;
 
     // 样式常量
     private static final String USER_BG = "#E3F2FD";
@@ -71,21 +87,35 @@ public class AgentChatStage extends Stage {
     }
 
     private void initUI() {
-        setTitle("AI 游戏数据助手 (增强版)");
-        setWidth(1100);
-        setHeight(750);
+        setTitle("AI 游戏数据助手 (协作增强版)");
+        setWidth(1300);
+        setHeight(800);
 
         BorderPane root = new BorderPane();
         root.setStyle("-fx-background-color: white;");
 
-        // 顶部工具栏
-        root.setTop(createToolbar());
+        // 顶部：工具栏 + 工作流进度条
+        VBox topContainer = new VBox();
+        topContainer.getChildren().add(createToolbar());
+
+        // 工作流进度条（默认隐藏）
+        workflowProgressBar = new WorkflowProgressBar();
+        workflowProgressBar.setVisible(false);
+        workflowProgressBar.setManaged(false);
+        topContainer.getChildren().add(workflowProgressBar);
+
+        root.setTop(topContainer);
+
+        // 左侧：上下文透明化面板 + AI能力说明
+        VBox leftPanel = createLeftPanel();
+        leftPanel.setPrefWidth(260);
+        leftPanel.setMinWidth(200);
 
         // 中间区域：聊天 + 结果展示(使用SplitPane)
         SplitPane mainSplitPane = new SplitPane();
         mainSplitPane.setOrientation(javafx.geometry.Orientation.HORIZONTAL);
 
-        // 左侧：聊天区域
+        // 聊天区域
         BorderPane chatPane = new BorderPane();
         chatPane.setCenter(createChatArea());
         chatPane.setBottom(createInputArea());
@@ -98,15 +128,278 @@ public class AgentChatStage extends Stage {
         mainSplitPane.getItems().addAll(chatPane, resultTabPane);
         mainSplitPane.setDividerPositions(0.6);
 
-        root.setCenter(mainSplitPane);
+        // 使用外层SplitPane包含左侧面板和主区域
+        SplitPane outerSplitPane = new SplitPane();
+        outerSplitPane.setOrientation(javafx.geometry.Orientation.HORIZONTAL);
+        outerSplitPane.getItems().addAll(leftPanel, mainSplitPane);
+        outerSplitPane.setDividerPositions(0.2);
+
+        root.setCenter(outerSplitPane);
 
         Scene scene = new Scene(root);
         setScene(scene);
+
+        // 初始化工作流引擎
+        initWorkflowEngine();
 
         // 关闭时清理
         setOnCloseRequest(e -> {
             if (agent != null) {
                 agent.clearSession();
+            }
+            if (workflowEngine != null && workflowEngine.hasActiveWorkflow()) {
+                workflowEngine.cancelWorkflow();
+            }
+        });
+    }
+
+    /**
+     * 创建左侧面板（上下文透明化 + AI能力说明 + 工作流历史）
+     */
+    private VBox createLeftPanel() {
+        VBox leftPanel = new VBox(8);
+        leftPanel.setStyle("-fx-background-color: #FAFAFA; -fx-border-color: #e0e0e0; -fx-border-width: 0 1 0 0;");
+
+        // 上下文透明化面板
+        contextPanel = new ContextTransparencyPanel();
+        contextPanel.setOnSupplementAdded(supplement -> {
+            addSystemMessage("已添加补充说明: " + supplement);
+        });
+
+        // AI能力说明面板
+        capabilityGuide = new AiCapabilityGuide();
+
+        // 工作流历史面板
+        historyPanel = new WorkflowHistoryPanel();
+        historyPanel.setOnUndoComplete(result -> {
+            if (result.success) {
+                addSystemMessage("↩ 撤销成功: " + result.message + " (恢复 " + result.restoredRows + " 行)");
+            } else {
+                addErrorMessage("撤销失败: " + result.message);
+            }
+        });
+
+        // 使用TabPane组织三个面板
+        TabPane leftTabPane = new TabPane();
+        leftTabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
+
+        Tab contextTab = new Tab("上下文", contextPanel);
+        contextTab.setGraphic(new Label("📍"));
+
+        Tab guideTab = new Tab("AI能力", capabilityGuide);
+        guideTab.setGraphic(new Label("💡"));
+
+        Tab historyTab = new Tab("历史", historyPanel);
+        historyTab.setGraphic(new Label("📜"));
+
+        leftTabPane.getTabs().addAll(contextTab, guideTab, historyTab);
+
+        leftPanel.getChildren().add(leftTabPane);
+        VBox.setVgrow(leftTabPane, Priority.ALWAYS);
+
+        return leftPanel;
+    }
+
+    // 工作流执行器
+    private WorkflowExecutors workflowExecutors;
+
+    /**
+     * 初始化工作流引擎
+     */
+    private void initWorkflowEngine() {
+        workflowEngine = new CollaborativeWorkflowEngine();
+
+        // 工作流执行器将在agent初始化后设置
+        // 见 initAgent() 中的延迟初始化
+
+        // 添加工作流监听器
+        workflowEngine.addListener(new WorkflowListener() {
+            @Override
+            public void onWorkflowStarted(WorkflowState state) {
+                Platform.runLater(() -> {
+                    workflowProgressBar.setVisible(true);
+                    workflowProgressBar.setManaged(true);
+                    workflowProgressBar.updateFromState(state);
+                    addSystemMessage("工作流已启动: " + state.getWorkflowType());
+
+                    // 更新历史面板的工作流ID
+                    if (historyPanel != null) {
+                        historyPanel.setCurrentWorkflowId(state.getWorkflowId());
+                        historyPanel.addTimelineEntry("WORKFLOW_STARTED", "工作流启动",
+                                "类型: " + state.getWorkflowType());
+                    }
+                });
+            }
+
+            @Override
+            public void onStepStarted(WorkflowStep step) {
+                Platform.runLater(() -> {
+                    addSystemMessage(step.getDisplayText() + " - " + step.description());
+
+                    // 记录步骤开始
+                    WorkflowState state = workflowEngine.getCurrentState();
+                    if (state != null) {
+                        state.logStepStarted();
+                    }
+
+                    // 更新历史面板
+                    if (historyPanel != null) {
+                        historyPanel.addTimelineEntry("STEP_STARTED", step.name(), step.description());
+                    }
+                });
+            }
+
+            @Override
+            public void onStepResultReady(WorkflowStep step, WorkflowStepResult result) {
+                Platform.runLater(() -> {
+                    // 显示步骤确认对话框
+                    showStepConfirmationDialog(step, result);
+                });
+            }
+
+            @Override
+            public void onStepConfirmed(WorkflowStep step) {
+                Platform.runLater(() -> {
+                    WorkflowState state = workflowEngine.getCurrentState();
+                    workflowProgressBar.updateProgress(state.getCurrentStepIndex());
+
+                    // 记录步骤确认
+                    state.logStepConfirmed();
+
+                    // 更新历史面板
+                    if (historyPanel != null) {
+                        historyPanel.addTimelineEntry("STEP_CONFIRMED", step.name() + " 已确认", null);
+                        historyPanel.notifyNewUndoableOperation();
+                    }
+
+                    // 更新撤销按钮状态
+                    updateUndoButtonState();
+                });
+            }
+
+            @Override
+            public void onStepSkipped(WorkflowStep step) {
+                Platform.runLater(() -> {
+                    WorkflowState state = workflowEngine.getCurrentState();
+                    if (state != null) {
+                        state.logStepSkipped();
+                    }
+
+                    addSystemMessage("⏭ 已跳过: " + step.name());
+
+                    if (historyPanel != null) {
+                        historyPanel.addTimelineEntry("STEP_SKIPPED", step.name() + " 已跳过", null);
+                    }
+                });
+            }
+
+            @Override
+            public void onStepCorrected(WorkflowStep step, String correction) {
+                Platform.runLater(() -> {
+                    WorkflowState state = workflowEngine.getCurrentState();
+                    if (state != null) {
+                        state.logStepCorrected(correction);
+                    }
+
+                    addSystemMessage("✏ 已修正: " + step.name() + "\n修正内容: " + correction);
+
+                    if (historyPanel != null) {
+                        historyPanel.addTimelineEntry("STEP_CORRECTED", step.name() + " 已修正", correction);
+                    }
+                });
+            }
+
+            @Override
+            public void onWorkflowCompleted(WorkflowState state) {
+                Platform.runLater(() -> {
+                    workflowProgressBar.markCompleted();
+
+                    // 显示完成摘要
+                    WorkflowState.WorkflowSummary summary = state.getSummary();
+                    addSystemMessage(String.format(
+                            "✅ 工作流已完成！\n" +
+                            "影响行数: %d\n" +
+                            "操作次数: %d\n" +
+                            "修正次数: %d\n" +
+                            "耗时: %d ms",
+                            summary.totalAffectedRows(),
+                            summary.operationCount(),
+                            summary.correctionCount(),
+                            summary.getDurationMs()
+                    ));
+
+                    // 更新历史面板
+                    if (historyPanel != null) {
+                        historyPanel.addTimelineEntry("WORKFLOW_COMPLETED", "工作流完成",
+                                "影响 " + state.getTotalAffectedRows() + " 行");
+                        historyPanel.refresh();
+                    }
+
+                    // 更新撤销按钮状态
+                    updateUndoButtonState();
+
+                    // 延迟隐藏进度条
+                    new Thread(() -> {
+                        try {
+                            Thread.sleep(3000);
+                            Platform.runLater(() -> {
+                                workflowProgressBar.setVisible(false);
+                                workflowProgressBar.setManaged(false);
+                            });
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                        }
+                    }).start();
+                });
+            }
+
+            @Override
+            public void onWorkflowCancelled() {
+                Platform.runLater(() -> {
+                    workflowProgressBar.markCancelled();
+                    addSystemMessage("工作流已取消");
+
+                    if (historyPanel != null) {
+                        historyPanel.addTimelineEntry("WORKFLOW_CANCELLED", "工作流已取消", null);
+                        historyPanel.refresh();
+                    }
+
+                    workflowProgressBar.setVisible(false);
+                    workflowProgressBar.setManaged(false);
+                });
+            }
+
+            @Override
+            public void onWorkflowError(WorkflowStep step, Throwable error) {
+                Platform.runLater(() -> {
+                    workflowProgressBar.markFailed();
+                    addErrorMessage("工作流执行失败: " + error.getMessage());
+
+                    if (historyPanel != null) {
+                        historyPanel.addTimelineEntry("WORKFLOW_FAILED", "工作流失败", error.getMessage());
+                        historyPanel.refresh();
+                    }
+                });
+            }
+        });
+    }
+
+    /**
+     * 显示步骤确认对话框
+     */
+    private void showStepConfirmationDialog(WorkflowStep step, WorkflowStepResult result) {
+        boolean hasPrevious = workflowEngine.getCurrentState().hasPreviousStep();
+
+        Optional<StepConfirmationDialog.UserAction> action =
+                StepConfirmationDialog.show(step, result, hasPrevious);
+
+        action.ifPresent(userAction -> {
+            switch (userAction.type()) {
+                case CONFIRM -> workflowEngine.confirmStep();
+                case MODIFY -> workflowEngine.modifyStep(userAction.correction());
+                case SKIP -> workflowEngine.skipStep();
+                case PREVIOUS -> workflowEngine.previousStep();
+                case CANCEL -> workflowEngine.cancelWorkflow();
             }
         });
     }
@@ -126,6 +419,11 @@ public class AgentChatStage extends Stage {
             if (agent != null) {
                 agent.switchModel(modelSelector.getValue());
                 addSystemMessage("已切换到 " + modelSelector.getValue() + " 模型");
+
+                // 同步更新工作流执行器的模型
+                if (workflowExecutors != null) {
+                    workflowExecutors.setCurrentModel(modelSelector.getValue());
+                }
             }
         });
 
@@ -163,9 +461,34 @@ public class AgentChatStage extends Stage {
         });
 
         // 上下文管理按钮
-        Button contextBtn = new Button("🧠 上下文管理");
+        Button contextBtn = new Button("\uD83E\uDDE0 上下文管理");
         contextBtn.setTooltip(new Tooltip("管理AI的语义上下文和预设映射"));
         contextBtn.setOnAction(e -> openContextManager());
+
+        // 工作流模式切换
+        workflowModeToggle = new ToggleButton("\uD83D\uDD04 协作模式");
+        workflowModeToggle.setTooltip(new Tooltip("开启协作模式：AI每步操作都需要确认"));
+        workflowModeToggle.setStyle("-fx-background-color: #9C27B0; -fx-text-fill: white;");
+        workflowModeToggle.setOnAction(e -> {
+            if (workflowModeToggle.isSelected()) {
+                workflowModeToggle.setStyle("-fx-background-color: #4CAF50; -fx-text-fill: white;");
+                addSystemMessage("\uD83D\uDD04 已开启协作模式\n" +
+                        "AI的每个操作步骤都会显示确认对话框\n" +
+                        "您可以确认、修正、跳过或回退每一步");
+                capabilityGuide.highlightForOperation("modify");
+            } else {
+                workflowModeToggle.setStyle("-fx-background-color: #9C27B0; -fx-text-fill: white;");
+                addSystemMessage("已关闭协作模式");
+                capabilityGuide.resetHighlight();
+            }
+        });
+
+        // 撤销按钮
+        undoButton = new Button("↩ 撤销");
+        undoButton.setTooltip(new Tooltip("撤销最近的数据修改操作"));
+        undoButton.setStyle("-fx-background-color: #FF9800; -fx-text-fill: white;");
+        undoButton.setDisable(true);
+        undoButton.setOnAction(e -> performUndo());
 
         // 状态指示
         statusLabel = new Label("就绪");
@@ -183,7 +506,9 @@ public class AgentChatStage extends Stage {
             new Separator(),
             newChatBtn, clearBtn,
             new Separator(),
-            sqlModeToggle, contextBtn,
+            sqlModeToggle, workflowModeToggle, contextBtn,
+            new Separator(),
+            undoButton,
             spacer,
             loadingIndicator, statusLabel
         );
@@ -298,7 +623,8 @@ public class AgentChatStage extends Stage {
     }
 
     private void initAgent() {
-        agent = new GameDataAgent();
+        // 从 Spring 容器获取 LangChain4j Agent
+        agent = SpringContextHolder.getBean(LangChainGameDataAgent.class);
 
         // 设置消息回调
         agent.setMessageCallback(message -> {
@@ -312,10 +638,18 @@ public class AgentChatStage extends Stage {
             // 初始化SQL工具
             sqlTool = new SqlExecutionTool(jdbcTemplate, modelSelector.getValue());
 
+            // 初始化追溯和撤销管理器
+            initUndoManagers();
+
             addSystemMessage("AI游戏数据助手已就绪！\n\n" +
-                "💬 对话模式: 可以用自然语言查询和修改游戏数据\n" +
-                "📊 SQL模式: 自动生成SQL查询并展示结果表格\n\n" +
+                "\uD83D\uDCAC 对话模式: 可以用自然语言查询和修改游戏数据\n" +
+                "\uD83D\uDCCA SQL模式: 自动生成SQL查询并展示结果表格\n" +
+                "\uD83D\uDD04 协作模式: AI每步操作都需要确认\n" +
+                "↩ 撤销功能: 支持回滚数据修改操作\n\n" +
                 "示例: \"查询所有50级以上的紫色武器\"");
+
+            // 初始化工作流执行器（在agent初始化后）
+            initWorkflowExecutors();
 
             // 异步初始化动态语义（后台进行，不阻塞UI）
             initDynamicSemanticsAsync();
@@ -324,6 +658,19 @@ public class AgentChatStage extends Stage {
             log.error("Agent初始化失败", e);
             addErrorMessage("Agent初始化失败: " + e.getMessage());
         }
+    }
+
+    /**
+     * 初始化工作流执行器
+     */
+    private void initWorkflowExecutors() {
+        workflowExecutors = new WorkflowExecutors(jdbcTemplate, agent);
+        workflowExecutors.setCurrentModel(modelSelector.getValue());
+
+        // 设置执行器提供者
+        workflowEngine.setExecutorProvider(workflowExecutors.createExecutorProvider());
+
+        log.info("工作流执行器初始化完成");
     }
 
     /**
@@ -630,8 +977,9 @@ public class AgentChatStage extends Stage {
      */
     private void openContextManager() {
         try {
+            // 检查 Agent 是否初始化（使用 jdbcTemplate 判断）
             red.jiuzhou.agent.texttosql.GameSemanticEnhancer enhancer =
-                agent.getMetadataService() != null ?
+                (agent != null && jdbcTemplate != null) ?
                     new red.jiuzhou.agent.texttosql.GameSemanticEnhancer(jdbcTemplate) :
                     null;
 
@@ -646,6 +994,205 @@ public class AgentChatStage extends Stage {
             log.error("打开上下文管理器失败", e);
             addErrorMessage("打开上下文管理器失败: " + e.getMessage());
         }
+    }
+
+    // ==================== 上下文感知消息 ====================
+
+    /**
+     * 发送上下文感知的消息
+     *
+     * 用于从右键菜单等外部触发的AI操作，将上下文信息和用户请求一起发送给AI。
+     * 支持协作工作流模式。
+     *
+     * @param context 设计上下文
+     * @param prompt 用户提示词
+     * @param operationType 操作类型（用于显示）
+     */
+    public void sendContextAwareMessage(DesignContext context, String prompt, String operationType) {
+        if (agent == null) {
+            addErrorMessage("AI助手未初始化");
+            return;
+        }
+
+        // 更新上下文透明化面板
+        contextPanel.updateContext(context);
+
+        // 更新AI能力说明高亮
+        capabilityGuide.highlightForOperation(operationType);
+
+        // 显示上下文信息提示
+        String operationLabel = getOperationLabel(operationType);
+        addSystemMessage(String.format(
+            "\uD83D\uDCCD 上下文感知模式\n" +
+            "操作: %s\n" +
+            "位置: %s",
+            operationLabel,
+            context.getSummary()
+        ));
+
+        // 判断是否需要工作流模式
+        boolean useWorkflow = workflowModeToggle.isSelected() ||
+                              CollaborativeWorkflowEngine.requiresWorkflow(operationType);
+
+        if (useWorkflow) {
+            // 使用协作工作流模式
+            startCollaborativeWorkflow(context, prompt, operationType);
+        } else {
+            // 普通模式
+            sendNormalContextMessage(context, prompt);
+        }
+    }
+
+    /**
+     * 启动协作工作流
+     */
+    private void startCollaborativeWorkflow(DesignContext context, String prompt, String operationType) {
+        // 推断工作流类型
+        String workflowType = CollaborativeWorkflowEngine.inferWorkflowType(operationType);
+
+        addSystemMessage(String.format(
+            "\uD83D\uDD04 启动协作工作流: %s\n" +
+            "每个步骤都会显示确认对话框，您可以随时修正或取消",
+            workflowType
+        ));
+
+        // 启动工作流
+        workflowEngine.startWorkflow(workflowType, context, prompt);
+    }
+
+    /**
+     * 发送普通上下文消息
+     */
+    private void sendNormalContextMessage(DesignContext context, String prompt) {
+        inputArea.setText(prompt);
+        setLoading(true);
+
+        new Thread(() -> {
+            try {
+                agent.chat(prompt, context);
+            } catch (Exception e) {
+                log.error("上下文感知消息处理失败", e);
+                Platform.runLater(() -> addErrorMessage("处理失败: " + e.getMessage()));
+            } finally {
+                Platform.runLater(() -> {
+                    setLoading(false);
+                    inputArea.clear();
+                    updatePendingBar();
+                });
+            }
+        }).start();
+    }
+
+    /**
+     * 显示数据对比对话框
+     *
+     * @param beforeData 修改前数据
+     * @param afterData 修改后数据
+     * @param modifiedColumns 被修改的列
+     * @return 用户选中的行索引列表
+     */
+    public List<Integer> showDataComparison(
+            List<Map<String, Object>> beforeData,
+            List<Map<String, Object>> afterData,
+            List<String> modifiedColumns) {
+
+        return DataComparisonView.showDialog(
+                "数据修改预览",
+                beforeData,
+                afterData,
+                modifiedColumns
+        );
+    }
+
+    /**
+     * 获取操作类型的显示标签
+     */
+    private String getOperationLabel(String operationType) {
+        return switch (operationType) {
+            case "analyze" -> "🔍 分析文件";
+            case "explain" -> "📖 解释数据结构";
+            case "generate" -> "✨ 生成相似配置";
+            case "check_refs" -> "🔗 检查引用完整性";
+            case "explain_row" -> "📖 解释行数据";
+            case "balance_check" -> "⚖️ 数值平衡性分析";
+            case "find_similar" -> "🔎 查找相似配置";
+            case "generate_variant" -> "✨ 生成变体";
+            default -> "🤖 AI操作";
+        };
+    }
+
+    /**
+     * 获取Agent实例（用于外部访问）
+     */
+    public GameDataAgent getAgent() {
+        return agent;
+    }
+
+    /**
+     * 执行撤销操作
+     */
+    private void performUndo() {
+        UndoManager undoManager = UndoManager.getInstance();
+
+        if (!undoManager.canUndo()) {
+            addSystemMessage("没有可撤销的操作");
+            return;
+        }
+
+        // 显示确认对话框
+        String undoDesc = undoManager.getLastUndoDescription();
+        Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
+        confirm.setTitle("确认撤销");
+        confirm.setHeaderText("撤销最近操作");
+        confirm.setContentText(undoDesc + "\n\n确定要撤销吗？");
+
+        confirm.showAndWait().ifPresent(response -> {
+            if (response == ButtonType.OK) {
+                UndoManager.UndoResult result = undoManager.undoLast();
+
+                if (result.success) {
+                    addSystemMessage("↩ " + result.message + " (恢复 " + result.restoredRows + " 行)");
+
+                    // 刷新历史面板
+                    if (historyPanel != null) {
+                        historyPanel.refresh();
+                    }
+                } else {
+                    addErrorMessage("撤销失败: " + result.message);
+                }
+
+                updateUndoButtonState();
+            }
+        });
+    }
+
+    /**
+     * 更新撤销按钮状态
+     */
+    private void updateUndoButtonState() {
+        Platform.runLater(() -> {
+            UndoManager undoManager = UndoManager.getInstance();
+            boolean canUndo = undoManager.canUndo();
+            undoButton.setDisable(!canUndo);
+
+            if (canUndo) {
+                undoButton.setTooltip(new Tooltip(undoManager.getLastUndoDescription()));
+            } else {
+                undoButton.setTooltip(new Tooltip("没有可撤销的操作"));
+            }
+        });
+    }
+
+    /**
+     * 初始化追溯和撤销管理器
+     */
+    private void initUndoManagers() {
+        // 设置JdbcTemplate到各管理器
+        WorkflowAuditLog.getInstance().setJdbcTemplate(jdbcTemplate);
+        DataSnapshot.getInstance().setJdbcTemplate(jdbcTemplate);
+        UndoManager.getInstance().setJdbcTemplate(jdbcTemplate);
+
+        log.info("追溯和撤销管理器初始化完成");
     }
 
     /**

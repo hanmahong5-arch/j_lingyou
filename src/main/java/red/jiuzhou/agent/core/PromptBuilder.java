@@ -2,6 +2,7 @@ package red.jiuzhou.agent.core;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import red.jiuzhou.agent.context.DesignContext;
 import red.jiuzhou.agent.texttosql.SqlExampleLibrary;
 import red.jiuzhou.agent.texttosql.GameSemanticEnhancer;
 import red.jiuzhou.agent.tools.ToolRegistry;
@@ -378,6 +379,160 @@ public class PromptBuilder {
         }
 
         return sb.toString();
+    }
+
+    // ==================== 上下文感知提示词构建 ====================
+
+    /**
+     * 构建上下文感知的提示词
+     *
+     * 将设计上下文（DesignContext）与用户查询结合，生成增强的提示词。
+     * 上下文信息会被格式化并添加到用户查询之前，让AI能够理解设计师当前的操作位置和意图。
+     *
+     * @param context 设计上下文
+     * @param userQuery 用户查询
+     * @return 增强后的提示词
+     */
+    public String buildContextAwarePrompt(DesignContext context, String userQuery) {
+        if (context == null) {
+            return userQuery;
+        }
+
+        StringBuilder sb = new StringBuilder();
+
+        // 添加上下文标题
+        sb.append("# 当前设计上下文\n\n");
+
+        // 使用 DesignContext 的 toPrompt() 方法获取格式化的上下文
+        sb.append(context.toPrompt());
+        sb.append("\n\n");
+
+        // 如果有表名，添加表结构详情
+        if (context.getTableName() != null && metadataService != null && metadataService.isInitialized()) {
+            sb.append("# 相关表详情\n\n");
+            sb.append(buildTableContextPrompt(context.getTableName()));
+            sb.append("\n\n");
+        }
+
+        // 如果有语义增强器，添加相关语义提示
+        if (semanticEnhancer != null) {
+            String hints = semanticEnhancer.translateToSqlHints(userQuery);
+            if (hints != null && !hints.isEmpty()) {
+                sb.append("# 语义提示\n\n");
+                sb.append(hints);
+                sb.append("\n\n");
+            }
+        }
+
+        // 添加用户查询
+        sb.append("# 用户请求\n\n");
+        sb.append(userQuery);
+
+        // 添加操作指导
+        sb.append("\n\n# 操作指导\n\n");
+        sb.append("请根据以上上下文信息回答用户的问题。");
+        sb.append("上下文已经提供了设计师当前正在查看的数据位置和相关信息，");
+        sb.append("请充分利用这些信息来给出准确、有帮助的回答。\n");
+
+        return sb.toString();
+    }
+
+    /**
+     * 构建针对特定操作类型的上下文提示词
+     *
+     * @param context 设计上下文
+     * @param operationType 操作类型
+     * @return 操作特定的提示词
+     */
+    public String buildOperationSpecificPrompt(DesignContext context, String operationType) {
+        StringBuilder sb = new StringBuilder();
+
+        // 基础上下文
+        sb.append(buildContextAwarePrompt(context, ""));
+
+        // 操作特定指导
+        sb.append("\n## 操作类型: ");
+        sb.append(getOperationDescription(operationType));
+        sb.append("\n\n");
+
+        sb.append("### 操作指导\n");
+        sb.append(getOperationGuidance(operationType));
+
+        return sb.toString();
+    }
+
+    /**
+     * 获取操作类型的描述
+     */
+    private String getOperationDescription(String operationType) {
+        return switch (operationType) {
+            case "analyze" -> "文件分析";
+            case "explain" -> "数据结构解释";
+            case "generate" -> "生成相似配置";
+            case "check_refs" -> "引用完整性检查";
+            case "explain_row" -> "行数据解释";
+            case "balance_check" -> "数值平衡性分析";
+            case "find_similar" -> "查找相似配置";
+            case "generate_variant" -> "生成变体";
+            default -> operationType;
+        };
+    }
+
+    /**
+     * 获取操作的指导说明
+     */
+    private String getOperationGuidance(String operationType) {
+        return switch (operationType) {
+            case "analyze" -> """
+                请分析当前文件的数据结构，包括：
+                1. 文件的主要用途和在游戏系统中的角色
+                2. 关键字段的含义和作用
+                3. 与其他配置文件/表的关联关系
+                4. 设计师可能关心的重点数据
+                """;
+
+            case "explain" -> """
+                请解释当前数据的结构和含义，包括：
+                1. 每个字段的游戏含义
+                2. 数值范围的合理性
+                3. 枚举值的含义（如品质、种族、职业等）
+                4. 字段之间的逻辑关系
+                """;
+
+            case "check_refs" -> """
+                请检查当前数据的引用关系，包括：
+                1. 本数据引用的外部数据是否存在
+                2. 引用的ID是否有效
+                3. 是否存在循环引用
+                4. 可能导致问题的悬空引用
+                """;
+
+            case "balance_check" -> """
+                请分析当前数据的数值平衡性，包括：
+                1. 数值是否在合理范围内
+                2. 与同类型数据相比是否异常
+                3. 成长曲线是否平滑
+                4. 可能导致游戏失衡的问题
+                """;
+
+            case "find_similar" -> """
+                请在数据库中查找与当前数据相似的配置，基于：
+                1. 相似的数值属性
+                2. 相同的分类/类型
+                3. 相近的等级要求
+                4. 类似的用途
+                """;
+
+            case "generate_variant" -> """
+                请基于当前数据生成一个变体版本：
+                1. 保持核心特征不变
+                2. 适当调整数值（±10-20%）
+                3. 可以改变名称和描述
+                4. 确保生成的数据合理可用
+                """;
+
+            default -> "请根据上下文执行相应操作。";
+        };
     }
 
     // ========== Getter/Setter ==========

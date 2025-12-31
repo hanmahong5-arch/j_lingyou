@@ -9,12 +9,16 @@ import javafx.stage.Window;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import red.jiuzhou.agent.context.ContextCollector;
+import red.jiuzhou.agent.context.DesignContext;
+
 import java.awt.Desktop;
 import java.io.File;
 import java.io.FileWriter;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -367,6 +371,176 @@ public class ContextMenuFactory {
         public Runnable exportCsv;
         public Runnable exportJson;
         public Runnable exportExcel;
+    }
+
+    // ==================== AI 智能操作菜单 ====================
+
+    /**
+     * 创建AI智能操作菜单（用于表格行）
+     *
+     * @param tableName 表名
+     * @param getRowData 获取选中行数据的函数
+     * @param callbacks AI操作回调
+     * @return AI菜单
+     */
+    public static Menu createAiMenu(
+            String tableName,
+            Supplier<Map<String, Object>> getRowData,
+            AiMenuCallbacks callbacks) {
+
+        Menu aiMenu = new Menu("🤖 AI智能操作");
+
+        // AI 解释当前行
+        MenuItem aiExplainItem = createMenuItem("🤖 让AI解释这行数据", "AI解释当前行数据的含义和作用");
+        aiExplainItem.setOnAction(e -> {
+            Map<String, Object> rowData = getRowData.get();
+            if (rowData != null && callbacks.onAiOperation != null) {
+                DesignContext context = DesignContext.fromRow(tableName, rowData);
+                callbacks.onAiOperation.accept(context, "explain_row");
+            }
+        });
+
+        // AI 数值平衡性分析
+        MenuItem aiBalanceItem = createMenuItem("🤖 让AI分析数值平衡性", "AI分析当前数据的数值是否合理");
+        aiBalanceItem.setOnAction(e -> {
+            Map<String, Object> rowData = getRowData.get();
+            if (rowData != null && callbacks.onAiOperation != null) {
+                DesignContext context = DesignContext.fromRow(tableName, rowData);
+                callbacks.onAiOperation.accept(context, "balance_check");
+            }
+        });
+
+        // AI 查找相似配置
+        MenuItem aiSimilarItem = createMenuItem("🤖 让AI查找相似配置", "AI在数据库中查找类似的配置");
+        aiSimilarItem.setOnAction(e -> {
+            Map<String, Object> rowData = getRowData.get();
+            if (rowData != null && callbacks.onAiOperation != null) {
+                DesignContext context = DesignContext.fromRow(tableName, rowData);
+                callbacks.onAiOperation.accept(context, "find_similar");
+            }
+        });
+
+        // AI 生成变体
+        MenuItem aiVariantItem = createMenuItem("🤖 让AI生成变体", "AI基于当前配置生成变体版本");
+        aiVariantItem.setOnAction(e -> {
+            Map<String, Object> rowData = getRowData.get();
+            if (rowData != null && callbacks.onAiOperation != null) {
+                DesignContext context = DesignContext.fromRow(tableName, rowData);
+                callbacks.onAiOperation.accept(context, "generate_variant");
+            }
+        });
+
+        // AI 检查引用完整性
+        MenuItem aiCheckRefsItem = createMenuItem("🤖 让AI检查引用完整性", "AI检查当前数据的引用关系是否正确");
+        aiCheckRefsItem.setOnAction(e -> {
+            Map<String, Object> rowData = getRowData.get();
+            if (rowData != null && callbacks.onAiOperation != null) {
+                DesignContext context = DesignContext.fromRow(tableName, rowData);
+                callbacks.onAiOperation.accept(context, "check_refs");
+            }
+        });
+
+        // 组装AI菜单
+        aiMenu.getItems().addAll(
+            aiExplainItem,
+            aiBalanceItem,
+            new SeparatorMenuItem(),
+            aiSimilarItem,
+            aiVariantItem,
+            new SeparatorMenuItem(),
+            aiCheckRefsItem
+        );
+
+        return aiMenu;
+    }
+
+    /**
+     * 创建带AI功能的表格行右键菜单
+     */
+    public static <T> ContextMenu createTableRowMenuWithAi(
+            TableView<T> tableView,
+            String tableName,
+            java.util.function.Function<T, Map<String, Object>> rowToMap,
+            TableMenuCallbacks<T> callbacks,
+            AiMenuCallbacks aiCallbacks) {
+
+        // 创建基础菜单
+        ContextMenu menu = createTableRowMenu(tableView, callbacks);
+
+        // 如果有AI回调，添加AI菜单
+        if (aiCallbacks != null && aiCallbacks.onAiOperation != null) {
+            Menu aiMenu = createAiMenu(
+                tableName,
+                () -> {
+                    T selected = tableView.getSelectionModel().getSelectedItem();
+                    return selected != null ? rowToMap.apply(selected) : null;
+                },
+                aiCallbacks
+            );
+
+            // 在菜单开头插入AI菜单（让AI功能更显眼）
+            menu.getItems().add(0, aiMenu);
+            menu.getItems().add(1, new SeparatorMenuItem());
+        }
+
+        return menu;
+    }
+
+    /**
+     * AI菜单回调接口
+     */
+    public static class AiMenuCallbacks {
+        /**
+         * AI操作回调
+         * 参数1: DesignContext 上下文信息
+         * 参数2: String 操作类型
+         *        - "explain_row": 解释当前行数据
+         *        - "balance_check": 数值平衡性分析
+         *        - "find_similar": 查找相似配置
+         *        - "generate_variant": 生成变体
+         *        - "check_refs": 检查引用完整性
+         */
+        public BiConsumer<DesignContext, String> onAiOperation;
+
+        public AiMenuCallbacks() {}
+
+        public AiMenuCallbacks(BiConsumer<DesignContext, String> onAiOperation) {
+            this.onAiOperation = onAiOperation;
+        }
+    }
+
+    /**
+     * 为现有菜单添加AI操作项
+     *
+     * @param menu 现有菜单
+     * @param tableName 表名
+     * @param getRowData 获取行数据的函数
+     * @param aiCallbacks AI回调
+     */
+    public static void addAiMenuItems(
+            ContextMenu menu,
+            String tableName,
+            Supplier<Map<String, Object>> getRowData,
+            AiMenuCallbacks aiCallbacks) {
+
+        if (aiCallbacks == null || aiCallbacks.onAiOperation == null) {
+            return;
+        }
+
+        Menu aiMenu = createAiMenu(tableName, getRowData, aiCallbacks);
+
+        // 找到合适的插入位置（在第一个分隔符之前或开头）
+        int insertIndex = 0;
+        for (int i = 0; i < menu.getItems().size(); i++) {
+            if (menu.getItems().get(i) instanceof SeparatorMenuItem) {
+                insertIndex = i;
+                break;
+            }
+        }
+
+        // 插入AI菜单
+        menu.getItems().add(insertIndex, new SeparatorMenuItem());
+        menu.getItems().add(insertIndex, aiMenu);
     }
 
     // ==================== 列头菜单 ====================

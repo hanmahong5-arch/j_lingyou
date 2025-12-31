@@ -14,8 +14,9 @@ import javafx.stage.Modality;
 import javafx.stage.Stage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import red.jiuzhou.ai.AiModelClient;
-import red.jiuzhou.ai.AiModelFactory;
+import dev.langchain4j.model.chat.ChatLanguageModel;
+import red.jiuzhou.langchain.LangChainModelFactory;
+import red.jiuzhou.util.SpringContextHolder;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -433,13 +434,15 @@ public class EnhancedContentEditorDialog extends Stage {
             @Override
             protected String call() throws Exception {
                 try {
-                    AiModelClient client = AiModelFactory.getClient(model);
+                    // 使用 LangChain4j 获取模型
+                    LangChainModelFactory modelFactory = SpringContextHolder.getBean(LangChainModelFactory.class);
+                    ChatLanguageModel chatModel = modelFactory.getModel(model);
 
                     // 构建完整提示词
                     String fullPrompt = prompt + "\n\n内容：\n" + content;
 
-                    // 调用AI
-                    String result = client.chat(fullPrompt);
+                    // 调用 LangChain4j
+                    String result = chatModel.generate(fullPrompt);
 
                     return result != null ? result.trim() : "";
                 } catch (Exception e) {

@@ -187,15 +187,93 @@ public class FocusAwareTreeCell<T> extends TreeCell<T> {
         // 应用着色样式
         applyFileNameStyle(nameLabel, mechanism, mechColor);
 
+        // 状态徽章区域（右侧）
+        HBox statusBadges = createStatusBadges(text, filePath);
+
         // 机制标签（只为非OTHER显示）
         if (mechanism != AionMechanismCategory.OTHER) {
             Label mechanismLabel = createMechanismBadge(mechanism);
-            container.getChildren().addAll(colorBar, fileIcon, nameLabel, mechanismLabel);
+            container.getChildren().addAll(colorBar, fileIcon, nameLabel, statusBadges, mechanismLabel);
         } else {
-            container.getChildren().addAll(colorBar, fileIcon, nameLabel);
+            container.getChildren().addAll(colorBar, fileIcon, nameLabel, statusBadges);
         }
 
         return container;
+    }
+
+    /**
+     * 创建状态徽章区域
+     * 显示文件的导入状态、DDL状态、服务器优先级等
+     */
+    private HBox createStatusBadges(String fileName, String filePath) {
+        HBox badges = new HBox(1);
+        badges.setAlignment(Pos.CENTER_RIGHT);
+        badges.setPadding(new Insets(0, 2, 0, 4));
+
+        // 从文件名推断表名
+        String tableName = inferTableName(fileName);
+
+        // 异步获取状态（避免阻塞UI）
+        FileStatusCache.getAsync(tableName, status -> {
+            javafx.application.Platform.runLater(() -> {
+                badges.getChildren().clear();
+
+                // 导入状态徽章
+                if (status.getImportStatus() != FileStatusInfo.ImportStatus.UNKNOWN) {
+                    Label importBadge = createStatusBadge(
+                        status.getImportIcon(),
+                        status.getImportTooltip()
+                    );
+                    badges.getChildren().add(importBadge);
+                }
+
+                // DDL状态徽章
+                if (status.getDdlStatus() != FileStatusInfo.DdlStatus.UNKNOWN &&
+                    !status.getDdlIcon().isEmpty()) {
+                    Label ddlBadge = createStatusBadge(
+                        status.getDdlIcon(),
+                        status.getDdlTooltip()
+                    );
+                    badges.getChildren().add(ddlBadge);
+                }
+
+                // 服务器优先级徽章
+                if (status.isServerLoaded()) {
+                    Label priorityBadge = createStatusBadge(
+                        status.getPriorityIcon(),
+                        status.getPriorityTooltip()
+                    );
+                    badges.getChildren().add(priorityBadge);
+                }
+            });
+        });
+
+        return badges;
+    }
+
+    /**
+     * 创建单个状态徽章
+     */
+    private Label createStatusBadge(String icon, String tooltip) {
+        Label badge = new Label(icon);
+        badge.setStyle("-fx-font-size: 9px; -fx-padding: 0 1;");
+        if (tooltip != null && !tooltip.isEmpty()) {
+            badge.setTooltip(new Tooltip(tooltip));
+        }
+        return badge;
+    }
+
+    /**
+     * 从文件名推断表名
+     */
+    private String inferTableName(String fileName) {
+        if (fileName == null) return "";
+        // 移除扩展名
+        int dotIndex = fileName.lastIndexOf('.');
+        if (dotIndex > 0) {
+            fileName = fileName.substring(0, dotIndex);
+        }
+        return fileName.toLowerCase();
     }
 
     /**
