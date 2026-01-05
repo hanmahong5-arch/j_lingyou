@@ -749,6 +749,22 @@ public class Dbxmltool extends Application {
         ));
         gameToolsBtn.setStyle("-fx-background-color: #FFF3E0;");
 
+        // 本地化去重按钮 - 删除公共目录中与China目录重复的条目
+        Button localizationDedupeBtn = new Button("🌏 本地化去重");
+        localizationDedupeBtn.setTooltip(new Tooltip(
+            "本地化条目去重工具\n\n" +
+            "🎯 核心功能:\n" +
+            "• 扫描 China 目录的本地化文件\n" +
+            "• 提取每个文件中的条目 ID\n" +
+            "• 在公共目录删除相同 ID 的条目\n" +
+            "• 支持预览和批量操作\n\n" +
+            "💡 适用场景:\n" +
+            "→ 私服不需要本地化覆盖机制\n" +
+            "→ 合并配置文件时清理重复\n" +
+            "→ 简化 XML 配置结构"
+        ));
+        localizationDedupeBtn.setStyle("-fx-background-color: #E0F7FA;");
+
         // 机制关系图按钮 - 27个机制间的依赖关系可视化
         Button mechanismRelationBtn = new Button("🔗 关系图");
         mechanismRelationBtn.setTooltip(new Tooltip(
@@ -957,6 +973,19 @@ public class Dbxmltool extends Application {
             }
         });
 
+        // 本地化去重 - 打开本地化去重工具窗口
+        localizationDedupeBtn.setOnAction(event -> {
+            try {
+                log.info("打开本地化去重工具");
+                LocalizationDeduplicationStage stage = new LocalizationDeduplicationStage();
+                stage.initOwner(primaryStage);
+                stage.show();
+            } catch (Exception e) {
+                log.error("打开本地化去重工具失败", e);
+                showError("打开本地化去重工具失败: " + e.getMessage());
+            }
+        });
+
         // 机制关系图 - 打开机制关系图可视化窗口
         mechanismRelationBtn.setOnAction(event -> {
             try {
@@ -1122,6 +1151,7 @@ public class Dbxmltool extends Application {
             // ========== 专业工具模块 ==========
             // 特殊领域的专业工具
             gameToolsBtn,        // 🎯 刷怪工具
+            localizationDedupeBtn, // 🌏 本地化去重
 
             // 状态信息区域（右对齐）
             spacer, statusLabel
