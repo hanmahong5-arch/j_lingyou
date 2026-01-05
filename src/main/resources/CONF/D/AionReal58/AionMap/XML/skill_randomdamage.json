@@ -1,8 +1,0 @@
-{
-	"file_path":"D:\\AionReal58\\AionMap\\XML\\skill_randomdamage.xml",
-	"xml_root_tag":"skill_randomdamages",
-	"list":[],
-	"xml_item_tag":"random_type",
-	"table_name":"skill_randomdamage",
-	"sql":"select * from skill_randomdamage order by CAST(range0 AS UNSIGNED) ASC"
-}

@@ -1,8 +1,0 @@
-{
-	"file_path":"D:\\AionReal58\\AionMap\\XML\\skill_damageattenuation.xml",
-	"xml_root_tag":"skill_damageattenuations",
-	"list":[],
-	"xml_item_tag":"attenuation_type",
-	"table_name":"skill_damageattenuation",
-	"sql":"select * from skill_damageattenuation order by CAST(attenuation_value_a AS UNSIGNED) ASC"
-}

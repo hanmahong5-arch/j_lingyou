@@ -1,9 +1,0 @@
-{
-	"file_path":"D:\\AionReal58\\AionMap\\XML\\skill_base.xml",
-	"xml_root_attr":"generated_time=2014/04/15 10:01:58",
-	"xml_root_tag":"skill_bases",
-	"list":[],
-	"xml_item_tag":"skill_base",
-	"table_name":"skill_base",
-	"sql":"select * from skill_base order by CAST(id AS UNSIGNED) ASC"
-}

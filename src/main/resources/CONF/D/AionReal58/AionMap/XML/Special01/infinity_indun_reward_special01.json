@@ -1,8 +1,0 @@
-{
-	"file_path":"D:\\AionReal58\\AionMap\\XML\\Special01\\infinity_indun_reward_special01.xml",
-	"xml_root_tag":"infinity_indun_rewards",
-	"list":[],
-	"xml_item_tag":"infinity_indun_reward",
-	"table_name":"infinity_indun_reward_special01",
-	"sql":"select * from infinity_indun_reward_special01 order by CAST(id AS UNSIGNED) ASC"
-}

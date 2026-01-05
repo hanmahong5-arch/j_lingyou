@@ -6,28 +6,32 @@ import javafx.geometry.Pos;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
-import red.jiuzhou.agent.context.*;
+import javafx.scene.shape.Circle;
+import red.jiuzhou.agent.context.DesignContext;
+import red.jiuzhou.agent.context.FieldReference;
+import red.jiuzhou.agent.context.ColumnMetadata;
+import red.jiuzhou.agent.context.TableMetadata;
 
-import java.util.Map;
+import java.util.*;
 import java.util.function.Consumer;
 
 /**
  * 上下文透明化面板
  *
- * <p>让设计师清晰看到AI正在使用的所有上下文信息，包括：
+ * <p>让设计师清楚看到AI正在使用的所有上下文信息，包括：
  * <ul>
- *   <li>位置信息（文件/表/行）</li>
- *   <li>表结构元数据</li>
- *   <li>当前行数据</li>
- *   <li>引用关系（入度/出度）</li>
- *   <li>语义提示（游戏术语映射）</li>
+ *   <li>当前位置（表、行、字段）</li>
+ *   <li>表结构信息（字段列表、类型）</li>
+ *   <li>引用关系（入度、出度）</li>
+ *   <li>AI的理解（意图、条件）</li>
+ *   <li>补充说明（用户输入）</li>
  * </ul>
  *
  * <p>设计原则：
  * <ol>
- *   <li>透明 - 所有AI使用的信息都可见</li>
- *   <li>可编辑 - 设计师可以补充/修正信息</li>
- *   <li>可信度 - 显示信息来源和可信度</li>
+ *   <li>透明 - 展示AI使用的所有信息</li>
+ *   <li>可编辑 - 允许用户补充语义提示</li>
+ *   <li>实时 - 随用户操作自动更新</li>
  * </ol>
  *
  * @author Claude
@@ -35,346 +39,477 @@ import java.util.function.Consumer;
  */
 public class ContextTransparencyPanel extends VBox {
 
-    // 上下文树视图
-    private final TreeView<ContextItem> contextTree;
+    // 颜色常量
+    private static final String COLOR_LOCATION = "#2196F3";    // 蓝色 - 位置
+    private static final String COLOR_SCHEMA = "#4CAF50";      // 绿色 - 结构
+    private static final String COLOR_REFERENCE = "#9C27B0";   // 紫色 - 引用
+    private static final String COLOR_AI = "#FF9800";          // 橙色 - AI理解
+    private static final String COLOR_SUPPLEMENT = "#00BCD4";  // 青色 - 补充
 
-    // 根节点
-    private final TreeItem<ContextItem> rootItem;
+    // UI组件
+    private final VBox locationSection;
+    private final VBox schemaSection;
+    private final VBox referenceSection;
+    private final VBox aiUnderstandingSection;
+    private final VBox supplementSection;
 
-    // 补充说明输入
-    private final TextArea supplementInput;
+    // 位置信息组件
+    private final Label locationTypeLabel;
+    private final Label locationPathLabel;
+    private final Label locationIdLabel;
+
+    // 表结构组件
+    private final Label tableNameLabel;
+    private final VBox columnsContainer;
+
+    // 引用关系组件
+    private final VBox outgoingRefsContainer;
+    private final VBox incomingRefsContainer;
+
+    // AI理解组件
+    private final Label intentLabel;
+    private final VBox conditionsContainer;
+    private final Label sqlPreviewLabel;
+
+    // 补充说明组件
+    private final TextField supplementInput;
+    private final VBox supplementsContainer;
 
     // 当前上下文
     private DesignContext currentContext;
 
-    // 补充说明回调
+    // 回调
     private Consumer<String> onSupplementAdded;
 
-    // 分类节点
-    private TreeItem<ContextItem> locationNode;
-    private TreeItem<ContextItem> schemaNode;
-    private TreeItem<ContextItem> rowDataNode;
-    private TreeItem<ContextItem> refsNode;
-    private TreeItem<ContextItem> semanticsNode;
+    // 已添加的补充说明
+    private final List<String> supplements = new ArrayList<>();
+
+    // 高亮的字段
+    private String highlightedField;
 
     public ContextTransparencyPanel() {
         this.setSpacing(8);
         this.setPadding(new Insets(8));
         this.getStyleClass().add("context-transparency-panel");
+        this.setStyle("-fx-background-color: #FAFAFA;");
 
         // 标题
         Label titleLabel = new Label("当前上下文");
-        titleLabel.getStyleClass().add("panel-title");
         titleLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 14px;");
 
-        // 上下文树
-        rootItem = new TreeItem<>(new ContextItem("root", "上下文信息", ContextItem.ItemType.ROOT));
-        rootItem.setExpanded(true);
+        // ==================== 位置信息区域 ====================
+        locationTypeLabel = new Label("--");
+        locationPathLabel = new Label("--");
+        locationPathLabel.setWrapText(true);
+        locationIdLabel = new Label("");
+        locationIdLabel.setStyle("-fx-text-fill: #666;");
 
-        contextTree = new TreeView<>(rootItem);
-        contextTree.setShowRoot(false);
-        contextTree.setCellFactory(tv -> new ContextTreeCell());
-        contextTree.getStyleClass().add("context-tree");
-        VBox.setVgrow(contextTree, Priority.ALWAYS);
+        locationSection = createSection("位置", COLOR_LOCATION,
+            createLabelRow("类型:", locationTypeLabel),
+            createLabelRow("路径:", locationPathLabel),
+            locationIdLabel
+        );
 
-        // 初始化分类节点
-        initCategoryNodes();
+        // ==================== 表结构区域 ====================
+        tableNameLabel = new Label("--");
+        tableNameLabel.setStyle("-fx-font-weight: bold;");
+        columnsContainer = new VBox(2);
+        columnsContainer.setPadding(new Insets(4, 0, 0, 16));
 
-        // 补充说明区域
-        TitledPane supplementPane = createSupplementPane();
+        schemaSection = createSection("表结构", COLOR_SCHEMA,
+            createLabelRow("表名:", tableNameLabel),
+            new Label("字段:"),
+            columnsContainer
+        );
 
-        // 组装
-        this.getChildren().addAll(titleLabel, contextTree, supplementPane);
+        // ==================== 引用关系区域 ====================
+        outgoingRefsContainer = new VBox(2);
+        incomingRefsContainer = new VBox(2);
+
+        VBox refsContent = new VBox(6);
+        refsContent.getChildren().addAll(
+            new Label("引用了 →"),
+            outgoingRefsContainer,
+            new Label("被引用 ←"),
+            incomingRefsContainer
+        );
+
+        referenceSection = createSection("引用关系", COLOR_REFERENCE, refsContent);
+
+        // ==================== AI理解区域 ====================
+        intentLabel = new Label("--");
+        intentLabel.setWrapText(true);
+        intentLabel.setStyle("-fx-font-style: italic;");
+
+        conditionsContainer = new VBox(2);
+        conditionsContainer.setPadding(new Insets(4, 0, 0, 16));
+
+        sqlPreviewLabel = new Label("");
+        sqlPreviewLabel.setWrapText(true);
+        sqlPreviewLabel.setStyle("-fx-font-family: monospace; -fx-font-size: 11px; -fx-text-fill: #666;");
+
+        aiUnderstandingSection = createSection("AI 理解", COLOR_AI,
+            createLabelRow("意图:", intentLabel),
+            new Label("条件:"),
+            conditionsContainer,
+            sqlPreviewLabel
+        );
+        aiUnderstandingSection.setVisible(false);
+        aiUnderstandingSection.setManaged(false);
+
+        // ==================== 补充说明区域 ====================
+        supplementInput = new TextField();
+        supplementInput.setPromptText("添加补充说明...");
+        supplementInput.setOnAction(e -> addSupplement());
+
+        Button addButton = new Button("+");
+        addButton.setStyle("-fx-background-color: " + COLOR_SUPPLEMENT + "; -fx-text-fill: white;");
+        addButton.setOnAction(e -> addSupplement());
+
+        HBox inputRow = new HBox(4, supplementInput, addButton);
+        HBox.setHgrow(supplementInput, Priority.ALWAYS);
+
+        supplementsContainer = new VBox(4);
+
+        supplementSection = createSection("补充说明", COLOR_SUPPLEMENT,
+            inputRow,
+            supplementsContainer
+        );
+
+        // ==================== 组装面板 ====================
+        ScrollPane scrollPane = new ScrollPane();
+        VBox content = new VBox(8);
+        content.getChildren().addAll(
+            locationSection,
+            schemaSection,
+            referenceSection,
+            aiUnderstandingSection,
+            supplementSection
+        );
+        scrollPane.setContent(content);
+        scrollPane.setFitToWidth(true);
+        scrollPane.setStyle("-fx-background-color: transparent;");
+        VBox.setVgrow(scrollPane, Priority.ALWAYS);
+
+        this.getChildren().addAll(titleLabel, scrollPane);
     }
 
     /**
-     * 初始化分类节点
+     * 创建带标题和颜色指示器的区域
      */
-    private void initCategoryNodes() {
-        locationNode = new TreeItem<>(new ContextItem("location", "位置信息", ContextItem.ItemType.CATEGORY));
-        locationNode.setExpanded(true);
+    private VBox createSection(String title, String color, Region... children) {
+        VBox section = new VBox(4);
+        section.setPadding(new Insets(8));
+        section.setStyle("-fx-background-color: white; -fx-background-radius: 4; " +
+                        "-fx-border-color: #E0E0E0; -fx-border-radius: 4;");
 
-        schemaNode = new TreeItem<>(new ContextItem("schema", "表结构", ContextItem.ItemType.CATEGORY));
-        schemaNode.setExpanded(false);
+        // 标题行
+        Circle indicator = new Circle(5, Color.web(color));
+        Label titleLabel = new Label(title);
+        titleLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 12px;");
+        HBox titleRow = new HBox(6, indicator, titleLabel);
+        titleRow.setAlignment(Pos.CENTER_LEFT);
 
-        rowDataNode = new TreeItem<>(new ContextItem("rowData", "当前行数据", ContextItem.ItemType.CATEGORY));
-        rowDataNode.setExpanded(false);
+        section.getChildren().add(titleRow);
+        section.getChildren().addAll(children);
 
-        refsNode = new TreeItem<>(new ContextItem("refs", "引用关系", ContextItem.ItemType.CATEGORY));
-        refsNode.setExpanded(true);
-
-        semanticsNode = new TreeItem<>(new ContextItem("semantics", "语义提示", ContextItem.ItemType.CATEGORY));
-        semanticsNode.setExpanded(true);
-
-        rootItem.getChildren().addAll(locationNode, schemaNode, rowDataNode, refsNode, semanticsNode);
+        return section;
     }
 
     /**
-     * 创建补充说明面板
+     * 创建标签行
      */
-    private TitledPane createSupplementPane() {
-        supplementInput = new TextArea();
-        supplementInput.setPromptText("补充AI可能需要的信息...\n例如：这个物品是活动奖励，不应该被普通怪物掉落");
-        supplementInput.setPrefRowCount(3);
-        supplementInput.setWrapText(true);
-
-        Button addButton = new Button("添加到上下文");
-        addButton.setOnAction(e -> {
-            String text = supplementInput.getText().trim();
-            if (!text.isEmpty()) {
-                addSupplementToContext(text);
-                supplementInput.clear();
-            }
-        });
-
-        VBox content = new VBox(8, supplementInput, addButton);
-        content.setAlignment(Pos.CENTER_RIGHT);
-
-        TitledPane pane = new TitledPane("补充说明", content);
-        pane.setExpanded(false);
-        pane.setAnimated(true);
-        return pane;
+    private HBox createLabelRow(String label, Label valueLabel) {
+        Label keyLabel = new Label(label);
+        keyLabel.setMinWidth(40);
+        keyLabel.setStyle("-fx-text-fill: #666;");
+        HBox row = new HBox(4, keyLabel, valueLabel);
+        row.setAlignment(Pos.CENTER_LEFT);
+        return row;
     }
 
     /**
      * 更新上下文显示
-     *
-     * @param context 设计上下文
      */
     public void updateContext(DesignContext context) {
         this.currentContext = context;
-
         Platform.runLater(() -> {
-            // 清空所有分类节点的子项
-            locationNode.getChildren().clear();
-            schemaNode.getChildren().clear();
-            rowDataNode.getChildren().clear();
-            refsNode.getChildren().clear();
-            semanticsNode.getChildren().clear();
-
             if (context == null) {
-                addPlaceholder(locationNode, "无上下文");
+                clearDisplay();
                 return;
             }
 
             // 更新位置信息
-            updateLocationInfo(context);
+            updateLocationSection(context);
 
             // 更新表结构
-            updateSchemaInfo(context);
-
-            // 更新行数据
-            updateRowData(context);
+            updateSchemaSection(context);
 
             // 更新引用关系
-            updateReferences(context);
+            updateReferenceSection(context);
 
-            // 更新语义提示
-            updateSemantics(context);
+            // 清空AI理解（等待新的理解结果）
+            clearAiUnderstanding();
         });
     }
 
     /**
-     * 更新位置信息
+     * 更新位置信息区域
      */
-    private void updateLocationInfo(DesignContext context) {
-        // 位置类型
-        if (context.getLocation() != null) {
-            String locationType = switch (context.getLocation()) {
-                case FILE -> "文件";
-                case TABLE -> "数据库表";
-                case ROW -> "表格行";
-                case FIELD -> "字段";
-                case MECHANISM -> "游戏机制";
-            };
-            addItem(locationNode, "type", "类型", locationType, ContextItem.ItemType.INFO);
+    private void updateLocationSection(DesignContext context) {
+        String locationType = context.getLocation() != null ?
+            getLocationTypeDisplay(context.getLocation()) : "--";
+        locationTypeLabel.setText(locationType);
+
+        String path = context.getFocusPath();
+        if (path != null) {
+            // 只显示文件名或表名
+            int lastSlash = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
+            String displayPath = lastSlash >= 0 ? path.substring(lastSlash + 1) : path;
+            locationPathLabel.setText(displayPath);
+            locationPathLabel.setTooltip(new Tooltip(path));
+        } else {
+            locationPathLabel.setText("--");
         }
 
-        // 表名
-        if (context.getTableName() != null) {
-            addItem(locationNode, "table", "表名", context.getTableName(), ContextItem.ItemType.INFO);
-        }
-
-        // 焦点路径
-        if (context.getFocusPath() != null) {
-            addItem(locationNode, "path", "路径", context.getFocusPath(), ContextItem.ItemType.INFO);
-        }
-
-        // 焦点ID
-        if (context.getFocusId() != null) {
-            addItem(locationNode, "id", "ID", context.getFocusId(), ContextItem.ItemType.INFO);
-        }
-
-        // 所属机制
-        if (context.getMechanism() != null) {
-            addItem(locationNode, "mechanism", "机制",
-                    context.getMechanism().getDisplayName(),
-                    ContextItem.ItemType.HIGHLIGHT);
-        }
-
-        if (locationNode.getChildren().isEmpty()) {
-            addPlaceholder(locationNode, "无位置信息");
+        String id = context.getFocusId();
+        if (id != null && !id.isEmpty()) {
+            locationIdLabel.setText("ID: " + id);
+            locationIdLabel.setVisible(true);
+            locationIdLabel.setManaged(true);
+        } else {
+            locationIdLabel.setVisible(false);
+            locationIdLabel.setManaged(false);
         }
     }
 
     /**
-     * 更新表结构信息
+     * 更新表结构区域
      */
-    private void updateSchemaInfo(DesignContext context) {
+    private void updateSchemaSection(DesignContext context) {
+        columnsContainer.getChildren().clear();
+
+        String tableName = context.getTableName();
+        if (tableName != null) {
+            tableNameLabel.setText(tableName);
+        } else {
+            tableNameLabel.setText("--");
+        }
+
         TableMetadata schema = context.getTableSchema();
-        if (schema == null) {
-            addPlaceholder(schemaNode, "无表结构信息");
+        if (schema != null && schema.getColumns() != null) {
+            for (ColumnMetadata col : schema.getColumns()) {
+                HBox colRow = createColumnRow(col);
+                columnsContainer.getChildren().add(colRow);
+            }
+            schemaSection.setVisible(true);
+            schemaSection.setManaged(true);
+        } else {
+            schemaSection.setVisible(tableName != null);
+            schemaSection.setManaged(tableName != null);
+        }
+    }
+
+    /**
+     * 创建字段行
+     */
+    private HBox createColumnRow(ColumnMetadata col) {
+        Label nameLabel = new Label(col.getName());
+        nameLabel.setMinWidth(80);
+
+        // 如果是高亮字段，添加背景色
+        if (col.getName().equals(highlightedField)) {
+            nameLabel.setStyle("-fx-background-color: #FFEB3B; -fx-font-weight: bold;");
+        }
+
+        Label typeLabel = new Label("(" + col.getType() + ")");
+        typeLabel.setStyle("-fx-text-fill: #999; -fx-font-size: 10px;");
+
+        HBox row = new HBox(4, nameLabel, typeLabel);
+        row.setAlignment(Pos.CENTER_LEFT);
+
+        // 添加注释提示（HBox没有setTooltip，使用Tooltip.install）
+        if (col.getComment() != null && !col.getComment().isEmpty()) {
+            Tooltip.install(row, new Tooltip(col.getComment()));
+        }
+
+        return row;
+    }
+
+    /**
+     * 更新引用关系区域
+     */
+    private void updateReferenceSection(DesignContext context) {
+        outgoingRefsContainer.getChildren().clear();
+        incomingRefsContainer.getChildren().clear();
+
+        List<FieldReference> outgoing = context.getOutgoingRefs();
+        List<FieldReference> incoming = context.getIncomingRefs();
+
+        boolean hasRefs = (outgoing != null && !outgoing.isEmpty()) ||
+                          (incoming != null && !incoming.isEmpty());
+
+        if (outgoing != null) {
+            for (FieldReference ref : outgoing) {
+                Label refLabel = new Label("  " + ref.getSourceField() + " → " +
+                                           ref.getTargetTable() + "." + ref.getTargetField());
+                refLabel.setStyle("-fx-text-fill: #666; -fx-font-size: 11px;");
+                outgoingRefsContainer.getChildren().add(refLabel);
+            }
+        }
+        if (outgoingRefsContainer.getChildren().isEmpty()) {
+            outgoingRefsContainer.getChildren().add(new Label("  (无)"));
+        }
+
+        if (incoming != null) {
+            for (FieldReference ref : incoming) {
+                Label refLabel = new Label("  " + ref.getSourceTable() + "." +
+                                           ref.getSourceField() + " → " + ref.getTargetField());
+                refLabel.setStyle("-fx-text-fill: #666; -fx-font-size: 11px;");
+                incomingRefsContainer.getChildren().add(refLabel);
+            }
+        }
+        if (incomingRefsContainer.getChildren().isEmpty()) {
+            incomingRefsContainer.getChildren().add(new Label("  (无)"));
+        }
+
+        referenceSection.setVisible(hasRefs);
+        referenceSection.setManaged(hasRefs);
+    }
+
+    /**
+     * 显示AI理解结果
+     */
+    public void showAiUnderstanding(String intent, List<String> conditions, String sqlPreview) {
+        Platform.runLater(() -> {
+            intentLabel.setText(intent != null ? intent : "--");
+
+            conditionsContainer.getChildren().clear();
+            if (conditions != null && !conditions.isEmpty()) {
+                for (String condition : conditions) {
+                    Label condLabel = new Label("• " + condition);
+                    condLabel.setStyle("-fx-text-fill: #666; -fx-font-size: 11px;");
+                    conditionsContainer.getChildren().add(condLabel);
+                }
+            } else {
+                conditionsContainer.getChildren().add(new Label("• (无具体条件)"));
+            }
+
+            if (sqlPreview != null && !sqlPreview.isEmpty()) {
+                sqlPreviewLabel.setText("SQL: " + sqlPreview);
+                sqlPreviewLabel.setVisible(true);
+                sqlPreviewLabel.setManaged(true);
+            } else {
+                sqlPreviewLabel.setVisible(false);
+                sqlPreviewLabel.setManaged(false);
+            }
+
+            aiUnderstandingSection.setVisible(true);
+            aiUnderstandingSection.setManaged(true);
+        });
+    }
+
+    /**
+     * 清空AI理解显示
+     */
+    private void clearAiUnderstanding() {
+        intentLabel.setText("--");
+        conditionsContainer.getChildren().clear();
+        sqlPreviewLabel.setText("");
+        aiUnderstandingSection.setVisible(false);
+        aiUnderstandingSection.setManaged(false);
+    }
+
+    /**
+     * 添加补充说明
+     */
+    private void addSupplement() {
+        String text = supplementInput.getText().trim();
+        if (text.isEmpty()) {
             return;
         }
 
-        // 表基本信息
-        addItem(schemaNode, "tableName", "表名", schema.getTableName(), ContextItem.ItemType.INFO);
-        addItem(schemaNode, "columnCount", "字段数", String.valueOf(schema.getColumns().size()), ContextItem.ItemType.INFO);
+        supplements.add(text);
+        supplementInput.clear();
 
-        // 字段列表
-        TreeItem<ContextItem> columnsItem = new TreeItem<>(
-                new ContextItem("columns", "字段列表", ContextItem.ItemType.CATEGORY));
-        schemaNode.getChildren().add(columnsItem);
+        // 添加到显示列表
+        HBox supplementRow = createSupplementRow(text);
+        supplementsContainer.getChildren().add(supplementRow);
 
-        for (ColumnMetadata col : schema.getColumns()) {
-            String display = col.getName() + " (" + col.getType() + ")";
-            if (col.getComment() != null && !col.getComment().isEmpty()) {
-                display += " // " + col.getComment();
-            }
-            addItem(columnsItem, col.getName(), col.getName(), display, ContextItem.ItemType.FIELD);
-        }
-    }
-
-    /**
-     * 更新行数据
-     */
-    private void updateRowData(DesignContext context) {
-        Map<String, Object> rowData = context.getRowData();
-        if (rowData == null || rowData.isEmpty()) {
-            addPlaceholder(rowDataNode, "无行数据");
-            return;
-        }
-
-        for (Map.Entry<String, Object> entry : rowData.entrySet()) {
-            String value = entry.getValue() != null ? entry.getValue().toString() : "null";
-            // 截断过长的值
-            if (value.length() > 100) {
-                value = value.substring(0, 100) + "...";
-            }
-            addItem(rowDataNode, entry.getKey(), entry.getKey(), value, ContextItem.ItemType.DATA);
-        }
-    }
-
-    /**
-     * 更新引用关系
-     */
-    private void updateReferences(DesignContext context) {
-        // 出度引用（引用了谁）
-        if (!context.getOutgoingRefs().isEmpty()) {
-            TreeItem<ContextItem> outgoingItem = new TreeItem<>(
-                    new ContextItem("outgoing", "引用了 (" + context.getOutgoingRefs().size() + ")", ContextItem.ItemType.CATEGORY));
-            refsNode.getChildren().add(outgoingItem);
-
-            for (FieldReference ref : context.getOutgoingRefs()) {
-                addItem(outgoingItem, ref.targetTable() + "." + ref.targetField(),
-                        "→ " + ref.targetTable(),
-                        ref.targetField() + (ref.count() > 0 ? " (" + ref.count() + "处)" : ""),
-                        ContextItem.ItemType.REF_OUT);
-            }
-        }
-
-        // 入度引用（被谁引用）
-        if (!context.getIncomingRefs().isEmpty()) {
-            TreeItem<ContextItem> incomingItem = new TreeItem<>(
-                    new ContextItem("incoming", "被引用 (" + context.getIncomingRefs().size() + ")", ContextItem.ItemType.CATEGORY));
-            refsNode.getChildren().add(incomingItem);
-
-            for (FieldReference ref : context.getIncomingRefs()) {
-                addItem(incomingItem, ref.sourceTable() + "." + ref.sourceField(),
-                        "← " + ref.sourceTable(),
-                        ref.sourceField() + (ref.count() > 0 ? " (" + ref.count() + "处)" : ""),
-                        ContextItem.ItemType.REF_IN);
-            }
-        }
-
-        if (refsNode.getChildren().isEmpty()) {
-            addPlaceholder(refsNode, "无引用关系");
-        }
-    }
-
-    /**
-     * 更新语义提示
-     */
-    private void updateSemantics(DesignContext context) {
-        Map<String, String> hints = context.getSemanticHints();
-        if (hints == null || hints.isEmpty()) {
-            addPlaceholder(semanticsNode, "无语义提示");
-            return;
-        }
-
-        for (Map.Entry<String, String> entry : hints.entrySet()) {
-            addItem(semanticsNode, entry.getKey(), entry.getKey(), entry.getValue(), ContextItem.ItemType.SEMANTIC);
-        }
-    }
-
-    /**
-     * 添加项到树节点
-     */
-    private void addItem(TreeItem<ContextItem> parent, String id, String key, String value, ContextItem.ItemType type) {
-        ContextItem item = new ContextItem(id, key + ": " + value, type);
-        item.setKey(key);
-        item.setValue(value);
-        parent.getChildren().add(new TreeItem<>(item));
-    }
-
-    /**
-     * 添加占位符
-     */
-    private void addPlaceholder(TreeItem<ContextItem> parent, String text) {
-        parent.getChildren().add(new TreeItem<>(new ContextItem("placeholder", text, ContextItem.ItemType.PLACEHOLDER)));
-    }
-
-    /**
-     * 添加补充信息到上下文
-     */
-    private void addSupplementToContext(String text) {
-        if (currentContext != null) {
-            currentContext.addSemanticHint("用户补充", text);
-            updateContext(currentContext);
-        }
-
+        // 触发回调
         if (onSupplementAdded != null) {
             onSupplementAdded.accept(text);
         }
     }
 
     /**
-     * 设置补充说明回调
+     * 创建补充说明行
      */
-    public void setOnSupplementAdded(Consumer<String> callback) {
-        this.onSupplementAdded = callback;
+    private HBox createSupplementRow(String text) {
+        Label textLabel = new Label("• " + text);
+        textLabel.setWrapText(true);
+        textLabel.setStyle("-fx-text-fill: #333;");
+        HBox.setHgrow(textLabel, Priority.ALWAYS);
+
+        Button removeBtn = new Button("×");
+        removeBtn.setStyle("-fx-background-color: transparent; -fx-text-fill: #999; " +
+                          "-fx-font-size: 10px; -fx-padding: 0 4;");
+        removeBtn.setOnAction(e -> {
+            supplements.remove(text);
+            supplementsContainer.getChildren().remove(removeBtn.getParent());
+        });
+
+        HBox row = new HBox(4, textLabel, removeBtn);
+        row.setAlignment(Pos.CENTER_LEFT);
+        return row;
     }
 
     /**
-     * 高亮指定的上下文项（AI正在使用的项）
-     *
-     * @param itemIds 要高亮的项ID列表
+     * 高亮指定字段
      */
-    public void highlightItems(java.util.List<String> itemIds) {
-        Platform.runLater(() -> {
-            // 遍历所有节点，设置高亮状态
-            highlightItemsRecursive(rootItem, itemIds);
-        });
+    public void highlightField(String fieldName) {
+        this.highlightedField = fieldName;
+        // 如果有当前上下文，刷新显示
+        if (currentContext != null) {
+            updateSchemaSection(currentContext);
+        }
     }
 
-    private void highlightItemsRecursive(TreeItem<ContextItem> node, java.util.List<String> itemIds) {
-        if (node.getValue() != null) {
-            node.getValue().setHighlighted(itemIds.contains(node.getValue().getId()));
+    /**
+     * 清除高亮
+     */
+    public void clearHighlight() {
+        this.highlightedField = null;
+        if (currentContext != null) {
+            updateSchemaSection(currentContext);
         }
-        for (TreeItem<ContextItem> child : node.getChildren()) {
-            highlightItemsRecursive(child, itemIds);
-        }
-        contextTree.refresh();
+    }
+
+    /**
+     * 清空显示
+     */
+    private void clearDisplay() {
+        locationTypeLabel.setText("--");
+        locationPathLabel.setText("--");
+        locationIdLabel.setText("");
+        tableNameLabel.setText("--");
+        columnsContainer.getChildren().clear();
+        outgoingRefsContainer.getChildren().clear();
+        incomingRefsContainer.getChildren().clear();
+        clearAiUnderstanding();
+    }
+
+    /**
+     * 获取位置类型的显示文本
+     */
+    private String getLocationTypeDisplay(DesignContext.ContextLocation location) {
+        return switch (location) {
+            case FILE -> "文件";
+            case TABLE -> "数据库表";
+            case ROW -> "表格行";
+            case FIELD -> "字段";
+            case MECHANISM -> "游戏机制";
+        };
     }
 
     /**
@@ -384,92 +519,25 @@ public class ContextTransparencyPanel extends VBox {
         return currentContext;
     }
 
-    // ==================== 内部类：上下文项 ====================
-
     /**
-     * 上下文树节点数据
+     * 获取所有补充说明
      */
-    public static class ContextItem {
-
-        public enum ItemType {
-            ROOT,           // 根节点
-            CATEGORY,       // 分类节点
-            INFO,           // 普通信息
-            DATA,           // 数据值
-            FIELD,          // 字段
-            REF_IN,         // 入度引用
-            REF_OUT,        // 出度引用
-            SEMANTIC,       // 语义提示
-            HIGHLIGHT,      // 高亮项
-            PLACEHOLDER     // 占位符
-        }
-
-        private final String id;
-        private final String display;
-        private final ItemType type;
-        private String key;
-        private String value;
-        private boolean highlighted;
-
-        public ContextItem(String id, String display, ItemType type) {
-            this.id = id;
-            this.display = display;
-            this.type = type;
-        }
-
-        public String getId() { return id; }
-        public String getDisplay() { return display; }
-        public ItemType getType() { return type; }
-        public String getKey() { return key; }
-        public void setKey(String key) { this.key = key; }
-        public String getValue() { return value; }
-        public void setValue(String value) { this.value = value; }
-        public boolean isHighlighted() { return highlighted; }
-        public void setHighlighted(boolean highlighted) { this.highlighted = highlighted; }
-
-        @Override
-        public String toString() {
-            return display;
-        }
+    public List<String> getSupplements() {
+        return new ArrayList<>(supplements);
     }
 
-    // ==================== 内部类：树单元格渲染 ====================
+    /**
+     * 清空补充说明
+     */
+    public void clearSupplements() {
+        supplements.clear();
+        supplementsContainer.getChildren().clear();
+    }
 
     /**
-     * 自定义树单元格渲染
+     * 设置补充说明添加回调
      */
-    private static class ContextTreeCell extends TreeCell<ContextItem> {
-
-        @Override
-        protected void updateItem(ContextItem item, boolean empty) {
-            super.updateItem(item, empty);
-
-            if (empty || item == null) {
-                setText(null);
-                setGraphic(null);
-                setStyle("");
-                return;
-            }
-
-            setText(item.getDisplay());
-
-            // 根据类型设置样式
-            String style = switch (item.getType()) {
-                case CATEGORY -> "-fx-font-weight: bold;";
-                case PLACEHOLDER -> "-fx-text-fill: #9E9E9E; -fx-font-style: italic;";
-                case REF_IN -> "-fx-text-fill: #4CAF50;";  // 绿色
-                case REF_OUT -> "-fx-text-fill: #2196F3;"; // 蓝色
-                case SEMANTIC -> "-fx-text-fill: #FF9800;"; // 橙色
-                case HIGHLIGHT -> "-fx-text-fill: #E91E63; -fx-font-weight: bold;"; // 粉色
-                default -> "";
-            };
-
-            // 高亮状态
-            if (item.isHighlighted()) {
-                style += "-fx-background-color: #FFEB3B; -fx-background-radius: 3;";
-            }
-
-            setStyle(style);
-        }
+    public void setOnSupplementAdded(Consumer<String> callback) {
+        this.onSupplementAdded = callback;
     }
 }

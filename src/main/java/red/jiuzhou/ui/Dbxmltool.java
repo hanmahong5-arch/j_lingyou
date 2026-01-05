@@ -23,7 +23,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.builder.SpringApplicationBuilder;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.ConfigurableApplicationContext;
+import red.jiuzhou.langchain.config.LangChainProperties;
 import red.jiuzhou.dbxml.DirectoryManagerDialog;
 import red.jiuzhou.dbxml.TabConfLoad;
 import red.jiuzhou.relationship.XmlRelationshipAnalyzer;
@@ -79,8 +81,10 @@ import java.util.concurrent.atomic.AtomicReference;
     "red.jiuzhou.ai",
     "red.jiuzhou.analysis",
     "red.jiuzhou.config",
-    "red.jiuzhou.ui.error"
+    "red.jiuzhou.ui.error",
+    "red.jiuzhou.langchain"
 })
+@EnableConfigurationProperties(LangChainProperties.class)
 public class Dbxmltool extends Application {
     private ConfigurableApplicationContext springContext;
 
@@ -303,6 +307,12 @@ public class Dbxmltool extends Application {
 
         // ==================== 创建文件状态面板 ====================
         fileStatusPanel = new FileStatusPanel();
+
+        // 连接AI操作处理器到文件状态面板
+        if (aiOperationHandler != null) {
+            fileStatusPanel.setOnAiOperation(aiOperationHandler.createFileStatusCallback());
+            log.info("AI操作处理器已连接到文件状态面板");
+        }
 
         // 连接菜单树选择事件到文件状态面板
         searchableMenu.setOnFileSelected(filePath -> {
@@ -705,6 +715,22 @@ public class Dbxmltool extends Application {
         ));
         aiAgentBtn.setStyle("-fx-background-color: #E8F5E9; -fx-font-weight: bold;");
 
+        // SQL模板按钮 - 快捷SQL模板库
+        Button sqlTemplateBtn = new Button("📊 SQL模板");
+        sqlTemplateBtn.setTooltip(new Tooltip(
+            "SQL 智能模板库\n\n" +
+            "🎯 核心功能:\n" +
+            "• 预设常用查询模板\n" +
+            "• 自然语言生成SQL\n" +
+            "• 参数化模板复用\n" +
+            "• 用户模板保存\n\n" +
+            "💡 快速查询:\n" +
+            "→ 按品质查询装备\n" +
+            "→ 按等级范围筛选\n" +
+            "→ 数据分布统计"
+        ));
+        sqlTemplateBtn.setStyle("-fx-background-color: #FFF3E0; -fx-font-weight: bold;");
+
         // 刷怪点工具按钮 - 坐标生成、概率模拟
         Button gameToolsBtn = new Button("🎯 刷怪工具");
         gameToolsBtn.setTooltip(new Tooltip(
@@ -862,9 +888,59 @@ public class Dbxmltool extends Application {
                 AgentChatStage stage = new AgentChatStage();
                 stage.initOwner(primaryStage);
                 stage.show();
+                stage.toFront(); // 确保窗口显示在最前面
             } catch (Exception e) {
                 log.error("打开AI数据助手失败", e);
-                showError("打开AI数据助手失败: " + e.getMessage());
+                e.printStackTrace(); // 打印完整堆栈
+                showError("打开AI数据助手失败\n\n" +
+                    "错误: " + e.getMessage() + "\n\n" +
+                    "可能原因:\n" +
+                    "1. AI API Key 未配置\n" +
+                    "2. Spring Bean 初始化失败\n" +
+                    "3. 数据库连接问题\n\n" +
+                    "请检查日志文件: logs/app.log");
+            }
+        });
+
+        // SQL模板 - 打开SQL模板面板窗口
+        sqlTemplateBtn.setOnAction(event -> {
+            try {
+                log.info("打开SQL模板面板");
+                // 创建包含 AiSqlTemplatePanel 的独立窗口
+                Stage templateStage = new Stage();
+                templateStage.initOwner(primaryStage);
+                templateStage.setTitle("SQL 智能模板库");
+
+                red.jiuzhou.agent.ui.AiSqlTemplatePanel templatePanel =
+                    new red.jiuzhou.agent.ui.AiSqlTemplatePanel();
+
+                // 配置 SQL 执行回调 - 打开 AI 助手执行
+                templatePanel.setOnExecuteSql((sql, description) -> {
+                    log.info("从模板执行SQL: {}", description);
+                    AgentChatStage chatStage = new AgentChatStage();
+                    chatStage.initOwner(primaryStage);
+                    chatStage.show();
+                    // 发送预填充的SQL请求
+                    chatStage.sendMessage("请执行以下SQL并显示结果：\n```sql\n" + sql + "\n```");
+                });
+
+                // 配置 AI 生成回调 - 调用 AI 助手生成 SQL
+                templatePanel.setOnGenerateRequest(prompt -> {
+                    log.info("AI生成SQL请求: {}", prompt);
+                    Platform.runLater(() -> {
+                        AgentChatStage chatStage = new AgentChatStage();
+                        chatStage.initOwner(primaryStage);
+                        chatStage.show();
+                        chatStage.sendMessage(prompt);
+                    });
+                });
+
+                javafx.scene.Scene scene = new javafx.scene.Scene(templatePanel, 450, 700);
+                templateStage.setScene(scene);
+                templateStage.show();
+            } catch (Exception e) {
+                log.error("打开SQL模板面板失败", e);
+                showError("打开SQL模板面板失败: " + e.getMessage());
             }
         });
 
@@ -1029,7 +1105,12 @@ public class Dbxmltool extends Application {
             mechanismExplorerBtn,// 🎮 机制浏览器
             serverKnowledgeBtn,  // 📚 服务器知识
             serverConfigBtn,     // 📋 配置清单
+            new Separator(),
+
+            // ========== AI 工具模块 ==========
+            // AI 驱动的智能数据处理
             aiAgentBtn,          // 🤖 AI助手
+            sqlTemplateBtn,      // 📊 SQL模板
             new Separator(),
 
             // ========== 设计工具模块 ==========

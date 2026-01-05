@@ -99,7 +99,26 @@ public class WorkflowAuditLog {
     // ==================== 工作流级别日志 ====================
 
     /**
-     * 记录工作流开始
+     * 记录工作流开始（简化版本，供 WorkflowState 调用）
+     */
+    public void logWorkflowStarted(String workflowId, String workflowType, String userIntent) {
+        WorkflowLogEntry entry = new WorkflowLogEntry(workflowId);
+        entry.workflowType = workflowType;
+        entry.userIntent = userIntent;
+        entry.startTime = Instant.now();
+        entry.status = WorkflowLogStatus.RUNNING;
+
+        workflowLogs.put(workflowId, entry);
+        addToRecentHistory(workflowId);
+
+        logEvent(workflowId, null, EventType.WORKFLOW_STARTED,
+                "工作流开始: " + workflowType, null, null, 0);
+
+        log.info("审计日志: 工作流开始 [{}] 类型={}", workflowId, workflowType);
+    }
+
+    /**
+     * 记录工作流开始（完整版本）
      */
     public void logWorkflowStarted(WorkflowState state) {
         WorkflowLogEntry entry = new WorkflowLogEntry(state.getWorkflowId());
@@ -123,7 +142,24 @@ public class WorkflowAuditLog {
     }
 
     /**
-     * 记录工作流完成
+     * 记录工作流完成（简化版本，供 WorkflowState 调用）
+     */
+    public void logWorkflowCompleted(String workflowId, int affectedRows) {
+        WorkflowLogEntry entry = workflowLogs.get(workflowId);
+        if (entry != null) {
+            entry.endTime = Instant.now();
+            entry.status = WorkflowLogStatus.COMPLETED;
+            entry.totalAffectedRows = affectedRows;
+        }
+
+        logEvent(workflowId, null, EventType.WORKFLOW_COMPLETED,
+                "工作流完成，影响行数: " + affectedRows, null, null, affectedRows);
+
+        log.info("审计日志: 工作流完成 [{}] 影响行数={}", workflowId, affectedRows);
+    }
+
+    /**
+     * 记录工作流完成（完整版本）
      */
     public void logWorkflowCompleted(WorkflowState state) {
         WorkflowLogEntry entry = workflowLogs.get(state.getWorkflowId());
@@ -157,7 +193,24 @@ public class WorkflowAuditLog {
     }
 
     /**
-     * 记录工作流失败
+     * 记录工作流失败（简化版本，供 WorkflowState 调用）
+     */
+    public void logWorkflowFailed(String workflowId, String reason) {
+        WorkflowLogEntry entry = workflowLogs.get(workflowId);
+        if (entry != null) {
+            entry.endTime = Instant.now();
+            entry.status = WorkflowLogStatus.FAILED;
+            entry.errorMessage = reason;
+        }
+
+        logEvent(workflowId, null, EventType.WORKFLOW_FAILED,
+                "工作流失败: " + reason, null, null, 0);
+
+        log.error("审计日志: 工作流失败 [{}] 原因={}", workflowId, reason);
+    }
+
+    /**
+     * 记录工作流失败（完整版本）
      */
     public void logWorkflowFailed(String workflowId, String stepId, Throwable error) {
         WorkflowLogEntry entry = workflowLogs.get(workflowId);
@@ -177,7 +230,24 @@ public class WorkflowAuditLog {
     // ==================== 步骤级别日志 ====================
 
     /**
-     * 记录步骤开始
+     * 记录步骤开始（简化版本，供 WorkflowState 调用）
+     */
+    public void logStepStarted(String workflowId, String stepId, String stepName) {
+        WorkflowLogEntry entry = workflowLogs.get(workflowId);
+        if (entry != null) {
+            StepLogEntry stepLog = findStepLog(entry, stepId);
+            if (stepLog != null) {
+                stepLog.startTime = Instant.now();
+                stepLog.status = StepLogStatus.RUNNING;
+            }
+        }
+
+        logEvent(workflowId, stepId, EventType.STEP_STARTED,
+                "步骤开始: " + stepName, null, null, 0);
+    }
+
+    /**
+     * 记录步骤开始（完整版本）
      */
     public void logStepStarted(String workflowId, WorkflowStep step) {
         WorkflowLogEntry entry = workflowLogs.get(workflowId);
@@ -215,7 +285,26 @@ public class WorkflowAuditLog {
     }
 
     /**
-     * 记录步骤确认
+     * 记录步骤确认（简化版本，供 WorkflowState 调用）
+     */
+    public void logStepConfirmed(String workflowId, String stepId) {
+        WorkflowLogEntry entry = workflowLogs.get(workflowId);
+        if (entry != null) {
+            StepLogEntry stepLog = findStepLog(entry, stepId);
+            if (stepLog != null) {
+                stepLog.endTime = Instant.now();
+                stepLog.status = StepLogStatus.CONFIRMED;
+            }
+        }
+
+        logEvent(workflowId, stepId, EventType.STEP_CONFIRMED,
+                "步骤已确认", null, null, 0);
+
+        log.info("审计日志: 步骤确认 [{}] stepId={}", workflowId, stepId);
+    }
+
+    /**
+     * 记录步骤确认（完整版本）
      */
     public void logStepConfirmed(String workflowId, WorkflowStep step) {
         WorkflowLogEntry entry = workflowLogs.get(workflowId);
@@ -234,7 +323,26 @@ public class WorkflowAuditLog {
     }
 
     /**
-     * 记录步骤修正
+     * 记录步骤修正（简化版本，供 WorkflowState 调用）
+     */
+    public void logStepCorrected(String workflowId, String stepId, String correction) {
+        WorkflowLogEntry entry = workflowLogs.get(workflowId);
+        if (entry != null) {
+            StepLogEntry stepLog = findStepLog(entry, stepId);
+            if (stepLog != null) {
+                stepLog.corrections.add(new CorrectionEntry(correction, Instant.now()));
+                stepLog.status = StepLogStatus.CORRECTED;
+            }
+        }
+
+        logEvent(workflowId, stepId, EventType.STEP_CORRECTED,
+                "步骤修正", correction, null, 0);
+
+        log.info("审计日志: 步骤修正 [{}] stepId={} 修正内容={}", workflowId, stepId, correction);
+    }
+
+    /**
+     * 记录步骤修正（完整版本）
      */
     public void logStepCorrected(String workflowId, WorkflowStep step, String correction) {
         WorkflowLogEntry entry = workflowLogs.get(workflowId);
@@ -253,7 +361,26 @@ public class WorkflowAuditLog {
     }
 
     /**
-     * 记录步骤跳过
+     * 记录步骤跳过（简化版本，供 WorkflowState 调用）
+     */
+    public void logStepSkipped(String workflowId, String stepId) {
+        WorkflowLogEntry entry = workflowLogs.get(workflowId);
+        if (entry != null) {
+            StepLogEntry stepLog = findStepLog(entry, stepId);
+            if (stepLog != null) {
+                stepLog.endTime = Instant.now();
+                stepLog.status = StepLogStatus.SKIPPED;
+            }
+        }
+
+        logEvent(workflowId, stepId, EventType.STEP_SKIPPED,
+                "步骤跳过", null, null, 0);
+
+        log.info("审计日志: 步骤跳过 [{}] stepId={}", workflowId, stepId);
+    }
+
+    /**
+     * 记录步骤跳过（完整版本）
      */
     public void logStepSkipped(String workflowId, WorkflowStep step) {
         WorkflowLogEntry entry = workflowLogs.get(workflowId);

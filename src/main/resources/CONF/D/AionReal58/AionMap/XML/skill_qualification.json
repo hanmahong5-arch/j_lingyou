@@ -1,8 +1,0 @@
-{
-	"file_path":"D:\\AionReal58\\AionMap\\XML\\skill_qualification.xml",
-	"xml_root_tag":"skill_qualifications",
-	"list":[],
-	"xml_item_tag":"skill_qualification",
-	"table_name":"skill_qualification",
-	"sql":"select * from skill_qualification order by CAST(id AS UNSIGNED) ASC"
-}

@@ -1,8 +1,0 @@
-{
-	"file_path":"D:\\AionReal58\\AionMap\\客户端XML\\data\\China\\skills\\skills\\client_absolute_stat_to_pc.xml",
-	"xml_root_tag":"absolute_stat_to_pc_clients",
-	"list":[],
-	"xml_item_tag":"absolute_stat_to_pc_client",
-	"table_name":"client_absolute_stat_to_pc",
-	"sql":"select * from client_absolute_stat_to_pc order by CAST(id AS UNSIGNED) ASC"
-}

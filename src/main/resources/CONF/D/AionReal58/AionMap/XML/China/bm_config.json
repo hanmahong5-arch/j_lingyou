@@ -1,9 +1,0 @@
-{
-	"file_path":"D:\\AionReal58\\AionMap\\XML\\China\\bm_config.xml",
-	"xml_root_attr":"generated_time=2016/12/01 11:55:10",
-	"xml_root_tag":"bm_configs",
-	"list":[],
-	"xml_item_tag":"bm_config",
-	"table_name":"bm_config",
-	"sql":"select * from bm_config order by CAST(id AS UNSIGNED) ASC"
-}

@@ -1,8 +1,0 @@
-{
-	"file_path":"D:\\AionReal58\\AionMap\\客户端XML\\data\\China\\skills\\skills\\conditional_bonuses.xml",
-	"xml_root_tag":"client_conditional_bonuss",
-	"list":[],
-	"xml_item_tag":"client_conditional_bonus",
-	"table_name":"conditional_bonuses",
-	"sql":"select * from conditional_bonuses order by CAST(id AS UNSIGNED) ASC"
-}

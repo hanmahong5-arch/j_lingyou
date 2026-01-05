@@ -1,8 +1,0 @@
-{
-	"file_path":"D:\\AionReal58\\AionMap\\XML\\housing_building.xml",
-	"xml_root_tag":"housing_buildings",
-	"list":[],
-	"xml_item_tag":"housing_building",
-	"table_name":"housing_building",
-	"sql":"select * from housing_building order by CAST(id AS UNSIGNED) ASC"
-}

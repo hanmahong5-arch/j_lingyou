@@ -1,8 +1,0 @@
-{
-	"file_path":"D:\\AionReal58\\AionMap\\XML\\Special01\\world_invasion_special01.xml",
-	"xml_root_tag":"world_invasions",
-	"list":[],
-	"xml_item_tag":"world_invasion",
-	"table_name":"world_invasion_special01",
-	"sql":"select * from world_invasion_special01 order by CAST(id AS UNSIGNED) ASC"
-}

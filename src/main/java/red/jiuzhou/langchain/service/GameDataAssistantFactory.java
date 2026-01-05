@@ -76,28 +76,38 @@ public class GameDataAssistantFactory {
     private GameDataAssistant createAssistant(String modelName) {
         log.info("创建 GameDataAssistant，模型: {}", modelName);
 
-        ChatLanguageModel model = modelFactory.getModel(modelName);
-        GameDataTools gameDataTools = new GameDataTools(jdbcTemplate);
-        HistoryTools historyTools = new HistoryTools();
+        try {
+            log.info("获取 ChatLanguageModel");
+            ChatLanguageModel model = modelFactory.getModel(modelName);
+            log.info("创建 GameDataTools");
+            GameDataTools gameDataTools = new GameDataTools(jdbcTemplate);
+            log.info("创建 HistoryTools");
+            HistoryTools historyTools = new HistoryTools();
 
-        // 创建会话记忆提供者
-        ChatMemoryProvider memoryProvider = memoryId -> {
-            String key = memoryId.toString();
-            return memoryCache.computeIfAbsent(key, k ->
-                    MessageWindowChatMemory.builder()
-                            .maxMessages(DEFAULT_MAX_MESSAGES)
-                            .build()
-            );
-        };
+            // 创建会话记忆提供者
+            log.info("创建 ChatMemoryProvider");
+            ChatMemoryProvider memoryProvider = memoryId -> {
+                String key = memoryId.toString();
+                return memoryCache.computeIfAbsent(key, k ->
+                        MessageWindowChatMemory.builder()
+                                .maxMessages(DEFAULT_MAX_MESSAGES)
+                                .build()
+                );
+            };
 
-        GameDataAssistant assistant = AiServices.builder(GameDataAssistant.class)
-                .chatLanguageModel(model)
-                .tools(gameDataTools, historyTools)
-                .chatMemoryProvider(memoryProvider)
-                .build();
+            log.info("调用 AiServices.builder()");
+            GameDataAssistant assistant = AiServices.builder(GameDataAssistant.class)
+                    .chatLanguageModel(model)
+                    .tools(gameDataTools, historyTools)
+                    .chatMemoryProvider(memoryProvider)
+                    .build();
 
-        log.info("GameDataAssistant 创建成功，模型: {}", modelName);
-        return assistant;
+            log.info("GameDataAssistant 创建成功，模型: {}", modelName);
+            return assistant;
+        } catch (Exception e) {
+            log.error("创建 GameDataAssistant 失败", e);
+            throw new RuntimeException("创建 GameDataAssistant 失败: " + e.getMessage(), e);
+        }
     }
 
     /**

@@ -249,6 +249,41 @@ public class AiOperationHandler implements BiConsumer<DesignContext, String> {
                 dataType, rowData
             );
 
+            // ==================== 批量操作（新增） ====================
+            case "batch_modify" -> String.format(
+                "我需要批量修改 %s 表的数据：\n%s\n\n" +
+                "请帮我：\n" +
+                "1. 理解我想要做的批量修改\n" +
+                "2. 生成安全的 UPDATE SQL\n" +
+                "3. 预估会影响多少条数据\n" +
+                "4. 提醒可能的风险点",
+                tableName, rowData
+            );
+
+            case "compare_versions" -> String.format(
+                "帮我对比 %s 表在不同条件下的数据差异：\n" +
+                "比如对比不同等级、不同品质的配置规律，\n" +
+                "找出数值变化的趋势和异常点。",
+                tableName
+            );
+
+            case "export_template" -> String.format(
+                "帮我把 %s 表的查询生成为可复用的 SQL 模板：\n" +
+                "1. 提取常用的查询模式\n" +
+                "2. 参数化可变的条件\n" +
+                "3. 添加适当的注释说明",
+                tableName
+            );
+
+            case "smart_fill" -> String.format(
+                "根据 %s 表的现有数据规律：\n%s\n\n" +
+                "智能推荐这个字段应该填什么值：\n" +
+                "- 参考同类数据的取值范围\n" +
+                "- 给出合理的默认值建议\n" +
+                "- 解释推荐理由",
+                tableName, rowData
+            );
+
             // ==================== FileStatusPanel 快捷操作 ====================
             case "analyze_structure" -> String.format(
                 "帮我分析 %s 表的结构：\n" +

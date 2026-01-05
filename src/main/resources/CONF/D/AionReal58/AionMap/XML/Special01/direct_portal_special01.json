@@ -1,8 +1,0 @@
-{
-	"file_path":"D:\\AionReal58\\AionMap\\XML\\Special01\\direct_portal_special01.xml",
-	"xml_root_tag":"direct_portals",
-	"list":[],
-	"xml_item_tag":"direct_portal",
-	"table_name":"direct_portal_special01",
-	"sql":"select * from direct_portal_special01 order by CAST(id AS UNSIGNED) ASC"
-}

@@ -1,8 +1,0 @@
-{
-	"file_path":"D:\\AionReal58\\AionMap\\XML\\toypet_doping.xml",
-	"xml_root_tag":"toypet_dopings",
-	"list":[],
-	"xml_item_tag":"toypet_doping",
-	"table_name":"toypet_doping",
-	"sql":"select * from toypet_doping order by CAST(id AS UNSIGNED) ASC"
-}

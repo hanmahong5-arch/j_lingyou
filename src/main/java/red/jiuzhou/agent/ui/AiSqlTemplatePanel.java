@@ -13,6 +13,11 @@ import org.slf4j.LoggerFactory;
 import red.jiuzhou.agent.templates.AiTemplateLibrary;
 import red.jiuzhou.agent.templates.AiTemplateLibrary.AiTemplate;
 import red.jiuzhou.agent.templates.AiTemplateLibrary.TemplateCategory;
+import red.jiuzhou.agent.templates.TableRelationshipAnalyzer;
+import red.jiuzhou.agent.templates.TableRelationshipAnalyzer.TableRelation;
+import red.jiuzhou.agent.templates.TableRelationshipAnalyzer.RelationType;
+import red.jiuzhou.agent.templates.MultiTableQueryBuilder;
+import red.jiuzhou.agent.templates.MultiTableQueryBuilder.QueryResult;
 
 import java.util.*;
 import java.util.concurrent.ExecutorService;
@@ -36,8 +41,15 @@ public class AiSqlTemplatePanel extends VBox {
     // 模板库
     private final AiTemplateLibrary templateLibrary = AiTemplateLibrary.getInstance();
 
+    // 表关系分析器
+    private final TableRelationshipAnalyzer relationAnalyzer = TableRelationshipAnalyzer.getInstance();
+    private final MultiTableQueryBuilder queryBuilder = new MultiTableQueryBuilder();
+
     // UI 组件
     private ComboBox<TemplateCategory> categoryCombo;
+    private VBox relationBox;           // 表关联显示区
+    private Button smartJoinButton;     // 智能关联按钮
+    private Label relationHintLabel;    // 关联提示
     private ListView<AiTemplate> templateList;
     private TextArea promptInput;
     private TextArea sqlPreview;
@@ -180,12 +192,40 @@ public class AiSqlTemplatePanel extends VBox {
         sqlContent.getChildren().addAll(sqlPreview, buttonRow);
         sqlPane.setContent(sqlContent);
 
+        // ==================== 表关联分析区 ====================
+        TitledPane relationPane = new TitledPane();
+        relationPane.setText("🔗 表关联分析");
+        relationPane.setCollapsible(true);
+        relationPane.setExpanded(false);
+
+        VBox relationContent = new VBox(8);
+        relationContent.setPadding(new Insets(8));
+
+        // 关联提示
+        relationHintLabel = new Label("选择表后显示关联关系");
+        relationHintLabel.setStyle("-fx-text-fill: #666666; -fx-font-size: 11px;");
+        relationHintLabel.setWrapText(true);
+
+        // 关联表列表
+        relationBox = new VBox(4);
+        relationBox.setStyle("-fx-background-color: #f8f9fa; -fx-padding: 8; -fx-background-radius: 4;");
+
+        // 智能关联按钮
+        smartJoinButton = createGradientButton("🔗 一键关联查询", "#17a2b8", "#138496");
+        smartJoinButton.setOnAction(e -> handleSmartJoinQuery());
+        smartJoinButton.setMaxWidth(Double.MAX_VALUE);
+        smartJoinButton.setDisable(true);
+
+        relationContent.getChildren().addAll(relationHintLabel, relationBox, smartJoinButton);
+        relationPane.setContent(relationContent);
+
         // ==================== 组装 ====================
         getChildren().addAll(
             titleBox,
             new Separator(),
             categoryBox,
             templateList,
+            relationPane,  // 新增表关联区
             paramPane,
             nlpPane,
             sqlPane
@@ -300,6 +340,53 @@ public class AiSqlTemplatePanel extends VBox {
         if (template.sqlTemplate() != null) {
             updateSqlPreview();
         }
+
+        // 检查是否为多表模板，添加生成按钮
+        if (MultiTableQueryBuilder.isMultiTableTemplate(template.id())) {
+            addMultiTableGenerateButton(template);
+        }
+    }
+
+    /**
+     * 为多表模板添加生成按钮
+     */
+    private void addMultiTableGenerateButton(AiTemplate template) {
+        HBox buttonRow = new HBox(8);
+        buttonRow.setAlignment(Pos.CENTER_LEFT);
+        buttonRow.setPadding(new Insets(8, 0, 0, 0));
+
+        Button generateBtn = createGradientButton("🔗 生成多表查询", "#17a2b8", "#138496");
+        generateBtn.setOnAction(e -> {
+            // 收集参数
+            Map<String, String> params = new HashMap<>();
+            for (var entry : parameterFields.entrySet()) {
+                String value = entry.getValue().getText();
+                if (value != null && !value.isEmpty()) {
+                    params.put(entry.getKey(), value);
+                }
+            }
+            // 添加当前表名
+            if (currentTableName != null) {
+                params.put("table", currentTableName);
+            }
+
+            // 生成查询
+            QueryResult result = queryBuilder.buildFromTemplate(template.id(), params);
+            if (result != null) {
+                sqlPreview.setText(result.getSql());
+                executeButton.setDisable(false);
+                saveButton.setDisable(false);
+
+                // 显示涉及的表
+                String tables = String.join(", ", result.getInvolvedTables());
+                promptInput.setText(result.getDescription() + "\n涉及表: " + tables);
+            } else {
+                showAlert("提示", "该模板需要AI生成SQL，请点击\"生成SQL\"按钮");
+            }
+        });
+
+        buttonRow.getChildren().add(generateBtn);
+        parameterBox.getChildren().add(buttonRow);
     }
 
     /**
@@ -492,6 +579,165 @@ public class AiSqlTemplatePanel extends VBox {
         // 更新 SQL 预览
         if (selectedTemplate != null) {
             updateSqlPreview();
+        }
+
+        // 更新表关联分析
+        updateRelationAnalysis(tableName);
+    }
+
+    /**
+     * 更新表关联分析显示
+     */
+    private void updateRelationAnalysis(String tableName) {
+        Platform.runLater(() -> {
+            relationBox.getChildren().clear();
+
+            if (tableName == null || tableName.isEmpty()) {
+                relationHintLabel.setText("选择表后显示关联关系");
+                smartJoinButton.setDisable(true);
+                return;
+            }
+
+            // 异步分析表关联
+            executor.submit(() -> {
+                try {
+                    List<TableRelation> relations = relationAnalyzer.getTableRelations(tableName);
+
+                    Platform.runLater(() -> {
+                        if (relations.isEmpty()) {
+                            relationHintLabel.setText("未发现明显的关联关系");
+                            smartJoinButton.setDisable(true);
+                            return;
+                        }
+
+                        // 分组显示
+                        List<TableRelation> outgoing = relations.stream()
+                            .filter(r -> r.relationType == RelationType.OUTGOING)
+                            .limit(8)
+                            .toList();
+                        List<TableRelation> incoming = relations.stream()
+                            .filter(r -> r.relationType == RelationType.INCOMING)
+                            .limit(5)
+                            .toList();
+
+                        relationHintLabel.setText(String.format("发现 %d 个关联 (出向:%d 入向:%d)",
+                            relations.size(), outgoing.size(), incoming.size()));
+
+                        // 显示出向关联（本表引用其他表）
+                        if (!outgoing.isEmpty()) {
+                            Label outLabel = new Label("📤 引用其他表:");
+                            outLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 11px; -fx-text-fill: #28a745;");
+                            relationBox.getChildren().add(outLabel);
+
+                            for (TableRelation r : outgoing) {
+                                HBox row = createRelationRow(r, true);
+                                relationBox.getChildren().add(row);
+                            }
+                        }
+
+                        // 显示入向关联（其他表引用本表）
+                        if (!incoming.isEmpty()) {
+                            Label inLabel = new Label("📥 被其他表引用:");
+                            inLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 11px; -fx-text-fill: #dc3545; -fx-padding: 8 0 0 0;");
+                            relationBox.getChildren().add(inLabel);
+
+                            for (TableRelation r : incoming) {
+                                HBox row = createRelationRow(r, false);
+                                relationBox.getChildren().add(row);
+                            }
+                        }
+
+                        smartJoinButton.setDisable(outgoing.isEmpty());
+                    });
+                } catch (Exception e) {
+                    log.warn("分析表关联失败: {}", e.getMessage());
+                    Platform.runLater(() -> {
+                        relationHintLabel.setText("分析失败: " + e.getMessage());
+                        smartJoinButton.setDisable(true);
+                    });
+                }
+            });
+        });
+    }
+
+    /**
+     * 创建关联行UI
+     */
+    private HBox createRelationRow(TableRelation r, boolean isOutgoing) {
+        HBox row = new HBox(6);
+        row.setAlignment(Pos.CENTER_LEFT);
+        row.setPadding(new Insets(2, 0, 2, 12));
+
+        String icon = isOutgoing ? "→" : "←";
+        String text = isOutgoing
+            ? String.format("%s %s.%s (%s)", icon, r.targetTable, r.targetField, r.description)
+            : String.format("%s.%s %s 本表 (%s)", r.targetTable, r.sourceField, icon, r.description);
+
+        Label label = new Label(text);
+        label.setStyle("-fx-font-size: 10px; -fx-text-fill: #555555;");
+
+        // 点击可以快速查询该关联表
+        Hyperlink link = new Hyperlink("查询");
+        link.setStyle("-fx-font-size: 10px;");
+        link.setOnAction(e -> {
+            if (isOutgoing) {
+                // 生成关联查询
+                QueryResult result = queryBuilder.buildSmartJoinQuery(
+                    currentTableName, null, null);
+                sqlPreview.setText(result.getSql());
+                executeButton.setDisable(false);
+                saveButton.setDisable(false);
+            }
+        });
+
+        row.getChildren().addAll(label, link);
+        return row;
+    }
+
+    /**
+     * 处理智能关联查询
+     */
+    private void handleSmartJoinQuery() {
+        if (currentTableName == null || currentTableName.isEmpty()) {
+            showAlert("提示", "请先选择一个表");
+            return;
+        }
+
+        try {
+            smartJoinButton.setDisable(true);
+            smartJoinButton.setText("⏳ 生成中...");
+
+            executor.submit(() -> {
+                try {
+                    QueryResult result = queryBuilder.buildSmartJoinQuery(currentTableName);
+
+                    Platform.runLater(() -> {
+                        sqlPreview.setText(result.getSql());
+                        executeButton.setDisable(false);
+                        saveButton.setDisable(false);
+
+                        // 显示提示
+                        String hint = String.format("已生成关联查询，涉及 %d 个表:\n%s",
+                            result.getTableCount(),
+                            String.join(", ", result.getInvolvedTables()));
+                        promptInput.setText(hint);
+
+                        log.info("智能关联查询生成成功: {}", result.getDescription());
+                    });
+                } catch (Exception e) {
+                    log.error("生成智能关联查询失败", e);
+                    Platform.runLater(() -> showAlert("错误", "生成失败: " + e.getMessage()));
+                } finally {
+                    Platform.runLater(() -> {
+                        smartJoinButton.setDisable(false);
+                        smartJoinButton.setText("🔗 一键关联查询");
+                    });
+                }
+            });
+        } catch (Exception e) {
+            showAlert("错误", "操作失败: " + e.getMessage());
+            smartJoinButton.setDisable(false);
+            smartJoinButton.setText("🔗 一键关联查询");
         }
     }
 

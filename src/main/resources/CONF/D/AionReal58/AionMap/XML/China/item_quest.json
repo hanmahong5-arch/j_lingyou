@@ -1,8 +1,0 @@
-{
-	"file_path":"D:\\AionReal58\\AionMap\\XML\\China\\item_quest.xml",
-	"xml_root_tag":"items",
-	"list":[],
-	"xml_item_tag":"item",
-	"table_name":"item_quest",
-	"sql":"select * from item_quest order by CAST(id AS UNSIGNED) ASC"
-}

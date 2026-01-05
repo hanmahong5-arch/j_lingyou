@@ -1,8 +1,0 @@
-{
-	"file_path":"D:\\AionReal58\\AionMap\\XML\\pvp_mod_table.xml",
-	"xml_root_tag":"pvp_mods",
-	"list":[],
-	"xml_item_tag":"level_diff_mod",
-	"table_name":"pvp_mod_table",
-	"sql":"select * from pvp_mod_table order by CAST(level_10 AS UNSIGNED) ASC"
-}

@@ -1,8 +1,0 @@
-{
-	"file_path":"D:\\AionReal58\\AionMap\\客户端XML\\data\\China\\skills\\skills\\client_ultra_skills.xml",
-	"xml_root_tag":"client_ultra_skills",
-	"list":[],
-	"xml_item_tag":"client_ultra_skill",
-	"table_name":"client_ultra_skills",
-	"sql":"select * from client_ultra_skills order by CAST(id AS UNSIGNED) ASC"
-}

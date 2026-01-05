@@ -1,8 +1,0 @@
-{
-	"file_path":"D:\\AionReal58\\AionMap\\XML\\Special01\\pvp_rank_special01.xml",
-	"xml_root_tag":"pvp_ranks",
-	"list":[],
-	"xml_item_tag":"pvp_rank",
-	"table_name":"pvp_rank_special01",
-	"sql":"select * from pvp_rank_special01 order by CAST(id AS UNSIGNED) ASC"
-}

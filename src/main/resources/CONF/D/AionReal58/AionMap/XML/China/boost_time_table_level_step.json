@@ -1,9 +1,0 @@
-{
-	"file_path":"D:\\AionReal58\\AionMap\\XML\\China\\boost_time_table_level_step.xml",
-	"xml_root_attr":"generated_time=2016/01/20 13:53:11",
-	"xml_root_tag":"boost_time_level_steps",
-	"list":[],
-	"xml_item_tag":"boost_time_level_step",
-	"table_name":"boost_time_table_level_step",
-	"sql":"select * from boost_time_table_level_step order by CAST(id AS UNSIGNED) ASC"
-}

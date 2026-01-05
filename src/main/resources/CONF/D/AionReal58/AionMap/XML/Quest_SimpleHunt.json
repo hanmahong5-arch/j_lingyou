@@ -1,8 +1,0 @@
-{
-	"file_path":"D:\\AionReal58\\AionMap\\XML\\Quest_SimpleHunt.xml",
-	"xml_root_tag":"quest_simplehunts",
-	"list":[],
-	"xml_item_tag":"id",
-	"table_name":"Quest_SimpleHunt",
-	"sql":"select * from Quest_SimpleHunt order by CAST(dev_name AS UNSIGNED) ASC"
-}

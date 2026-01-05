@@ -1,8 +1,0 @@
-{
-	"file_path":"D:\\AionReal58\\AionMap\\XML\\skill_prohibit.xml",
-	"xml_root_tag":"skill_prohibits",
-	"list":[],
-	"xml_item_tag":"id",
-	"table_name":"skill_prohibit",
-	"sql":"select * from skill_prohibit order by CAST(limit_type AS UNSIGNED) ASC"
-}

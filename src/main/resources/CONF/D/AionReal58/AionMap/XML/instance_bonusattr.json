@@ -1,8 +1,0 @@
-{
-	"file_path":"D:\\AionReal58\\AionMap\\XML\\instance_bonusattr.xml",
-	"xml_root_tag":"instance_bonusattrs",
-	"list":[],
-	"xml_item_tag":"instance_bonusattr",
-	"table_name":"instance_bonusattr",
-	"sql":"select * from instance_bonusattr order by CAST(id AS UNSIGNED) ASC"
-}

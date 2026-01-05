@@ -1,8 +1,0 @@
-{
-	"file_path":"D:\\AionReal58\\AionMap\\XML\\Special01\\matchmaker_special01.xml",
-	"xml_root_tag":"matchmakers",
-	"list":[],
-	"xml_item_tag":"matchmaker",
-	"table_name":"matchmaker_special01",
-	"sql":"select * from matchmaker_special01 order by CAST(id AS UNSIGNED) ASC"
-}

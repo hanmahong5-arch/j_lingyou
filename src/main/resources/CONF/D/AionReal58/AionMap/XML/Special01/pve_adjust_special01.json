@@ -1,8 +1,0 @@
-{
-	"file_path":"D:\\AionReal58\\AionMap\\XML\\Special01\\pve_adjust_special01.xml",
-	"xml_root_tag":"pve_adjusts",
-	"list":[],
-	"xml_item_tag":"name",
-	"table_name":"pve_adjust_special01",
-	"sql":"select * from pve_adjust_special01 order by CAST(__comment__ AS UNSIGNED) ASC"
-}

@@ -1,8 +1,0 @@
-{
-	"file_path":"D:\\AionReal58\\AionMap\\XML\\instance_restrict.xml",
-	"xml_root_tag":"instance_restricts",
-	"list":[],
-	"xml_item_tag":"instance_restrict",
-	"table_name":"instance_restrict",
-	"sql":"select * from instance_restrict order by CAST(id AS UNSIGNED) ASC"
-}

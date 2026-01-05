@@ -1,8 +1,0 @@
-{
-	"file_path":"D:\\AionReal58\\AionMap\\XML\\skill_charge.xml",
-	"xml_root_tag":"skill_charges",
-	"list":[],
-	"xml_item_tag":"skill_charge",
-	"table_name":"skill_charge",
-	"sql":"select * from skill_charge order by CAST(id AS UNSIGNED) ASC"
-}

@@ -1,8 +1,0 @@
-{
-	"file_path":"D:\\AionReal58\\AionMap\\客户端XML\\data\\guild_emblem.xml",
-	"xml_root_tag":"guild_emblems",
-	"list":[],
-	"xml_item_tag":"guild_emblem",
-	"table_name":"guild_emblem",
-	"sql":"select * from guild_emblem order by CAST(server AS UNSIGNED) ASC"
-}

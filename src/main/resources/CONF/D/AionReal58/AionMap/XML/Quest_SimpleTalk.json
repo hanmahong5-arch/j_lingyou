@@ -1,8 +1,0 @@
-{
-	"file_path":"D:\\AionReal58\\AionMap\\XML\\Quest_SimpleTalk.xml",
-	"xml_root_tag":"quest_simpletalks",
-	"list":[],
-	"xml_item_tag":"id",
-	"table_name":"Quest_SimpleTalk",
-	"sql":"select * from Quest_SimpleTalk order by CAST(acquired_npc_name AS UNSIGNED) ASC"
-}

@@ -1,8 +1,0 @@
-{
-	"file_path":"D:\\AionReal58\\AionMap\\XML\\Special01\\aitimeconditions_special01.xml",
-	"xml_root_tag":"aitimeconditions",
-	"list":[],
-	"xml_item_tag":"aitimecondition",
-	"table_name":"aitimeconditions_special01",
-	"sql":"select * from aitimeconditions_special01 order by CAST(id AS UNSIGNED) ASC"
-}

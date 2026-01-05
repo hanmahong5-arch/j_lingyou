@@ -1,8 +1,0 @@
-{
-	"file_path":"D:\\AionReal58\\AionMap\\XML\\Special01\\pc_level_func_restrict_special01.xml",
-	"xml_root_tag":"pc_level_func_restricts",
-	"list":[],
-	"xml_item_tag":"level",
-	"table_name":"pc_level_func_restrict_special01",
-	"sql":"select * from pc_level_func_restrict_special01 order by CAST(sellgold_limit AS UNSIGNED) ASC"
-}

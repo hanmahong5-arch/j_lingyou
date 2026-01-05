@@ -1,8 +1,0 @@
-{
-	"file_path":"D:\\AionReal58\\AionMap\\XML\\client_strings_msg.xml",
-	"xml_root_tag":"strings",
-	"list":[],
-	"xml_item_tag":"string",
-	"table_name":"client_strings_msg",
-	"sql":"select * from client_strings_msg order by CAST(id AS UNSIGNED) ASC"
-}

@@ -8,6 +8,7 @@ import dev.langchain4j.store.embedding.EmbeddingStore;
 import dev.langchain4j.store.embedding.EmbeddingStoreIngestor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
@@ -31,6 +32,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * @version 1.0
  */
 @Service
+@ConditionalOnBean({EmbeddingStore.class, EmbeddingModel.class})
 public class GameSchemaEmbeddingService {
 
     private static final Logger log = LoggerFactory.getLogger(GameSchemaEmbeddingService.class);

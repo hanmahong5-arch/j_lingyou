@@ -1340,24 +1340,7 @@ public class ConfigEditorStage extends Stage {
         });
     }
 
-    private void gotoLine(int lineNumber) {
-        String text = editorArea.getText();
-        String[] lines = text.split("\n", -1);
-
-        if (lineNumber < 1 || lineNumber > lines.length) {
-            showStatus("行号超出范围 (1-" + lines.length + ")", true);
-            return;
-        }
-
-        int pos = 0;
-        for (int i = 0; i < lineNumber - 1; i++) {
-            pos += lines[i].length() + 1;
-        }
-
-        editorArea.positionCaret(pos);
-        editorArea.requestFocus();
-        showStatus("跳转到第 " + lineNumber + " 行", false);
-    }
+    // gotoLine(int) 方法已移至第1965行，改为 public 方法供外部调用
 
     private void showBackupHistory() {
         if (currentEntry == null) return;
@@ -1950,9 +1933,9 @@ public class ConfigEditorStage extends Stage {
      */
     private void loadApplicationYml() {
         // 查找 application.yml 配置项
-        for (ConfigFileEntry entry : configService.discoverConfigFiles()) {
-            if (entry.getFileName().equals("application.yml")) {
-                loadConfigFile(entry);
+        for (ConfigFileEntry entry : configService.getAllConfigs()) {
+            if ("application.yml".equals(entry.getName())) {
+                loadConfigContent(entry);
                 break;
             }
         }
@@ -1965,17 +1948,18 @@ public class ConfigEditorStage extends Stage {
     public void gotoLine(int lineNum) {
         if (lineNum <= 0) return;
 
+        final int targetLine = lineNum;  // 创建 effectively final 变量用于 lambda
+
         Platform.runLater(() -> {
             String text = editorArea.getText();
             String[] lines = text.split("\n", -1);
 
-            if (lineNum > lines.length) {
-                lineNum = lines.length;
-            }
+            // 使用局部变量避免修改 lambda 外部变量
+            int effectiveLine = Math.min(targetLine, lines.length);
 
             // 计算目标位置
             int targetPos = 0;
-            for (int i = 0; i < lineNum - 1 && i < lines.length; i++) {
+            for (int i = 0; i < effectiveLine - 1 && i < lines.length; i++) {
                 targetPos += lines[i].length() + 1;
             }
 
@@ -1984,11 +1968,11 @@ public class ConfigEditorStage extends Stage {
             editorArea.requestFocus();
 
             // 选中整行
-            int lineEnd = targetPos + (lineNum <= lines.length ? lines[lineNum - 1].length() : 0);
+            int lineEnd = targetPos + (effectiveLine <= lines.length ? lines[effectiveLine - 1].length() : 0);
             editorArea.selectRange(targetPos, lineEnd);
 
             // 滚动到可见区域
-            scrollToLine(lineNum);
+            scrollToLine(effectiveLine);
         });
     }
 

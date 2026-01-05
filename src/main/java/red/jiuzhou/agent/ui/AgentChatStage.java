@@ -64,6 +64,11 @@ public class AgentChatStage extends Stage {
     private WorkflowHistoryPanel historyPanel;
     private Button undoButton;
 
+    // 设计师体验增强组件
+    private DesignerWorkbenchPanel workbenchPanel;
+    private WorkflowVisualization workflowVisualization;
+    private DomainKnowledgeCards knowledgeCards;
+
     // 样式常量
     private static final String USER_BG = "#E3F2FD";
     private static final String ASSISTANT_BG = "#F5F5F5";
@@ -82,8 +87,11 @@ public class AgentChatStage extends Stage {
 
     public AgentChatStage(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
+        log.info("AgentChatStage 构造函数开始");
         initUI();
+        log.info("UI 初始化完成");
         initAgent();
+        log.info("Agent 初始化完成，窗口准备就绪");
     }
 
     private void initUI() {
@@ -154,22 +162,80 @@ public class AgentChatStage extends Stage {
     }
 
     /**
-     * 创建左侧面板（上下文透明化 + AI能力说明 + 工作流历史）
+     * 创建左侧面板（设计师工作台 + 上下文透明化 + 工作流可视化 + 历史）
      */
     private VBox createLeftPanel() {
-        VBox leftPanel = new VBox(8);
+        VBox leftPanel = new VBox(0);  // 无间距，TabPane 占满
         leftPanel.setStyle("-fx-background-color: #FAFAFA; -fx-border-color: #e0e0e0; -fx-border-width: 0 1 0 0;");
+        leftPanel.setPrefWidth(280);  // 增加默认宽度
 
-        // 上下文透明化面板
+        // ==================== 设计师工作台面板 ====================
+        workbenchPanel = new DesignerWorkbenchPanel();
+        workbenchPanel.setOnOperationSelected(operation -> {
+            switch (operation) {
+                case "query" -> inputArea.setText("查询");
+                case "modify" -> inputArea.setText("修改");
+                case "analyze" -> inputArea.setText("分析");
+                case "template" -> addSystemMessage("打开SQL模板库");
+            }
+            inputArea.requestFocus();
+        });
+        workbenchPanel.setOnSuggestionExecuted(suggestion -> {
+            if (suggestion.sql() != null && !suggestion.sql().isEmpty()) {
+                // 直接执行SQL
+                executeSqlDirectly(suggestion.sql(), suggestion.title());
+            } else if (suggestion.prompt() != null) {
+                // 发送提示词到AI
+                inputArea.setText(suggestion.prompt());
+                sendMessage();
+            }
+        });
+        workbenchPanel.setOnCustomPromptSubmitted(prompt -> {
+            inputArea.setText(prompt);
+            sendMessage();
+        });
+        workbenchPanel.setOnSqlExecuteRequested(sql -> {
+            executeSqlDirectly(sql, "知识库SQL");
+        });
+
+        // ==================== 上下文透明化面板 ====================
         contextPanel = new ContextTransparencyPanel();
         contextPanel.setOnSupplementAdded(supplement -> {
             addSystemMessage("已添加补充说明: " + supplement);
         });
 
-        // AI能力说明面板
+        // ==================== 工作流可视化面板 ====================
+        workflowVisualization = new WorkflowVisualization();
+        workflowVisualization.setOnStepAction((step, action) -> {
+            switch (action) {
+                case "confirm" -> workflowEngine.confirmStep();
+                case "skip" -> workflowEngine.skipStep();
+                case "cancel" -> workflowEngine.cancelWorkflow();
+                case "regenerate" -> addSystemMessage("重新生成功能正在开发中");
+                case "supplement" -> {
+                    // 弹出补充说明对话框
+                    TextInputDialog dialog = new TextInputDialog();
+                    dialog.setTitle("补充说明");
+                    dialog.setHeaderText("为当前步骤添加补充说明");
+                    dialog.setContentText("说明:");
+                    dialog.showAndWait().ifPresent(text -> {
+                        workflowEngine.modifyStep(text);
+                    });
+                }
+            }
+        });
+        workflowVisualization.setOnWorkflowComplete(result -> {
+            if (result.success()) {
+                addSystemMessage("✅ 工作流完成: " + result.message());
+            } else {
+                addErrorMessage("工作流失败: " + result.message());
+            }
+        });
+
+        // ==================== AI能力说明面板 ====================
         capabilityGuide = new AiCapabilityGuide();
 
-        // 工作流历史面板
+        // ==================== 工作流历史面板 ====================
         historyPanel = new WorkflowHistoryPanel();
         historyPanel.setOnUndoComplete(result -> {
             if (result.success) {
@@ -179,25 +245,79 @@ public class AgentChatStage extends Stage {
             }
         });
 
-        // 使用TabPane组织三个面板
+        // ==================== 领域知识卡片面板 ====================
+        knowledgeCards = new DomainKnowledgeCards();
+        knowledgeCards.setOnExecuteClicked(sql -> {
+            executeSqlDirectly(sql, "知识库SQL");
+        });
+
+        // ==================== 使用TabPane组织面板 ====================
         TabPane leftTabPane = new TabPane();
         leftTabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
+        leftTabPane.setTabMinWidth(40);  // 设置最小宽度
+        leftTabPane.setStyle("-fx-background-color: #FAFAFA;");
 
-        Tab contextTab = new Tab("上下文", contextPanel);
-        contextTab.setGraphic(new Label("📍"));
+        // 使用纯文本标签，避免 emoji 显示问题
+        Tab workbenchTab = new Tab("工作台");
+        workbenchTab.setContent(workbenchPanel);
 
-        Tab guideTab = new Tab("AI能力", capabilityGuide);
-        guideTab.setGraphic(new Label("💡"));
+        Tab contextTab = new Tab("上下文");
+        contextTab.setContent(contextPanel);
 
-        Tab historyTab = new Tab("历史", historyPanel);
-        historyTab.setGraphic(new Label("📜"));
+        Tab workflowTab = new Tab("工作流");
+        workflowTab.setContent(workflowVisualization);
 
-        leftTabPane.getTabs().addAll(contextTab, guideTab, historyTab);
+        Tab historyTab = new Tab("历史");
+        historyTab.setContent(historyPanel);
+
+        Tab guideTab = new Tab("AI能力");
+        guideTab.setContent(capabilityGuide);
+
+        Tab knowledgeTab = new Tab("知识库");
+        knowledgeTab.setContent(knowledgeCards);
+
+        leftTabPane.getTabs().addAll(workbenchTab, contextTab, workflowTab, historyTab, guideTab, knowledgeTab);
 
         leftPanel.getChildren().add(leftTabPane);
         VBox.setVgrow(leftTabPane, Priority.ALWAYS);
 
         return leftPanel;
+    }
+
+    /**
+     * 直接执行SQL并显示结果
+     */
+    private void executeSqlDirectly(String sql, String queryName) {
+        if (sql == null || sql.trim().isEmpty()) {
+            addErrorMessage("SQL为空");
+            return;
+        }
+
+        setLoading(true);
+        addSystemMessage("执行SQL: " + sql.substring(0, Math.min(50, sql.length())) + "...");
+
+        new Thread(() -> {
+            try {
+                SqlExecutionTool.SqlExecutionResult result = sqlTool.executeSql(sql);
+
+                Platform.runLater(() -> {
+                    if (result.isSuccess()) {
+                        addAssistantMessage(String.format("✅ 查询完成\n返回 %d 行数据, 耗时 %d ms",
+                            result.getRowCount(), result.getExecutionTimeMs()));
+                        displayResultTable(result.getRows(), queryName);
+                    } else {
+                        addErrorMessage("SQL执行失败: " + result.getError());
+                    }
+                    setLoading(false);
+                });
+            } catch (Exception e) {
+                log.error("SQL执行失败", e);
+                Platform.runLater(() -> {
+                    addErrorMessage("SQL执行失败: " + e.getMessage());
+                    setLoading(false);
+                });
+            }
+        }).start();
     }
 
     // 工作流执行器
@@ -228,6 +348,24 @@ public class AgentChatStage extends Stage {
                         historyPanel.addTimelineEntry("WORKFLOW_STARTED", "工作流启动",
                                 "类型: " + state.getWorkflowType());
                     }
+
+                    // 更新工作流可视化面板
+                    if (workflowVisualization != null) {
+                        workflowVisualization.setWorkflowType(state.getWorkflowType());
+                        // 根据工作流类型创建步骤
+                        var steps = switch (state.getWorkflowType()) {
+                            case "query" -> WorkflowVisualization.createQueryWorkflowSteps();
+                            case "modify" -> WorkflowVisualization.createModifyWorkflowSteps();
+                            case "analyze" -> WorkflowVisualization.createAnalyzeWorkflowSteps();
+                            default -> WorkflowVisualization.createQueryWorkflowSteps();
+                        };
+                        workflowVisualization.setSteps(steps);
+                    }
+
+                    // 更新工作台面板的上下文
+                    if (workbenchPanel != null && state.getContext() != null) {
+                        workbenchPanel.updateContext(state.getContext());
+                    }
                 });
             }
 
@@ -245,6 +383,12 @@ public class AgentChatStage extends Stage {
                     // 更新历史面板
                     if (historyPanel != null) {
                         historyPanel.addTimelineEntry("STEP_STARTED", step.name(), step.description());
+                    }
+
+                    // 更新工作流可视化面板
+                    if (workflowVisualization != null && state != null) {
+                        workflowVisualization.updateStepStatus(state.getCurrentStepIndex(),
+                            WorkflowVisualization.StepStatus.RUNNING);
                     }
                 });
             }
@@ -272,6 +416,18 @@ public class AgentChatStage extends Stage {
                         historyPanel.notifyNewUndoableOperation();
                     }
 
+                    // 更新工作流可视化面板 - 标记为完成
+                    if (workflowVisualization != null) {
+                        int stepIndex = state.getCurrentStepIndex() - 1; // 当前已移到下一步
+                        if (stepIndex >= 0) {
+                            workflowVisualization.updateStepStatus(stepIndex,
+                                WorkflowVisualization.StepStatus.COMPLETED);
+                            workflowVisualization.addHistoryEntry(
+                                workflowVisualization.getSteps().get(stepIndex),
+                                "步骤已确认");
+                        }
+                    }
+
                     // 更新撤销按钮状态
                     updateUndoButtonState();
                 });
@@ -287,8 +443,21 @@ public class AgentChatStage extends Stage {
 
                     addSystemMessage("⏭ 已跳过: " + step.name());
 
+                    // 更新历史面板
                     if (historyPanel != null) {
                         historyPanel.addTimelineEntry("STEP_SKIPPED", step.name() + " 已跳过", null);
+                    }
+
+                    // 更新工作流可视化面板 - 标记为跳过
+                    if (workflowVisualization != null && state != null) {
+                        int stepIndex = state.getCurrentStepIndex() - 1;
+                        if (stepIndex >= 0) {
+                            workflowVisualization.updateStepStatus(stepIndex,
+                                WorkflowVisualization.StepStatus.SKIPPED);
+                            workflowVisualization.addHistoryEntry(
+                                workflowVisualization.getSteps().get(stepIndex),
+                                "步骤已跳过");
+                        }
                     }
                 });
             }
@@ -303,8 +472,20 @@ public class AgentChatStage extends Stage {
 
                     addSystemMessage("✏ 已修正: " + step.name() + "\n修正内容: " + correction);
 
+                    // 更新历史面板
                     if (historyPanel != null) {
                         historyPanel.addTimelineEntry("STEP_CORRECTED", step.name() + " 已修正", correction);
+                    }
+
+                    // 更新工作流可视化面板 - 显示修正信息
+                    if (workflowVisualization != null && state != null) {
+                        int stepIndex = state.getCurrentStepIndex();
+                        if (stepIndex >= 0 && stepIndex < workflowVisualization.getSteps().size()) {
+                            var vizStep = workflowVisualization.getSteps().get(stepIndex);
+                            vizStep.setOutput("修正: " + correction);
+                            workflowVisualization.showStepDetail(vizStep);
+                            workflowVisualization.addHistoryEntry(vizStep, "用户修正: " + correction);
+                        }
                     }
                 });
             }
@@ -335,6 +516,21 @@ public class AgentChatStage extends Stage {
                         historyPanel.refresh();
                     }
 
+                    // 更新工作流可视化面板 - 标记所有步骤完成
+                    if (workflowVisualization != null) {
+                        var steps = workflowVisualization.getSteps();
+                        for (int i = 0; i < steps.size(); i++) {
+                            var step = steps.get(i);
+                            if (step.getStatus() == WorkflowVisualization.StepStatus.PENDING ||
+                                step.getStatus() == WorkflowVisualization.StepStatus.RUNNING) {
+                                workflowVisualization.updateStepStatus(i,
+                                    WorkflowVisualization.StepStatus.COMPLETED);
+                            }
+                        }
+                        workflowVisualization.addHistoryEntry(null,
+                            "工作流完成, 影响 " + state.getTotalAffectedRows() + " 行");
+                    }
+
                     // 更新撤销按钮状态
                     updateUndoButtonState();
 
@@ -359,9 +555,16 @@ public class AgentChatStage extends Stage {
                     workflowProgressBar.markCancelled();
                     addSystemMessage("工作流已取消");
 
+                    // 更新历史面板
                     if (historyPanel != null) {
                         historyPanel.addTimelineEntry("WORKFLOW_CANCELLED", "工作流已取消", null);
                         historyPanel.refresh();
+                    }
+
+                    // 更新工作流可视化面板 - 重置状态
+                    if (workflowVisualization != null) {
+                        workflowVisualization.reset();
+                        workflowVisualization.addHistoryEntry(null, "工作流已取消");
                     }
 
                     workflowProgressBar.setVisible(false);
@@ -375,9 +578,26 @@ public class AgentChatStage extends Stage {
                     workflowProgressBar.markFailed();
                     addErrorMessage("工作流执行失败: " + error.getMessage());
 
+                    // 更新历史面板
                     if (historyPanel != null) {
                         historyPanel.addTimelineEntry("WORKFLOW_FAILED", "工作流失败", error.getMessage());
                         historyPanel.refresh();
+                    }
+
+                    // 更新工作流可视化面板 - 标记当前步骤失败
+                    if (workflowVisualization != null) {
+                        WorkflowState state = workflowEngine.getCurrentState();
+                        if (state != null) {
+                            int stepIndex = state.getCurrentStepIndex();
+                            if (stepIndex >= 0 && stepIndex < workflowVisualization.getSteps().size()) {
+                                workflowVisualization.updateStepStatus(stepIndex,
+                                    WorkflowVisualization.StepStatus.FAILED);
+                                var vizStep = workflowVisualization.getSteps().get(stepIndex);
+                                vizStep.setOutput("错误: " + error.getMessage());
+                                workflowVisualization.showStepDetail(vizStep);
+                            }
+                        }
+                        workflowVisualization.addHistoryEntry(null, "工作流失败: " + error.getMessage());
                     }
                 });
             }
@@ -623,28 +843,37 @@ public class AgentChatStage extends Stage {
     }
 
     private void initAgent() {
-        // 从 Spring 容器获取 LangChain4j Agent
-        agent = SpringContextHolder.getBean(LangChainGameDataAgent.class);
-
-        // 设置消息回调
-        agent.setMessageCallback(message -> {
-            Platform.runLater(() -> addMessageToChat(message));
-        });
-
-        // 初始化Agent（快速启动，不阻塞UI）
+        // 先初始化基础组件（即使 AI 失败也能用）
         try {
-            agent.initialize(jdbcTemplate);
-
-            // 初始化SQL工具
+            // 初始化SQL工具（不依赖 AI）
             sqlTool = new SqlExecutionTool(jdbcTemplate, modelSelector.getValue());
+            log.info("SQL工具初始化成功");
 
             // 初始化追溯和撤销管理器
             initUndoManagers();
+            log.info("撤销管理器初始化成功");
+        } catch (Exception e) {
+            log.error("基础工具初始化失败", e);
+            addErrorMessage("⚠ 基础工具初始化失败: " + e.getMessage());
+        }
 
-            addSystemMessage("AI游戏数据助手已就绪！\n\n" +
-                "\uD83D\uDCAC 对话模式: 可以用自然语言查询和修改游戏数据\n" +
-                "\uD83D\uDCCA SQL模式: 自动生成SQL查询并展示结果表格\n" +
-                "\uD83D\uDD04 协作模式: AI每步操作都需要确认\n" +
+        // 初始化 AI Agent
+        try {
+            // 从 Spring 容器获取 LangChain4j Agent
+            agent = SpringContextHolder.getBean(LangChainGameDataAgent.class);
+
+            // 设置消息回调
+            agent.setMessageCallback(message -> {
+                Platform.runLater(() -> addMessageToChat(message));
+            });
+
+            // 初始化Agent（快速启动，不阻塞UI）
+            agent.initialize(jdbcTemplate);
+
+            addSystemMessage("✅ AI游戏数据助手已就绪！\n\n" +
+                "🗣 对话模式: 可以用自然语言查询和修改游戏数据\n" +
+                "📊 SQL模式: 自动生成SQL查询并展示结果表格\n" +
+                "🔄 协作模式: AI每步操作都需要确认\n" +
                 "↩ 撤销功能: 支持回滚数据修改操作\n\n" +
                 "示例: \"查询所有50级以上的紫色武器\"");
 
@@ -655,8 +884,21 @@ public class AgentChatStage extends Stage {
             initDynamicSemanticsAsync();
 
         } catch (Exception e) {
-            log.error("Agent初始化失败", e);
-            addErrorMessage("Agent初始化失败: " + e.getMessage());
+            log.error("AI Agent初始化失败", e);
+            e.printStackTrace();
+
+            Platform.runLater(() -> {
+                addErrorMessage("⚠ AI Agent 初始化失败\n\n" +
+                    "错误: " + e.getMessage() + "\n\n" +
+                    "可能原因:\n" +
+                    "1. AI API Key 未配置或无效\n" +
+                    "2. 网络连接问题\n" +
+                    "3. DashScope SDK 版本不兼容\n\n" +
+                    "💡 提示：\n" +
+                    "- 可以继续使用 SQL 直接查询功能\n" +
+                    "- 请检查 application.yml 中的 AI 配置\n" +
+                    "- 确保配置了有效的 API Key");
+            });
         }
     }
 
@@ -664,13 +906,22 @@ public class AgentChatStage extends Stage {
      * 初始化工作流执行器
      */
     private void initWorkflowExecutors() {
-        workflowExecutors = new WorkflowExecutors(jdbcTemplate, agent);
-        workflowExecutors.setCurrentModel(modelSelector.getValue());
+        if (agent == null) {
+            log.warn("Agent 未初始化，跳过工作流执行器初始化");
+            return;
+        }
 
-        // 设置执行器提供者
-        workflowEngine.setExecutorProvider(workflowExecutors.createExecutorProvider());
+        try {
+            workflowExecutors = new WorkflowExecutors(jdbcTemplate, agent);
+            workflowExecutors.setCurrentModel(modelSelector.getValue());
 
-        log.info("工作流执行器初始化完成");
+            // 设置执行器提供者
+            workflowEngine.setExecutorProvider(workflowExecutors.createExecutorProvider());
+
+            log.info("工作流执行器初始化完成");
+        } catch (Exception e) {
+            log.error("工作流执行器初始化失败", e);
+        }
     }
 
     /**
@@ -999,6 +1250,24 @@ public class AgentChatStage extends Stage {
     // ==================== 上下文感知消息 ====================
 
     /**
+     * 发送简单消息（供外部调用）
+     *
+     * @param message 要发送的消息
+     */
+    public void sendMessage(String message) {
+        if (message == null || message.trim().isEmpty()) {
+            return;
+        }
+
+        Platform.runLater(() -> {
+            // 设置输入框内容
+            inputArea.setText(message);
+            // 触发发送（调用私有的无参sendMessage方法）
+            sendMessage();
+        });
+    }
+
+    /**
      * 发送上下文感知的消息
      *
      * 用于从右键菜单等外部触发的AI操作，将上下文信息和用户请求一起发送给AI。
@@ -1015,7 +1284,14 @@ public class AgentChatStage extends Stage {
         }
 
         // 更新上下文透明化面板
-        contextPanel.updateContext(context);
+        if (contextPanel != null) {
+            contextPanel.updateContext(context);
+        }
+
+        // 更新设计师工作台面板
+        if (workbenchPanel != null) {
+            workbenchPanel.updateContext(context);
+        }
 
         // 更新AI能力说明高亮
         capabilityGuide.highlightForOperation(operationType);
@@ -1124,7 +1400,7 @@ public class AgentChatStage extends Stage {
     /**
      * 获取Agent实例（用于外部访问）
      */
-    public GameDataAgent getAgent() {
+    public LangChainGameDataAgent getAgent() {
         return agent;
     }
 

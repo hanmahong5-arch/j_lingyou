@@ -1,8 +1,0 @@
-{
-	"file_path":"D:\\AionReal58\\AionMap\\XML\\instance_pool.xml",
-	"xml_root_tag":"instance_pools",
-	"list":[],
-	"xml_item_tag":"instance_pool",
-	"table_name":"instance_pool",
-	"sql":"select * from instance_pool order by CAST(base AS UNSIGNED) ASC"
-}

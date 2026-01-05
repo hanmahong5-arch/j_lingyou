@@ -1,8 +1,0 @@
-{
-	"file_path":"D:\\AionReal58\\AionMap\\客户端XML\\data\\China\\skills\\skills\\skill_shortcut_replace.xml",
-	"xml_root_tag":"client_skill_replaces",
-	"list":[],
-	"xml_item_tag":"client_skill_replace",
-	"table_name":"skill_shortcut_replace",
-	"sql":"select * from skill_shortcut_replace order by CAST(id AS UNSIGNED) ASC"
-}

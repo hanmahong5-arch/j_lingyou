@@ -1,9 +1,0 @@
-{
-	"file_path":"D:\\AionReal58\\AionMap\\XML\\item_luna.xml",
-	"xml_root_attr":"generated_time=2015/12/30 17:36:43",
-	"xml_root_tag":"items",
-	"list":[],
-	"xml_item_tag":"item",
-	"table_name":"item_luna",
-	"sql":"select * from item_luna order by CAST(id AS UNSIGNED) ASC"
-}

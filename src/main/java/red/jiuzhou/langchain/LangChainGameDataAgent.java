@@ -2,6 +2,7 @@ package red.jiuzhou.langchain;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import red.jiuzhou.agent.context.DesignContext;
@@ -62,18 +63,22 @@ public class LangChainGameDataAgent {
     // ========== 对话历史（本地缓存） ==========
     private final Map<String, List<AgentMessage>> sessionHistory = new LinkedHashMap<>();
 
+    @Autowired
     public LangChainGameDataAgent(
             LangChainModelFactory modelFactory,
             GameDataAssistantFactory assistantFactory,
-            GameSchemaEmbeddingService embeddingService,
-            GameContentRetriever contentRetriever
+            @Autowired(required = false) GameSchemaEmbeddingService embeddingService,
+            @Autowired(required = false) GameContentRetriever contentRetriever
     ) {
         this.modelFactory = modelFactory;
         this.assistantFactory = assistantFactory;
         this.embeddingService = embeddingService;
         this.contentRetriever = contentRetriever;
 
-        log.info("LangChainGameDataAgent 创建完成");
+        // RAG 功能是否可用取决于依赖是否注入
+        this.ragEnabled = (embeddingService != null && contentRetriever != null);
+
+        log.info("LangChainGameDataAgent 创建完成, RAG功能: {}", ragEnabled ? "已启用" : "未配置");
     }
 
     /**
@@ -86,25 +91,51 @@ public class LangChainGameDataAgent {
         this.operationExecutor = new OperationExecutor(jdbcTemplate, operationLogger);
         this.gameDataTools = new GameDataTools(jdbcTemplate);
 
-        // 创建 AI Service
-        createAssistant();
+        // 检查 API key 是否配置
+        if (isAiConfigured()) {
+            try {
+                // 创建 AI Service
+                createAssistant();
 
-        // 创建新会话
-        startNewSession();
+                // 创建新会话
+                startNewSession();
 
-        log.info("LangChainGameDataAgent 初始化完成，模型: {}, RAG: {}", currentModel, ragEnabled);
+                log.info("LangChainGameDataAgent 初始化完成，模型: {}, RAG: {}", currentModel, ragEnabled);
+            } catch (Exception e) {
+                log.warn("AI 功能初始化失败，将以纯工具模式运行: {}", e.getMessage());
+                this.assistant = null;
+            }
+        } else {
+            log.warn("AI API Key 未配置，Agent 将以纯工具模式运行（仅支持直接SQL执行）");
+            this.assistant = null;
+        }
+    }
+
+    /**
+     * 检查 AI 是否已配置
+     */
+    private boolean isAiConfigured() {
+        var qwenConfig = modelFactory.getProperties().getQwen();
+        return qwenConfig != null && qwenConfig.isConfigured();
     }
 
     /**
      * 创建 AI Service
      */
     private void createAssistant() {
-        if (ragEnabled && contentRetriever != null) {
-            assistant = assistantFactory.createAssistantWithRag(currentModel, contentRetriever);
-            log.info("创建带 RAG 的 GameDataAssistant");
-        } else {
-            assistant = assistantFactory.getAssistant(currentModel);
-            log.info("创建标准 GameDataAssistant");
+        try {
+            log.info("开始创建 Assistant，模型: {}, RAG: {}", currentModel, ragEnabled);
+            if (ragEnabled && contentRetriever != null) {
+                assistant = assistantFactory.createAssistantWithRag(currentModel, contentRetriever);
+                log.info("创建带 RAG 的 GameDataAssistant");
+            } else {
+                log.info("调用 assistantFactory.getAssistant()");
+                assistant = assistantFactory.getAssistant(currentModel);
+                log.info("创建标准 GameDataAssistant 成功");
+            }
+        } catch (Exception e) {
+            log.error("创建 Assistant 失败", e);
+            throw new RuntimeException("创建 AI Assistant 失败: " + e.getMessage(), e);
         }
     }
 
@@ -153,6 +184,14 @@ public class LangChainGameDataAgent {
             return handleConfirm();
         } else if (isCancelCommand(userInput)) {
             return handleCancel();
+        }
+
+        // 检查 AI 是否可用
+        if (assistant == null) {
+            AgentMessage errorMsg = AgentMessage.assistant("AI 功能未配置或初始化失败。请检查 application.yml 中的 AI API Key 配置。");
+            addToHistory(errorMsg);
+            notifyMessage(errorMsg);
+            return errorMsg;
         }
 
         // 调用 AI Service

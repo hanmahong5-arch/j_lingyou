@@ -535,6 +535,210 @@ public class PromptBuilder {
         };
     }
 
+    // ==================== 详细表结构提示（增强SQL准确率） ====================
+
+    /**
+     * 构建多个表的详细结构提示词
+     *
+     * 用于复杂查询时提供更精确的表结构信息，提升SQL生成准确率。
+     *
+     * @param tables 表名列表
+     * @return 详细的表结构提示词
+     */
+    public String buildDetailedSchemaPrompt(java.util.List<String> tables) {
+        if (metadataService == null || !metadataService.isInitialized()) {
+            return "# 数据库结构\n\n数据库元数据尚未加载。\n";
+        }
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("# 详细数据库结构\n\n");
+
+        for (String tableName : tables) {
+            sb.append("## 表: `").append(tableName).append("`\n\n");
+
+            java.util.List<red.jiuzhou.ui.mapping.DatabaseTableScanner.ColumnInfo> columns =
+                metadataService.getTableColumns(tableName);
+
+            if (columns.isEmpty()) {
+                sb.append("(表不存在或无字段信息)\n\n");
+                continue;
+            }
+
+            sb.append("| 字段名 | 类型 | 可空 | 说明 |\n");
+            sb.append("|--------|------|------|------|\n");
+
+            for (red.jiuzhou.ui.mapping.DatabaseTableScanner.ColumnInfo col : columns) {
+                sb.append("| `").append(col.getColumnName()).append("`");
+                sb.append(" | ").append(col.getColumnType());
+                sb.append(" | ").append(col.isNullable() ? "是" : "否");
+                sb.append(" | ");
+                if (col.getComment() != null && !col.getComment().isEmpty()) {
+                    sb.append(col.getComment());
+                }
+                if (col.isPrimaryKey()) {
+                    sb.append(" **[PK]**");
+                }
+                sb.append(" |\n");
+            }
+            sb.append("\n");
+        }
+
+        return sb.toString();
+    }
+
+    /**
+     * 构建查询类型特定的Few-Shot示例
+     *
+     * @param queryType 查询类型 (query, update, insert, analyze, count)
+     * @return Few-Shot示例提示词
+     */
+    public String buildQueryTypeFewShotExamples(String queryType) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("## ").append(queryType.toUpperCase()).append(" 示例\n\n");
+
+        switch (queryType.toLowerCase()) {
+            case "query" -> sb.append("""
+                **示例1**: "查询50级以上的紫装"
+                ```sql
+                SELECT * FROM item_armors WHERE level > 50 AND quality = 3 LIMIT 100
+                ```
+
+                **示例2**: "统计每个品质的装备数量"
+                ```sql
+                SELECT quality, COUNT(*) as count FROM item_armors GROUP BY quality ORDER BY quality
+                ```
+
+                **示例3**: "查询火属性高伤害技能"
+                ```sql
+                SELECT * FROM client_skill WHERE element_type = 1 AND base_damage >= 1000 LIMIT 50
+                ```
+                """);
+
+            case "update" -> sb.append("""
+                **示例1**: "将所有紫装攻击力提高10%"
+                ```sql
+                UPDATE item_weapons SET attack = attack * 1.1 WHERE quality = 3
+                ```
+                -- 预计影响: 查询 `SELECT COUNT(*) FROM item_weapons WHERE quality = 3` 确认行数
+
+                **示例2**: "修正NPC掉落率"
+                ```sql
+                UPDATE client_npc SET drop_rate = drop_rate * 0.9 WHERE level < 30
+                ```
+                """);
+
+            case "analyze" -> sb.append("""
+                **示例1**: "分析装备等级分布"
+                ```sql
+                SELECT
+                    CASE
+                        WHEN level < 20 THEN '初级 (1-19)'
+                        WHEN level < 40 THEN '中级 (20-39)'
+                        WHEN level < 60 THEN '高级 (40-59)'
+                        ELSE '顶级 (60+)'
+                    END as level_range,
+                    COUNT(*) as count
+                FROM item_armors
+                GROUP BY level_range
+                ORDER BY MIN(level)
+                ```
+
+                **示例2**: "分析技能伤害与冷却的关系"
+                ```sql
+                SELECT
+                    ROUND(base_damage / 100) * 100 as damage_range,
+                    AVG(cooldown) as avg_cooldown,
+                    COUNT(*) as skill_count
+                FROM client_skill
+                GROUP BY damage_range
+                ORDER BY damage_range
+                ```
+                """);
+
+            case "count" -> sb.append("""
+                **示例1**: "统计各表数据量"
+                ```sql
+                SELECT table_name, table_rows
+                FROM information_schema.tables
+                WHERE table_schema = DATABASE()
+                ORDER BY table_rows DESC
+                LIMIT 20
+                ```
+
+                **示例2**: "统计品质分布"
+                ```sql
+                SELECT quality, COUNT(*) as count, ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER(), 2) as percentage
+                FROM item_armors
+                GROUP BY quality
+                ```
+                """);
+
+            default -> sb.append("请参考通用SQL语法生成查询。\n");
+        }
+
+        return sb.toString();
+    }
+
+    /**
+     * 构建针对特定查询的完整增强提示词（整合所有增强功能）
+     *
+     * @param userQuery 用户查询
+     * @param relatedTables 相关表列表（可为null）
+     * @param queryType 查询类型（可为null，自动推断）
+     * @return 完整的增强提示词
+     */
+    public String buildFullEnhancedPrompt(String userQuery,
+                                          java.util.List<String> relatedTables,
+                                          String queryType) {
+        StringBuilder sb = new StringBuilder();
+
+        // 1. 精简系统提示词
+        sb.append(buildCompactSystemPrompt());
+        sb.append("\n\n");
+
+        // 2. 相关表的详细结构（如果提供）
+        if (relatedTables != null && !relatedTables.isEmpty()) {
+            sb.append(buildDetailedSchemaPrompt(relatedTables));
+            sb.append("\n");
+        }
+
+        // 3. 查询类型特定的Few-Shot示例
+        if (queryType != null) {
+            sb.append(buildQueryTypeFewShotExamples(queryType));
+            sb.append("\n");
+        }
+
+        // 4. 通用Few-Shot示例（基于相似度匹配）
+        if (exampleLibrary != null) {
+            sb.append(exampleLibrary.generateFewShotPrompt(userQuery, 3));
+            sb.append("\n");
+        }
+
+        // 5. 语义增强提示
+        if (semanticEnhancer != null) {
+            String hints = semanticEnhancer.translateToSqlHints(userQuery);
+            if (!hints.isEmpty()) {
+                sb.append(hints);
+                sb.append("\n");
+            }
+        }
+
+        // 6. 当前用户查询
+        sb.append("# 用户查询\n\n");
+        sb.append(userQuery);
+        sb.append("\n\n");
+
+        // 7. 生成指导
+        sb.append("# SQL生成指导\n\n");
+        sb.append("请根据以上表结构、示例和语义映射，生成准确的MySQL SQL查询。\n");
+        sb.append("- 确保表名和字段名正确（参考上方表结构）\n");
+        sb.append("- 应用语义映射转换游戏术语（如紫装 → quality = 3）\n");
+        sb.append("- SELECT查询必须添加LIMIT子句（默认100行）\n");
+        sb.append("- 确保SQL语法为MySQL标准语法\n");
+
+        return sb.toString();
+    }
+
     // ========== Getter/Setter ==========
 
     public void setMetadataService(SchemaMetadataService metadataService) {

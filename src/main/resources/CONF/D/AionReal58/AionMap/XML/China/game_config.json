@@ -1,8 +1,0 @@
-{
-	"file_path":"D:\\AionReal58\\AionMap\\XML\\China\\game_config.xml",
-	"xml_root_tag":"config_items",
-	"list":[],
-	"xml_item_tag":"config_item",
-	"table_name":"game_config",
-	"sql":"select * from game_config order by CAST(id AS UNSIGNED) ASC"
-}

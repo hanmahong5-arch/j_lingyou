@@ -555,7 +555,7 @@ public class WorkflowState {
     /**
      * 获取工作流时间线
      */
-    public List<WorkflowAuditLog.TimelineEntry> getTimeline() {
+    public List<WorkflowAuditLog.TimelineEvent> getTimeline() {
         return auditLog.getWorkflowTimeline(workflowId);
     }
 

@@ -1,8 +1,0 @@
-{
-	"file_path":"D:\\AionReal58\\AionMap\\XML\\Special01\\board_bm_special01.xml",
-	"xml_root_tag":"board_bms",
-	"list":[],
-	"xml_item_tag":"board_bm",
-	"table_name":"board_bm_special01",
-	"sql":"select * from board_bm_special01 order by CAST(id AS UNSIGNED) ASC"
-}

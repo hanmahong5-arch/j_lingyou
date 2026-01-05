@@ -101,7 +101,7 @@ public enum SqlExampleLibrary {
     private void initializeDefaultExamples() {
         // ========== 物品相关 ==========
         addExample("查询所有紫色品质的物品",
-            "SELECT * FROM item_armors WHERE quality = 'epic' LIMIT 20",
+            "SELECT * FROM item_armors WHERE quality = 3 OR quality = 'epic' LIMIT 20",
             "物品");
 
         addExample("查询所有50级以上的武器",
@@ -113,11 +113,28 @@ public enum SqlExampleLibrary {
             "物品");
 
         addExample("查询所有传说品质的物品",
-            "SELECT * FROM item_armors WHERE quality = 'legendary' OR quality >= 5 LIMIT 20",
+            "SELECT * FROM item_armors WHERE quality = 4 OR quality = 'legendary' LIMIT 20",
             "物品");
 
         addExample("查询防御力大于1000的护甲",
             "SELECT * FROM item_armors WHERE physical_defense > 1000 LIMIT 20",
+            "物品");
+
+        // ========== 简写术语示例（常用） ==========
+        addExample("查询所有紫装",
+            "SELECT * FROM item_armors WHERE quality = 3 LIMIT 50",
+            "物品");
+
+        addExample("查询50级以上的紫装",
+            "SELECT * FROM item_armors WHERE level >= 50 AND quality = 3 LIMIT 50",
+            "物品");
+
+        addExample("查询橙装",
+            "SELECT * FROM item_armors WHERE quality = 4 LIMIT 50",
+            "物品");
+
+        addExample("查询所有高等级装备",
+            "SELECT * FROM item_armors WHERE level >= 50 LIMIT 50",
             "物品");
 
         // ========== 技能相关 ==========

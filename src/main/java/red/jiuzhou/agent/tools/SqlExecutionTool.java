@@ -32,6 +32,7 @@ public class SqlExecutionTool {
     private final JdbcTemplate jdbcTemplate;
     private final DatabaseSchemaProvider schemaProvider;
     private final ConfigBasedSchemaProvider configProvider;
+    private final SqlValidator sqlValidator;
     private final ChatLanguageModel chatModel;
     private LangChainModelFactory modelFactory;
 
@@ -149,6 +150,7 @@ public class SqlExecutionTool {
         this.jdbcTemplate = jdbcTemplate;
         this.schemaProvider = new DatabaseSchemaProvider(jdbcTemplate);
         this.configProvider = new ConfigBasedSchemaProvider(jdbcTemplate);
+        this.sqlValidator = new SqlValidator(jdbcTemplate);
 
         // 使用 LangChain4j 初始化 AI 模型
         if (aiModel == null || aiModel.isEmpty()) {
@@ -156,7 +158,7 @@ public class SqlExecutionTool {
         }
         this.chatModel = getModelFactory().getModel(aiModel);
 
-        log.info("SqlExecutionTool 初始化完成 (LangChain4j), AI模型: {}, 配置驱动Schema: enabled", aiModel);
+        log.info("SqlExecutionTool 初始化完成 (LangChain4j), AI模型: {}, SqlValidator: enabled", aiModel);
     }
 
     /**
@@ -208,8 +210,31 @@ public class SqlExecutionTool {
                 return SqlGenerationResult.error("AI未能生成有效的SQL语句");
             }
 
-            // 添加LIMIT保护
-            sql = addLimitIfNeeded(sql);
+            // 使用 SqlValidator 验证和修正 SQL
+            SqlValidator.ValidationResult validationResult = sqlValidator.validate(sql);
+
+            if (!validationResult.isValid()) {
+                // 如果有致命错误，返回错误信息
+                log.warn("SQL验证失败: {}", String.join("; ", validationResult.getErrors()));
+                return SqlGenerationResult.error("SQL验证失败: " + String.join("; ", validationResult.getErrors()));
+            }
+
+            // 使用修正后的SQL
+            sql = validationResult.getCorrectedSql();
+
+            // 记录修正信息
+            if (validationResult.hasCorrections()) {
+                log.info("SQL自动修正: {}", String.join(", ", validationResult.getCorrections()));
+                if (explanation == null || explanation.isEmpty()) {
+                    explanation = "";
+                }
+                explanation += "\n[自动修正: " + String.join(", ", validationResult.getCorrections()) + "]";
+            }
+
+            // 记录警告
+            if (!validationResult.getWarnings().isEmpty()) {
+                log.warn("SQL验证警告: {}", String.join("; ", validationResult.getWarnings()));
+            }
 
             log.info("生成的SQL: {}", sql);
             return SqlGenerationResult.success(sql, explanation);
@@ -265,29 +290,120 @@ public class SqlExecutionTool {
     }
 
     /**
-     * 从AI响应中提取SQL
+     * 从AI响应中提取SQL（多重策略）
+     *
+     * 策略优先级：
+     * 1. 标准 markdown sql 代码块
+     * 2. 无语言标记的代码块（含SQL关键字）
+     * 3. 直接 SQL 语句（以关键字开头）
+     * 4. 任意代码块（最后兜底）
      */
     private String extractSql(String response) {
-        // 提取```sql代码块
-        Pattern pattern = Pattern.compile("```sql\\s*\\n(.+?)\\n```", Pattern.DOTALL);
-        java.util.regex.Matcher matcher = pattern.matcher(response);
+        if (response == null || response.isEmpty()) {
+            return null;
+        }
 
-        if (matcher.find()) {
-            String sql = matcher.group(1).trim();
-            // 移除注释行
-            sql = sql.replaceAll("--.*?\\n", "\n").trim();
+        String sql = null;
+
+        // 策略1: 标准 markdown sql 代码块 (```sql ... ```)
+        Pattern p1 = Pattern.compile("```sql\\s*\\n?(.+?)\\n?```", Pattern.DOTALL | Pattern.CASE_INSENSITIVE);
+        java.util.regex.Matcher m1 = p1.matcher(response);
+        if (m1.find()) {
+            sql = cleanupSql(m1.group(1));
+            if (isValidSql(sql)) {
+                log.debug("SQL提取策略1(sql代码块)成功");
+                return sql;
+            }
+        }
+
+        // 策略2: 无语言标记的代码块，但内容以SQL关键字开头
+        Pattern p2 = Pattern.compile("```\\s*\\n?((?:SELECT|UPDATE|INSERT|DELETE|WITH)\\s+.+?)\\n?```",
+                Pattern.DOTALL | Pattern.CASE_INSENSITIVE);
+        java.util.regex.Matcher m2 = p2.matcher(response);
+        if (m2.find()) {
+            sql = cleanupSql(m2.group(1));
+            if (isValidSql(sql)) {
+                log.debug("SQL提取策略2(无标记代码块)成功");
+                return sql;
+            }
+        }
+
+        // 策略3: 直接 SQL 语句（以关键字开头，到分号或双换行结束）
+        Pattern p3 = Pattern.compile("^\\s*(SELECT|UPDATE|INSERT|DELETE|WITH)\\s+.+?(?:;|\\n\\n|$)",
+                Pattern.MULTILINE | Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+        java.util.regex.Matcher m3 = p3.matcher(response);
+        if (m3.find()) {
+            sql = cleanupSql(m3.group(0));
+            if (isValidSql(sql)) {
+                log.debug("SQL提取策略3(直接SQL)成功");
+                return sql;
+            }
+        }
+
+        // 策略4: 任意代码块（兜底）
+        Pattern p4 = Pattern.compile("```\\s*\\n?(.+?)\\n?```", Pattern.DOTALL);
+        java.util.regex.Matcher m4 = p4.matcher(response);
+        if (m4.find()) {
+            String content = m4.group(1).trim();
+            // 检查是否包含SQL关键字
+            if (content.toUpperCase().contains("SELECT") ||
+                content.toUpperCase().contains("FROM")) {
+                sql = cleanupSql(content);
+                if (isValidSql(sql)) {
+                    log.debug("SQL提取策略4(兜底代码块)成功");
+                    return sql;
+                }
+            }
+        }
+
+        // 策略5: 宽松匹配 - 查找任意SELECT语句
+        Pattern p5 = Pattern.compile("SELECT\\s+.+?FROM\\s+.+?(?:WHERE\\s+.+?)?(?:LIMIT\\s+\\d+)?",
+                Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+        java.util.regex.Matcher m5 = p5.matcher(response);
+        if (m5.find()) {
+            sql = cleanupSql(m5.group(0));
+            log.debug("SQL提取策略5(宽松匹配)成功");
             return sql;
         }
 
-        // 如果没有代码块,尝试查找SELECT语句
-        pattern = Pattern.compile("(SELECT\\s+.+?)(;|$)", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
-        matcher = pattern.matcher(response);
+        log.warn("所有SQL提取策略均失败");
+        return null;
+    }
 
-        if (matcher.find()) {
-            return matcher.group(1).trim();
+    /**
+     * 清理SQL字符串
+     */
+    private String cleanupSql(String sql) {
+        if (sql == null) return null;
+
+        // 移除注释行
+        sql = sql.replaceAll("--.*?(\\n|$)", "\n");
+
+        // 移除多余空白
+        sql = sql.replaceAll("\\s+", " ");
+
+        // 移除首尾空白和分号
+        sql = sql.trim().replaceAll(";+$", "").trim();
+
+        return sql;
+    }
+
+    /**
+     * 验证SQL基本有效性
+     */
+    private boolean isValidSql(String sql) {
+        if (sql == null || sql.trim().isEmpty()) {
+            return false;
         }
 
-        return null;
+        String upperSql = sql.toUpperCase().trim();
+
+        // 必须以SQL关键字开头
+        return upperSql.startsWith("SELECT") ||
+               upperSql.startsWith("UPDATE") ||
+               upperSql.startsWith("INSERT") ||
+               upperSql.startsWith("DELETE") ||
+               upperSql.startsWith("WITH");
     }
 
     /**

@@ -5,12 +5,12 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>red.jiuzhou</groupId>
-    <artifactId>dbxmlTool</artifactId>
-    <version>2.0.0</version>
+    <artifactId>j_lingyou</artifactId>
+    <version>1.0.0</version>
     <packaging>jar</packaging>
 
-    <name>DbXmlTool</name>
-    <description>游戏配置数据管理工具 - MySQL与XML双向转换</description>
+    <name>灵游 (LingYou)</name>
+    <description>灵游 - 游戏配置数据智能管理平台</description>
 
     <properties>
         <!-- ==================== 核心版本 ==================== -->
@@ -203,11 +203,14 @@
         </dependency>
 
         <!-- ==================== AI 服务 ==================== -->
+        <!-- DashScope SDK 由 langchain4j-community-dashscope 传递依赖管理，避免版本冲突 -->
+        <!--
         <dependency>
             <groupId>com.alibaba</groupId>
             <artifactId>dashscope-sdk-java</artifactId>
             <version>${dashscope.version}</version>
         </dependency>
+        -->
         <dependency>
             <groupId>com.volcengine</groupId>
             <artifactId>volcengine-java-sdk-ark-runtime</artifactId>

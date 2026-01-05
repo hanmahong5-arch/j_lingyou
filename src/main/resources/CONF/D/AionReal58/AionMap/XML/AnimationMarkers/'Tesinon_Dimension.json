@@ -1,8 +1,0 @@
-{
-	"file_path":"D:\\AionReal58\\AionMap\\XML\\AnimationMarkers\\'Tesinon_Dimension.xml",
-	"xml_root_tag":"animations",
-	"list":[],
-	"xml_item_tag":"animation",
-	"table_name":"'Tesinon_Dimension",
-	"sql":"select * from 'Tesinon_Dimension order by CAST(hitpoint AS UNSIGNED) ASC"
-}

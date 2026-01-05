@@ -1,8 +1,0 @@
-{
-	"file_path":"D:\\AionReal58\\AionMap\\XML\\housing_object_place_tag.xml",
-	"xml_root_tag":"housing_object_place_tags",
-	"list":[],
-	"xml_item_tag":"housing_object_place_tag",
-	"table_name":"housing_object_place_tag",
-	"sql":"select * from housing_object_place_tag order by CAST(id AS UNSIGNED) ASC"
-}

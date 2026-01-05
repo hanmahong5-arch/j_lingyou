@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-
-<skill_damageattenuations>
-  <attenuation_type attenuation_type="Inc_A">
-    <attenuation_value_a/>
-    <attenuation_value_b/>
-    <attenuation_value_m/>
-  </attenuation_type>
-</skill_damageattenuations>

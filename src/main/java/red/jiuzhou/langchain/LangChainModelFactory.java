@@ -97,12 +97,18 @@ public class LangChainModelFactory {
     private ChatLanguageModel createQwenModel(LangChainProperties.ModelConfig config) {
         log.info("创建 Qwen 模型: {}", config.getModel());
 
-        return QwenChatModel.builder()
-                .apiKey(config.getApikey())
-                .modelName(config.getModel())
-                .temperature((float) properties.getTemperature())
-                .maxTokens(properties.getMaxTokens())
-                .build();
+        try {
+            return QwenChatModel.builder()
+                    .apiKey(config.getApikey())
+                    .modelName(config.getModel())
+                    .temperature((float) properties.getTemperature())
+                    .maxTokens(properties.getMaxTokens())
+                    .build();
+        } catch (Throwable e) {
+            // 捕获所有异常，包括 NoClassDefFoundError
+            log.error("创建 Qwen 模型失败: {}", e.getMessage());
+            throw new RuntimeException("创建 Qwen 模型失败，请检查 DashScope SDK 依赖和 API Key 配置: " + e.getMessage(), e);
+        }
     }
 
     /**

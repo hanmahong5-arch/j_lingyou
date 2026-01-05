@@ -1,8 +1,0 @@
-{
-	"file_path":"D:\\AionReal58\\AionMap\\客户端XML\\data\\China\\items\\items\\client_item_custom_set.xml",
-	"xml_root_tag":"client_itemcustomsets",
-	"list":[],
-	"xml_item_tag":"client_itemcustomset",
-	"table_name":"client_item_custom_set",
-	"sql":"select * from client_item_custom_set order by CAST(id AS UNSIGNED) ASC"
-}

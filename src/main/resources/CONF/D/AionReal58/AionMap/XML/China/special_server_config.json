@@ -1,9 +1,0 @@
-{
-	"file_path":"D:\\AionReal58\\AionMap\\XML\\China\\special_server_config.xml",
-	"xml_root_attr":"generated_time=2017/08/18 14:09:04",
-	"xml_root_tag":"special_server_configs",
-	"list":[],
-	"xml_item_tag":"special_server_config",
-	"table_name":"special_server_config",
-	"sql":"select * from special_server_config order by CAST(id AS UNSIGNED) ASC"
-}

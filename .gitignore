@@ -17,6 +17,12 @@ src/main/resources/application.yml
 nul
 *.tmp
 
+# Data directory (large XML files)
+data/
+
+# Generated config files
+src/main/resources/CONF/D/
+
 # Temporary documentation files
 COMPILATION_*.md
 COMPILE_*.md
@@ -59,3 +65,4 @@ dependency-reduced-pom.xml
 src/main/java/**/*Test.java
 src/main/java/**/*Stub.java
 src/main/java/**/test/
+.vscode/

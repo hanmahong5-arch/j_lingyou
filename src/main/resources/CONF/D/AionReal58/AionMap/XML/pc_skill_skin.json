@@ -1,8 +1,0 @@
-{
-	"file_path":"D:\\AionReal58\\AionMap\\XML\\pc_skill_skin.xml",
-	"xml_root_tag":"pc_skill_skins",
-	"list":[],
-	"xml_item_tag":"pc_skill_skin",
-	"table_name":"pc_skill_skin",
-	"sql":"select * from pc_skill_skin order by CAST(id AS UNSIGNED) ASC"
-}

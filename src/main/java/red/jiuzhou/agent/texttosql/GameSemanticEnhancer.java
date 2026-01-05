@@ -82,6 +82,22 @@ public class GameSemanticEnhancer {
         semanticMap.put("史诗", "quality = 3 OR quality = 'epic'");
         semanticMap.put("传说", "quality = 4 OR quality = 'legendary'");
 
+        // ========== 简写映射（常用游戏术语） ==========
+        semanticMap.put("白装", "quality = 0 OR quality = 'common'");
+        semanticMap.put("绿装", "quality = 1 OR quality = 'uncommon'");
+        semanticMap.put("蓝装", "quality = 2 OR quality = 'rare'");
+        semanticMap.put("紫装", "quality = 3 OR quality = 'epic'");
+        semanticMap.put("橙装", "quality = 4 OR quality = 'legendary'");
+        semanticMap.put("金装", "quality = 5 OR quality = 'mythic'");
+        semanticMap.put("神器", "quality >= 5 OR quality = 'artifact'");
+
+        // ========== 数值比较简写 ==========
+        semanticMap.put("高等级", "level >= 50");
+        semanticMap.put("低等级", "level <= 20");
+        semanticMap.put("高伤害", "damage >= 1000 OR base_damage >= 1000");
+        semanticMap.put("低CD", "cooldown <= 5");
+        semanticMap.put("无CD", "cooldown = 0");
+
         // ========== 元素属性映射 ==========
         semanticMap.put("火属性", "element = 'fire' OR element_type = 1");
         semanticMap.put("水属性", "element = 'water' OR element_type = 2");

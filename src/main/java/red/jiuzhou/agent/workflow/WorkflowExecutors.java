@@ -41,11 +41,23 @@ public class WorkflowExecutors {
     private String currentModel = "qwen";
     private LangChainModelFactory modelFactory;
 
-    // SQL提取正则
-    private static final Pattern SQL_PATTERN = Pattern.compile(
-            "```sql\\s*\\n([\\s\\S]*?)\\n```",
+    // SQL提取正则模式（多策略）
+    private static final Pattern SQL_PATTERN_BLOCK = Pattern.compile(
+            "```sql\\s*\\n?([\\s\\S]*?)\\n?```",
             Pattern.CASE_INSENSITIVE
     );
+    private static final Pattern SQL_PATTERN_UNMARKED = Pattern.compile(
+            "```\\s*\\n?((?:SELECT|UPDATE|INSERT|DELETE|WITH)\\s+[\\s\\S]*?)\\n?```",
+            Pattern.CASE_INSENSITIVE
+    );
+    private static final Pattern SQL_PATTERN_DIRECT = Pattern.compile(
+            "^\\s*(SELECT|UPDATE|INSERT|DELETE|WITH)\\s+[^;]+",
+            Pattern.MULTILINE | Pattern.CASE_INSENSITIVE
+    );
+
+    // AI调用重试配置
+    private static final int MAX_RETRY_COUNT = 3;
+    private static final long RETRY_BASE_DELAY_MS = 1000;
 
     public WorkflowExecutors(JdbcTemplate jdbcTemplate, LangChainGameDataAgent agent) {
         this.jdbcTemplate = jdbcTemplate;
@@ -381,16 +393,73 @@ public class WorkflowExecutors {
     // ==================== 辅助方法 ====================
 
     /**
-     * 调用AI模型（使用 LangChain4j）
+     * 调用AI模型（使用 LangChain4j，带重试机制）
      */
     private String callAi(String prompt) {
-        try {
-            ChatLanguageModel model = getModelFactory().getModel(currentModel);
-            return model.generate(prompt);
-        } catch (Exception e) {
-            log.error("AI调用失败", e);
-            throw new RuntimeException("AI调用失败: " + e.getMessage(), e);
+        return callAiWithRetry(prompt, MAX_RETRY_COUNT);
+    }
+
+    /**
+     * 带重试的AI调用
+     *
+     * @param prompt      提示词
+     * @param maxRetries  最大重试次数
+     * @return AI响应
+     */
+    private String callAiWithRetry(String prompt, int maxRetries) {
+        Exception lastException = null;
+
+        for (int attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                ChatLanguageModel model = getModelFactory().getModel(currentModel);
+                String response = model.generate(prompt);
+
+                // 验证响应有效性
+                if (isValidAiResponse(response)) {
+                    if (attempt > 1) {
+                        log.info("AI调用成功（第{}次尝试）", attempt);
+                    }
+                    return response;
+                }
+
+                log.warn("AI响应无效（第{}次尝试）：响应为空或格式不正确", attempt);
+
+            } catch (Exception e) {
+                lastException = e;
+                log.warn("AI调用失败（第{}次尝试）: {}", attempt, e.getMessage());
+
+                if (attempt < maxRetries) {
+                    // 指数退避
+                    long delayMs = RETRY_BASE_DELAY_MS * (1L << (attempt - 1));
+                    log.info("等待 {} ms 后重试...", delayMs);
+                    try {
+                        Thread.sleep(delayMs);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        throw new RuntimeException("AI调用被中断", ie);
+                    }
+                }
+            }
         }
+
+        // 所有重试都失败
+        String errorMsg = String.format("AI调用失败，已重试%d次", maxRetries);
+        log.error(errorMsg, lastException);
+        throw new RuntimeException(errorMsg, lastException);
+    }
+
+    /**
+     * 验证AI响应有效性
+     */
+    private boolean isValidAiResponse(String response) {
+        if (response == null || response.trim().isEmpty()) {
+            return false;
+        }
+        // 响应长度合理
+        if (response.length() < 10) {
+            return false;
+        }
+        return true;
     }
 
     /**
@@ -457,51 +526,235 @@ public class WorkflowExecutors {
     }
 
     /**
-     * 解析意图响应
+     * 解析意图响应（多重策略）
+     *
+     * 策略优先级：
+     * 1. 标准 JSON 代码块
+     * 2. 直接 JSON 对象
+     * 3. 结构化文本解析
+     * 4. 原始响应降级
      */
     private IntentParseResult parseIntentResponse(String response) {
         IntentParseResult result = new IntentParseResult();
 
+        if (response == null || response.trim().isEmpty()) {
+            result.intent = "无法解析空响应";
+            return result;
+        }
+
+        // 策略1: 标准 JSON 代码块
         try {
-            // 尝试提取JSON
-            Pattern jsonPattern = Pattern.compile("```json\\s*\\n([\\s\\S]*?)\\n```");
-            Matcher matcher = jsonPattern.matcher(response);
+            Pattern jsonBlockPattern = Pattern.compile("```json\\s*\\n?([\\s\\S]*?)\\n?```", Pattern.CASE_INSENSITIVE);
+            Matcher matcher = jsonBlockPattern.matcher(response);
 
             if (matcher.find()) {
-                String json = matcher.group(1);
-                Map<String, Object> parsed = com.alibaba.fastjson.JSON.parseObject(json, Map.class);
-
-                result.intent = (String) parsed.getOrDefault("intent", "");
-                result.operation = (String) parsed.getOrDefault("operation", "query");
-                result.generatedSql = (String) parsed.get("sql");
-
-                Object conditions = parsed.get("conditions");
-                if (conditions instanceof Map) {
-                    result.conditions = new HashMap<>();
-                    ((Map<?, ?>) conditions).forEach((k, v) ->
-                            result.conditions.put(String.valueOf(k), v));
+                String json = matcher.group(1).trim();
+                if (parseJsonToResult(json, result)) {
+                    log.debug("意图解析策略1(JSON代码块)成功");
+                    return result;
                 }
-            } else {
-                // 没有JSON，使用原始响应
-                result.intent = response.length() > 200 ? response.substring(0, 200) + "..." : response;
             }
         } catch (Exception e) {
-            log.warn("解析意图响应失败: {}", e.getMessage());
-            result.intent = response;
+            log.debug("策略1解析失败: {}", e.getMessage());
+        }
+
+        // 策略2: 直接 JSON 对象
+        try {
+            String trimmed = response.trim();
+            if (trimmed.startsWith("{") && trimmed.contains("}")) {
+                // 提取第一个完整的 JSON 对象
+                int depth = 0;
+                int start = trimmed.indexOf('{');
+                int end = -1;
+                for (int i = start; i < trimmed.length(); i++) {
+                    char c = trimmed.charAt(i);
+                    if (c == '{') depth++;
+                    else if (c == '}') {
+                        depth--;
+                        if (depth == 0) {
+                            end = i + 1;
+                            break;
+                        }
+                    }
+                }
+                if (end > start) {
+                    String json = trimmed.substring(start, end);
+                    if (parseJsonToResult(json, result)) {
+                        log.debug("意图解析策略2(直接JSON)成功");
+                        return result;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.debug("策略2解析失败: {}", e.getMessage());
+        }
+
+        // 策略3: 结构化文本解析
+        try {
+            if (parseStructuredText(response, result)) {
+                log.debug("意图解析策略3(结构化文本)成功");
+                return result;
+            }
+        } catch (Exception e) {
+            log.debug("策略3解析失败: {}", e.getMessage());
+        }
+
+        // 策略4: 降级 - 使用原始响应作为意图
+        log.debug("意图解析降级：使用原始响应");
+        result.intent = response.length() > 300 ? response.substring(0, 300) + "..." : response;
+
+        // 尝试从响应中提取 SQL
+        String sql = extractSql(response);
+        if (!sql.isEmpty()) {
+            result.generatedSql = sql;
         }
 
         return result;
     }
 
     /**
-     * 从响应中提取SQL
+     * 解析 JSON 到结果对象
+     */
+    private boolean parseJsonToResult(String json, IntentParseResult result) {
+        try {
+            Map<String, Object> parsed = com.alibaba.fastjson.JSON.parseObject(json, Map.class);
+            if (parsed == null || parsed.isEmpty()) {
+                return false;
+            }
+
+            result.intent = getStringValue(parsed, "intent", "");
+            result.operation = getStringValue(parsed, "operation", "query");
+            result.generatedSql = getStringValue(parsed, "sql", null);
+
+            Object conditions = parsed.get("conditions");
+            if (conditions instanceof Map) {
+                result.conditions = new HashMap<>();
+                ((Map<?, ?>) conditions).forEach((k, v) ->
+                        result.conditions.put(String.valueOf(k), v));
+            }
+
+            return !result.intent.isEmpty();
+        } catch (Exception e) {
+            log.debug("JSON解析异常: {}", e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * 从 Map 获取字符串值
+     */
+    private String getStringValue(Map<String, Object> map, String key, String defaultValue) {
+        Object value = map.get(key);
+        if (value == null) {
+            return defaultValue;
+        }
+        return String.valueOf(value);
+    }
+
+    /**
+     * 解析结构化文本
+     */
+    private boolean parseStructuredText(String text, IntentParseResult result) {
+        // 查找 "意图:" 或 "Intent:" 等模式
+        Pattern intentPattern = Pattern.compile("(?:意图|Intent|目的|操作)[：:]\\s*(.+?)(?:\\n|$)", Pattern.CASE_INSENSITIVE);
+        Matcher intentMatcher = intentPattern.matcher(text);
+        if (intentMatcher.find()) {
+            result.intent = intentMatcher.group(1).trim();
+        }
+
+        // 查找操作类型
+        Pattern opPattern = Pattern.compile("(?:操作类型|Operation|类型)[：:]\\s*(query|modify|analyze|update|delete|insert)", Pattern.CASE_INSENSITIVE);
+        Matcher opMatcher = opPattern.matcher(text);
+        if (opMatcher.find()) {
+            result.operation = opMatcher.group(1).toLowerCase();
+        }
+
+        // 尝试提取 SQL
+        String sql = extractSql(text);
+        if (!sql.isEmpty()) {
+            result.generatedSql = sql;
+        }
+
+        // 只要找到了意图就算成功
+        return !result.intent.isEmpty();
+    }
+
+    /**
+     * 从响应中提取SQL（多重策略）
+     *
+     * 策略优先级：
+     * 1. ```sql 代码块
+     * 2. 无标记代码块（含SQL关键字）
+     * 3. 直接 SQL 语句
      */
     private String extractSql(String response) {
-        Matcher matcher = SQL_PATTERN.matcher(response);
-        if (matcher.find()) {
-            return matcher.group(1).trim();
+        if (response == null || response.isEmpty()) {
+            return "";
         }
+
+        // 策略1: 标准 ```sql 代码块
+        Matcher m1 = SQL_PATTERN_BLOCK.matcher(response);
+        if (m1.find()) {
+            String sql = cleanupExtractedSql(m1.group(1));
+            if (isValidExtractedSql(sql)) {
+                log.debug("SQL提取策略1(sql代码块)成功");
+                return sql;
+            }
+        }
+
+        // 策略2: 无语言标记代码块
+        Matcher m2 = SQL_PATTERN_UNMARKED.matcher(response);
+        if (m2.find()) {
+            String sql = cleanupExtractedSql(m2.group(1));
+            if (isValidExtractedSql(sql)) {
+                log.debug("SQL提取策略2(无标记代码块)成功");
+                return sql;
+            }
+        }
+
+        // 策略3: 直接 SQL 语句
+        Matcher m3 = SQL_PATTERN_DIRECT.matcher(response);
+        if (m3.find()) {
+            String sql = cleanupExtractedSql(m3.group(0));
+            if (isValidExtractedSql(sql)) {
+                log.debug("SQL提取策略3(直接SQL)成功");
+                return sql;
+            }
+        }
+
+        log.debug("所有SQL提取策略均失败");
         return "";
+    }
+
+    /**
+     * 清理提取的SQL
+     */
+    private String cleanupExtractedSql(String sql) {
+        if (sql == null) return "";
+
+        // 移除注释
+        sql = sql.replaceAll("--.*?(\\n|$)", "\n");
+        // 规范化空白
+        sql = sql.replaceAll("\\s+", " ");
+        // 移除首尾空白和分号
+        sql = sql.trim().replaceAll(";+$", "").trim();
+
+        return sql;
+    }
+
+    /**
+     * 验证提取的SQL有效性
+     */
+    private boolean isValidExtractedSql(String sql) {
+        if (sql == null || sql.trim().isEmpty()) {
+            return false;
+        }
+        String upper = sql.toUpperCase().trim();
+        return upper.startsWith("SELECT") ||
+               upper.startsWith("UPDATE") ||
+               upper.startsWith("INSERT") ||
+               upper.startsWith("DELETE") ||
+               upper.startsWith("WITH");
     }
 
     /**
@@ -603,38 +856,130 @@ public class WorkflowExecutors {
     }
 
     /**
-     * 计算表达式值
+     * 计算表达式值（增强版，支持更多运算）
+     *
+     * 支持的表达式类型：
+     * - 列引用: column
+     * - 乘法: column * 1.1
+     * - 除法: column / 2
+     * - 加法: column + 10
+     * - 减法: column - 5
+     * - 字面量: 'value' 或 123
+     * - 函数: CONCAT(col1, '_', col2)
      */
     private Object evaluateExpression(String expression, Map<String, Object> row) {
         expression = expression.trim();
 
-        // 处理简单的数学表达式，如 column * 1.1
-        if (expression.contains("*")) {
-            String[] parts = expression.split("\\*");
-            if (parts.length == 2) {
-                String colName = parts[0].trim().replace("`", "");
-                try {
-                    double multiplier = Double.parseDouble(parts[1].trim());
-                    Object oldValue = row.get(colName);
-                    if (oldValue instanceof Number) {
-                        return ((Number) oldValue).doubleValue() * multiplier;
-                    }
-                } catch (NumberFormatException e) {
-                    // 忽略解析错误
-                }
-            }
-        }
-
-        // 处理字面量
+        // 1. 处理字符串字面量
         if (expression.startsWith("'") && expression.endsWith("'")) {
             return expression.substring(1, expression.length() - 1);
         }
 
-        try {
-            return Double.parseDouble(expression);
-        } catch (NumberFormatException e) {
-            return expression;
+        // 2. 处理数字字面量
+        if (expression.matches("-?\\d+\\.?\\d*")) {
+            try {
+                if (expression.contains(".")) {
+                    return Double.parseDouble(expression);
+                } else {
+                    return Long.parseLong(expression);
+                }
+            } catch (NumberFormatException e) {
+                // 继续尝试其他解析
+            }
         }
+
+        // 3. 处理乘法表达式: column * value 或 value * column
+        if (expression.contains("*")) {
+            return evaluateBinaryOperation(expression, "*", row, (a, b) -> a * b);
+        }
+
+        // 4. 处理除法表达式: column / value
+        if (expression.contains("/")) {
+            return evaluateBinaryOperation(expression, "/", row, (a, b) -> b != 0 ? a / b : a);
+        }
+
+        // 5. 处理加法表达式: column + value
+        if (expression.contains("+")) {
+            // 区分数字加法和字符串拼接
+            Object result = evaluateBinaryOperation(expression, "+", row, Double::sum);
+            if (result != null) {
+                return result;
+            }
+        }
+
+        // 6. 处理减法表达式: column - value
+        if (expression.contains("-") && !expression.startsWith("-")) {
+            return evaluateBinaryOperation(expression, "-", row, (a, b) -> a - b);
+        }
+
+        // 7. 简单列引用
+        String colName = expression.replace("`", "").trim();
+        if (row.containsKey(colName)) {
+            return row.get(colName);
+        }
+
+        // 8. 无法解析，返回原始表达式
+        return expression;
+    }
+
+    /**
+     * 计算二元运算表达式
+     */
+    private Object evaluateBinaryOperation(String expression, String operator,
+                                           Map<String, Object> row,
+                                           java.util.function.BiFunction<Double, Double, Double> operation) {
+        // 找到运算符位置（避免负号混淆）
+        int opIndex = -1;
+        if (operator.equals("-")) {
+            // 对于减法，找第一个非开头的减号
+            for (int i = 1; i < expression.length(); i++) {
+                if (expression.charAt(i) == '-' && !Character.isWhitespace(expression.charAt(i-1))) {
+                    opIndex = i;
+                    break;
+                }
+            }
+        } else {
+            opIndex = expression.indexOf(operator);
+        }
+
+        if (opIndex <= 0 || opIndex >= expression.length() - 1) {
+            return null;
+        }
+
+        String leftPart = expression.substring(0, opIndex).trim().replace("`", "");
+        String rightPart = expression.substring(opIndex + 1).trim().replace("`", "");
+
+        try {
+            // 尝试获取左操作数
+            Double leftValue = null;
+            if (row.containsKey(leftPart)) {
+                Object val = row.get(leftPart);
+                if (val instanceof Number) {
+                    leftValue = ((Number) val).doubleValue();
+                }
+            } else {
+                leftValue = Double.parseDouble(leftPart);
+            }
+
+            // 尝试获取右操作数
+            Double rightValue = null;
+            if (row.containsKey(rightPart)) {
+                Object val = row.get(rightPart);
+                if (val instanceof Number) {
+                    rightValue = ((Number) val).doubleValue();
+                }
+            } else {
+                rightValue = Double.parseDouble(rightPart);
+            }
+
+            if (leftValue != null && rightValue != null) {
+                return operation.apply(leftValue, rightValue);
+            }
+        } catch (NumberFormatException e) {
+            log.debug("表达式计算失败: {} {} {}", leftPart, operator, rightPart);
+        }
+
+        return null;
     }
 
     /**

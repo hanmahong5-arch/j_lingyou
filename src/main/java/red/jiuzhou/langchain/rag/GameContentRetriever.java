@@ -11,6 +11,7 @@ import dev.langchain4j.store.embedding.EmbeddingSearchResult;
 import dev.langchain4j.store.embedding.EmbeddingStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -32,6 +33,7 @@ import java.util.stream.Collectors;
  * @version 1.0
  */
 @Component
+@ConditionalOnBean({EmbeddingStore.class, EmbeddingModel.class})
 public class GameContentRetriever implements ContentRetriever {
 
     private static final Logger log = LoggerFactory.getLogger(GameContentRetriever.class);

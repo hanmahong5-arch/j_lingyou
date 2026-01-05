@@ -1,8 +1,0 @@
-{
-	"file_path":"D:\\AionReal58\\AionMap\\XML\\item_option_probability.xml",
-	"xml_root_tag":"item_option_probability_datas",
-	"list":[],
-	"xml_item_tag":"item_option_probability_data",
-	"table_name":"item_option_probability",
-	"sql":"select * from item_option_probability order by CAST(id AS UNSIGNED) ASC"
-}

@@ -1,8 +1,0 @@
-{
-	"file_path":"D:\\AionReal58\\AionMap\\XML\\item_prohibit.xml",
-	"xml_root_tag":"item_prohibits",
-	"list":[],
-	"xml_item_tag":"id",
-	"table_name":"item_prohibit",
-	"sql":"select * from item_prohibit order by CAST(limit_item AS UNSIGNED) ASC"
-}

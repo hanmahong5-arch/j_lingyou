@@ -413,6 +413,159 @@ public class AiTemplateLibrary {
             List.of("*"),
             50
         ));
+
+        // ==================== 多表关联查询模板 ====================
+
+        presetTemplates.add(new AiTemplate(
+            "multi_table_item_usage",
+            "物品使用场景分析",
+            "分析物品在任务、商店、掉落等系统中的使用情况",
+            TemplateCategory.ANALYSIS,
+            "分析物品 {item_id} 在游戏各系统中的使用情况：任务奖励、商店出售、NPC掉落、配方等",
+            null, // 复杂查询需要AI生成
+            List.of(new TemplateParam("item_id", "物品ID")),
+            List.of("*item*", "client_items"),
+            95
+        ));
+
+        presetTemplates.add(new AiTemplate(
+            "multi_table_npc_full_info",
+            "NPC完整信息查询",
+            "查询NPC及其关联的任务、商店、掉落等信息",
+            TemplateCategory.QUERY,
+            "查询NPC {npc_id} 的完整信息，包括所属任务、商店、掉落物品等",
+            null,
+            List.of(new TemplateParam("npc_id", "NPC ID")),
+            List.of("*npc*", "client_npcs*"),
+            95
+        ));
+
+        presetTemplates.add(new AiTemplate(
+            "multi_table_quest_dependencies",
+            "任务依赖分析",
+            "分析任务涉及的所有物品、NPC、技能等",
+            TemplateCategory.ANALYSIS,
+            "分析任务 {quest_id} 的完整依赖：需要的物品、涉及的NPC、奖励内容等",
+            null,
+            List.of(new TemplateParam("quest_id", "任务ID")),
+            List.of("*quest*", "client_quest*"),
+            95
+        ));
+
+        presetTemplates.add(new AiTemplate(
+            "multi_table_item_source",
+            "物品来源追溯",
+            "追溯物品的所有获取途径",
+            TemplateCategory.QUERY,
+            "查找物品 {item_id} 的所有获取途径：商店购买、NPC掉落、任务奖励、配方制作等",
+            null,
+            List.of(new TemplateParam("item_id", "物品ID")),
+            List.of("*item*", "client_items"),
+            90
+        ));
+
+        presetTemplates.add(new AiTemplate(
+            "multi_table_shop_inventory",
+            "商店完整库存",
+            "查询商店及其所有商品详情",
+            TemplateCategory.QUERY,
+            "查询商店 {shop_id} 的完整商品列表，包括物品名称、价格、等级限制等",
+            "SELECT s.*, i.name as item_name, i.level as item_level, i.quality as item_quality " +
+            "FROM shop_templates s " +
+            "LEFT JOIN client_items i ON s.item_id = i.id " +
+            "WHERE s.shop_id = {shop_id} OR s.id = {shop_id} " +
+            "ORDER BY i.level",
+            List.of(new TemplateParam("shop_id", "商店ID")),
+            List.of("shop*", "*shop*"),
+            90
+        ));
+
+        presetTemplates.add(new AiTemplate(
+            "multi_table_drop_analysis",
+            "掉落表关联分析",
+            "分析掉落表关联的NPC和物品",
+            TemplateCategory.ANALYSIS,
+            "分析掉落配置 {drop_id} 关联的所有NPC和掉落物品，包括掉落概率",
+            null,
+            List.of(new TemplateParam("drop_id", "掉落ID")),
+            List.of("drop*", "*drop*"),
+            85
+        ));
+
+        presetTemplates.add(new AiTemplate(
+            "multi_table_luna_shop",
+            "Luna商店商品分析",
+            "查询Luna商店的商品及物品详情",
+            TemplateCategory.QUERY,
+            "查询Luna商店中的商品，包括物品详情、价格、限购等信息",
+            null,
+            List.of(),
+            List.of("luna*", "*luna*"),
+            85
+        ));
+
+        presetTemplates.add(new AiTemplate(
+            "multi_table_recipe_materials",
+            "配方材料追溯",
+            "分析配方的材料来源和产物用途",
+            TemplateCategory.ANALYSIS,
+            "分析配方 {recipe_id} 的材料清单，并追溯每种材料的获取途径",
+            null,
+            List.of(new TemplateParam("recipe_id", "配方ID")),
+            List.of("recipe*", "*recipe*"),
+            85
+        ));
+
+        presetTemplates.add(new AiTemplate(
+            "multi_table_skill_usage",
+            "技能使用场景",
+            "分析技能在NPC、任务、物品中的使用",
+            TemplateCategory.ANALYSIS,
+            "分析技能 {skill_id} 的使用场景：哪些NPC使用、哪些任务奖励、哪些物品附带",
+            null,
+            List.of(new TemplateParam("skill_id", "技能ID")),
+            List.of("*skill*", "client_skill*"),
+            85
+        ));
+
+        presetTemplates.add(new AiTemplate(
+            "multi_table_cross_reference",
+            "跨表引用检查",
+            "检查指定ID在多个表中的引用情况",
+            TemplateCategory.VALIDATION,
+            "检查ID值 {id_value} 在物品、NPC、任务、技能等表中的引用情况",
+            null,
+            List.of(new TemplateParam("id_value", "ID值")),
+            List.of("*"),
+            80
+        ));
+
+        presetTemplates.add(new AiTemplate(
+            "auto_join_query",
+            "智能关联查询",
+            "自动识别表关联并生成JOIN查询",
+            TemplateCategory.QUERY,
+            "对 {table} 表进行智能关联查询，自动JOIN相关表并显示关键信息",
+            null,
+            List.of(new TemplateParam("table", "主表名")),
+            List.of("*"),
+            100
+        ));
+
+        presetTemplates.add(new AiTemplate(
+            "impact_analysis",
+            "影响分析",
+            "分析修改某条数据的影响范围",
+            TemplateCategory.ANALYSIS,
+            "分析修改 {table} 表中 id={id_value} 的记录会影响哪些关联数据",
+            null,
+            List.of(
+                new TemplateParam("table", "表名"),
+                new TemplateParam("id_value", "记录ID")
+            ),
+            List.of("*"),
+            90
+        ));
     }
 
     // ==================== 公共方法 ====================
