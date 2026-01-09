@@ -512,7 +512,7 @@ public class DataOperationCenterStage extends Stage {
                 }
             } else {
                 // 其他操作：加载数据库中的表
-                String sql = "SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE() ORDER BY table_name";
+                String sql = "SELECT table_name FROM information_schema.tables WHERE table_schema = current_schema() ORDER BY table_name";
                 List<Map<String, Object>> rows = DatabaseUtil.getJdbcTemplate().queryForList(sql);
                 for (Map<String, Object> row : rows) {
                     tables.add(row.get("table_name").toString());

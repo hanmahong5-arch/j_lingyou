@@ -2,10 +2,10 @@ server:
   port: 8081
 spring:
   datasource:
-    url: jdbc:mysql://localhost:3306/xmldb_suiyue?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true
-    username: root
+    url: jdbc:postgresql://localhost:5432/xmldb_suiyue?currentSchema=public
+    username: postgres
     password: "your-password"
-    driver-class-name: com.mysql.cj.jdbc.Driver
+    driver-class-name: org.postgresql.Driver
 ALIYUN:
   ACCESS_KEY_ID: ${ALIYUN_ACCESS_KEY_ID:your_access_key_id_here}
   ACCESS_KEY_SECRET: ${ALIYUN_ACCESS_KEY_SECRET:your_access_key_secret_here}

@@ -38,7 +38,7 @@ public class QuerySelfCorrection {
         try {
             // 获取所有表名
             List<String> tables = jdbcTemplate.queryForList(
-                "SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE()",
+                "SELECT table_name FROM information_schema.tables WHERE table_schema = current_schema()",
                 String.class
             );
 
@@ -47,7 +47,7 @@ public class QuerySelfCorrection {
 
                 // 获取表的列名
                 List<String> columns = jdbcTemplate.queryForList(
-                    "SELECT column_name FROM information_schema.columns WHERE table_name = ? AND table_schema = DATABASE()",
+                    "SELECT column_name FROM information_schema.columns WHERE table_name = ? AND table_schema = current_schema()",
                     String.class,
                     table
                 );

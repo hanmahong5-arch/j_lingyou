@@ -220,11 +220,13 @@ public class GameSchemaEmbeddingService {
     }
 
     /**
-     * 获取所有表名
+     * 获取所有表名 (PostgreSQL)
      */
     private List<String> getTableList() {
         try {
-            return jdbcTemplate.queryForList("SHOW TABLES", String.class);
+            // PostgreSQL: 使用 pg_tables 替代 SHOW TABLES
+            return jdbcTemplate.queryForList(
+                "SELECT tablename FROM pg_tables WHERE schemaname = current_schema()", String.class);
         } catch (Exception e) {
             log.error("获取表列表失败: {}", e.getMessage());
             return Collections.emptyList();
@@ -232,47 +234,38 @@ public class GameSchemaEmbeddingService {
     }
 
     /**
-     * 生成表描述
+     * 生成表描述 (PostgreSQL)
      */
     private String generateTableDescription(String tableName) {
         try {
             StringBuilder sb = new StringBuilder();
             sb.append("表名: ").append(tableName).append("\n");
 
-            // 获取列信息
+            // 获取列信息 (PostgreSQL: 没有 COLUMN_COMMENT 和 COLUMN_KEY)
             String sql = """
-                SELECT COLUMN_NAME, DATA_TYPE, COLUMN_COMMENT, IS_NULLABLE, COLUMN_KEY
-                FROM INFORMATION_SCHEMA.COLUMNS
-                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?
-                ORDER BY ORDINAL_POSITION
+                SELECT column_name, data_type, is_nullable
+                FROM information_schema.columns
+                WHERE table_schema = current_schema() AND table_name = ?
+                ORDER BY ordinal_position
                 """;
 
             List<Map<String, Object>> columns = jdbcTemplate.queryForList(sql, tableName);
 
             sb.append("列信息:\n");
             for (Map<String, Object> col : columns) {
-                String colName = (String) col.get("COLUMN_NAME");
-                String dataType = (String) col.get("DATA_TYPE");
-                String comment = (String) col.get("COLUMN_COMMENT");
-                String isKey = (String) col.get("COLUMN_KEY");
+                // PostgreSQL: 列名小写
+                String colName = (String) col.get("column_name");
+                String dataType = (String) col.get("data_type");
 
                 sb.append("  - ").append(colName)
                         .append(" (").append(dataType).append(")");
 
-                if ("PRI".equals(isKey)) {
-                    sb.append(" [主键]");
-                }
-
-                if (comment != null && !comment.isEmpty()) {
-                    sb.append(": ").append(comment);
-                }
-
                 sb.append("\n");
             }
 
-            // 获取示例数据
+            // 获取示例数据 (PostgreSQL: 使用双引号)
             try {
-                String sampleSql = "SELECT * FROM `" + tableName + "` LIMIT 3";
+                String sampleSql = "SELECT * FROM \"" + tableName + "\" LIMIT 3";
                 List<Map<String, Object>> samples = jdbcTemplate.queryForList(sampleSql);
                 if (!samples.isEmpty()) {
                     sb.append("示例数据:\n");

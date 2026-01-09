@@ -282,7 +282,8 @@ public class TemplateInstantiator {
      * @return 新ID（字符串形式）
      */
     private String generateNewId(String tableName) {
-        String sql = "SELECT MAX(CAST(id AS UNSIGNED)) FROM " + tableName;
+        // PostgreSQL: 使用 CAST AS INTEGER 替代 UNSIGNED
+        String sql = "SELECT MAX(CAST(\"id\" AS INTEGER)) FROM \"" + tableName + "\"";
         try {
             Integer maxId = jdbcTemplate.queryForObject(sql, Integer.class);
             int newId = (maxId != null ? maxId : 0) + 1;

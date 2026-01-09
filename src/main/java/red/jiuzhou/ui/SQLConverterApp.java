@@ -233,14 +233,14 @@ public class SQLConverterApp{
             List<String> ids;
 
             if ("新增".equals(operation)) {
-                // 操作为新增，选择源表中有但目的表中没有的 ID
+                // 操作为新增，选择源表中有但目的表中没有的 ID (PostgreSQL语法)
                 String sql = String.format(
-                        "SELECT DISTINCT ID FROM %s.%s WHERE ID NOT IN (SELECT DISTINCT ID FROM %s.%s) ORDER BY CAST(ID AS UNSIGNED)", sourceDbCombo.getValue(), sourceTable, targetDbCombo.getValue(), targetTable);
+                        "SELECT DISTINCT \"ID\" FROM \"%s\".\"%s\" WHERE \"ID\" NOT IN (SELECT DISTINCT \"ID\" FROM \"%s\".\"%s\") ORDER BY CAST(\"ID\" AS INTEGER)", sourceDbCombo.getValue(), sourceTable, targetDbCombo.getValue(), targetTable);
                 ids = jdbc.queryForList(sql, String.class);
             } else if ("更新".equals(operation)) {
-                // 操作为更新，选择源表和目的表中都存在的 ID
+                // 操作为更新，选择源表和目的表中都存在的 ID (PostgreSQL语法)
                 String sql = String.format(
-                        "SELECT DISTINCT ID FROM %s.%s WHERE ID IN (SELECT DISTINCT ID FROM %s.%s) ORDER BY CAST(ID AS UNSIGNED)", sourceDbCombo.getValue(), sourceTable, targetDbCombo.getValue(), targetTable);
+                        "SELECT DISTINCT \"ID\" FROM \"%s\".\"%s\" WHERE \"ID\" IN (SELECT DISTINCT \"ID\" FROM \"%s\".\"%s\") ORDER BY CAST(\"ID\" AS INTEGER)", sourceDbCombo.getValue(), sourceTable, targetDbCombo.getValue(), targetTable);
                 ids = jdbc.queryForList(sql, String.class);
             } else {
                 ids = null;

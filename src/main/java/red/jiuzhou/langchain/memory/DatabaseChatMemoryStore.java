@@ -59,23 +59,26 @@ public class DatabaseChatMemoryStore implements ChatMemoryStore {
     }
 
     /**
-     * 确保存储表存在
+     * 确保存储表存在 (PostgreSQL)
      */
     private void ensureTableExists() {
         try {
             String createTableSql = """
                 CREATE TABLE IF NOT EXISTS chat_memory (
-                    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                    id BIGSERIAL PRIMARY KEY,
                     memory_id VARCHAR(100) NOT NULL,
                     message_type VARCHAR(20) NOT NULL,
                     message_content TEXT NOT NULL,
                     tool_name VARCHAR(100),
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    INDEX idx_memory_id (memory_id),
-                    INDEX idx_created_at (created_at)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
                 """;
             jdbcTemplate.execute(createTableSql);
+
+            // PostgreSQL: 单独创建索引
+            jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_memory_id ON chat_memory (memory_id)");
+            jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_created_at ON chat_memory (created_at)");
+
             log.info("chat_memory 表已就绪");
         } catch (Exception e) {
             log.warn("创建 chat_memory 表失败（可能已存在）: {}", e.getMessage());

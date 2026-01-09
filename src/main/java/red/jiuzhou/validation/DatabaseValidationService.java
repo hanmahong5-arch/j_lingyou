@@ -299,7 +299,7 @@ public class DatabaseValidationService {
     private List<String> getTableColumns(String tableName) {
         try {
             String sql = "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS " +
-                         "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?";
+                         "WHERE table_schema = current_schema() AND TABLE_NAME = ?";
             return jdbcTemplate.queryForList(sql, String.class, tableName);
         } catch (Exception e) {
             return Collections.emptyList();
@@ -312,7 +312,7 @@ public class DatabaseValidationService {
     private List<String> getNumericColumns(String tableName) {
         try {
             String sql = "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS " +
-                         "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? " +
+                         "WHERE table_schema = current_schema() AND TABLE_NAME = ? " +
                          "AND DATA_TYPE IN ('int', 'bigint', 'decimal', 'float', 'double')";
             return jdbcTemplate.queryForList(sql, String.class, tableName);
         } catch (Exception e) {
@@ -364,7 +364,7 @@ public class DatabaseValidationService {
     private boolean tableExists(String tableName) {
         try {
             String sql = "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES " +
-                         "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?";
+                         "WHERE table_schema = current_schema() AND TABLE_NAME = ?";
             Integer count = jdbcTemplate.queryForObject(sql, Integer.class, tableName);
             return count != null && count > 0;
         } catch (Exception e) {
@@ -378,7 +378,7 @@ public class DatabaseValidationService {
     private boolean columnExists(String tableName, String columnName) {
         try {
             String sql = "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS " +
-                         "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?";
+                         "WHERE table_schema = current_schema() AND TABLE_NAME = ? AND COLUMN_NAME = ?";
             Integer count = jdbcTemplate.queryForObject(sql, Integer.class, tableName, columnName);
             return count != null && count > 0;
         } catch (Exception e) {

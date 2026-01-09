@@ -14,13 +14,17 @@ public class SqlGeneratorUtil {
     }
 
     public static List<String> getPrimaryKeys(JdbcTemplate jdbcTemplate, String tableName, String schema) {
-        String sql = "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE " +
-                "WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND CONSTRAINT_NAME = 'PRIMARY'";
-        return jdbcTemplate.query(sql, new Object[]{schema, tableName}, (rs, rowNum) -> rs.getString("COLUMN_NAME"));
+        // PostgreSQL: 通过 information_schema 查询主键
+        String sql = "SELECT kcu.column_name FROM information_schema.table_constraints tc " +
+                "JOIN information_schema.key_column_usage kcu " +
+                "ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema " +
+                "WHERE tc.table_schema = ? AND tc.table_name = ? AND tc.constraint_type = 'PRIMARY KEY'";
+        return jdbcTemplate.query(sql, new Object[]{schema, tableName}, (rs, rowNum) -> rs.getString("column_name"));
     }
 
     public static Map<String, Object> getRandomRow(JdbcTemplate jdbcTemplate, String tableName) {
-        String sql = "SELECT * FROM `" + tableName + "` ORDER BY RAND() LIMIT 1";
+        // PostgreSQL: 使用 RANDOM() 替代 RAND()
+        String sql = "SELECT * FROM \"" + tableName + "\" ORDER BY RANDOM() LIMIT 1";
         return jdbcTemplate.queryForMap(sql);
     }
 
@@ -36,8 +40,8 @@ public class SqlGeneratorUtil {
         }
 
         StringBuilder sql = new StringBuilder();
-        sql.append("INSERT INTO `").append(tableName).append("` (")
-                .append(columns.stream().map(col -> "`" + col + "`").collect(Collectors.joining(", ")))
+        sql.append("INSERT INTO \"").append(tableName).append("\" (")
+                .append(columns.stream().map(col -> "\"" + col + "\"").collect(Collectors.joining(", ")))
                 .append(") VALUES (");
 
         List<String> values = columns.stream()
@@ -70,14 +74,14 @@ public class SqlGeneratorUtil {
         List<String> setParts = new ArrayList<>();
         for (String col : columns) {
             if (primaryKeys.contains(col)) continue;
-            setParts.add("`" + col + "` = " + toSqlValue(row.get(col)));
+            setParts.add("\"" + col + "\" = " + toSqlValue(row.get(col)));
         }
 
         List<String> whereParts = primaryKeys.stream()
-                .map(pk -> "`" + pk + "` = " + toSqlValue(row.get(pk)))
+                .map(pk -> "\"" + pk + "\" = " + toSqlValue(row.get(pk)))
                 .collect(Collectors.toList());
 
-        return "UPDATE `" + tableName + "` SET " +
+        return "UPDATE \"" + tableName + "\" SET " +
                 String.join(", ", setParts) +
                 " WHERE " + String.join(" AND ", whereParts) + ";";
     }
@@ -101,10 +105,10 @@ public class SqlGeneratorUtil {
         }
 
         List<String> whereParts = primaryKeys.stream()
-                .map(pk -> "`" + pk + "` = " + toSqlValue(row.get(pk)))
+                .map(pk -> "\"" + pk + "\" = " + toSqlValue(row.get(pk)))
                 .collect(Collectors.toList());
 
-        return "DELETE FROM `" + tableName + "` WHERE " + String.join(" AND ", whereParts) + ";";
+        return "DELETE FROM \"" + tableName + "\" WHERE " + String.join(" AND ", whereParts) + ";";
     }
 
     public static String buildSelectByRandomPrimaryKey(String tableName) {
@@ -126,12 +130,12 @@ public class SqlGeneratorUtil {
         }
 
         List<String> whereParts = primaryKeys.stream()
-                .map(pk -> "`" + pk + "` = " + toSqlValue(row.get(pk)))
+                .map(pk -> "\"" + pk + "\" = " + toSqlValue(row.get(pk)))
                 .collect(Collectors.toList());
 
         return "SELECT " +
-                columns.stream().map(col -> "`" + col + "`").collect(Collectors.joining(", ")) +
-                " FROM `" + tableName + "` WHERE " + String.join(" AND ", whereParts) + ";";
+                columns.stream().map(col -> "\"" + col + "\"").collect(Collectors.joining(", ")) +
+                " FROM \"" + tableName + "\" WHERE " + String.join(" AND ", whereParts) + ";";
     }
 
     private static String toSqlValue(Object val) {

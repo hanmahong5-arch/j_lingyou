@@ -51,7 +51,7 @@ public class DatabaseUtil {
         // 1. 读取 application.yml 配置
         Properties properties = loadYamlProperties("application.yml");
 
-        // 2. 创建 DataSource (MySQL 的 JDBC URL 格式)
+        // 2. 创建 DataSource (PostgreSQL 的 JDBC URL 格式)
         dataSource = DataSourceBuilder.create()
                 .url(properties.getProperty("spring.datasource.url"))
                 .username(properties.getProperty("spring.datasource.username"))
@@ -81,9 +81,9 @@ public class DatabaseUtil {
             Properties properties = loadYamlProperties("application.yml");
             String urlTemplate = properties.getProperty("spring.datasource.url");
 
-            // 修改 URL 中的数据库名
+            // 修改 URL 中的数据库名 (PostgreSQL)
             String modifiedUrl = urlTemplate.replaceFirst(
-                    "(jdbc:mysql://[^/]+:\\d{1,5}/)([^/?]+)",
+                    "(jdbc:postgresql://[^/]+:\\d{1,5}/)([^/?]+)",
                     "$1" + databaseName
             );
 
@@ -169,9 +169,9 @@ public class DatabaseUtil {
 
             log.info("开始清理表 {} 的重复主键（主键列：{}）", tableName, primaryKeyColumn);
 
-            // 查找重复的主键
+            // 查找重复的主键 (PostgreSQL)
             String findDuplicatesSql = String.format(
-                "SELECT `%s`, COUNT(*) as cnt FROM `%s` GROUP BY `%s` HAVING cnt > 1",
+                "SELECT \"%s\", COUNT(*) as cnt FROM \"%s\" GROUP BY \"%s\" HAVING COUNT(*) > 1",
                 primaryKeyColumn, tableName, primaryKeyColumn
             );
 
@@ -193,14 +193,12 @@ public class DatabaseUtil {
                 int count = ((Number) duplicate.get("cnt")).intValue();
 
                 try {
-                    // 方法1: 使用子查询和临时表删除重复记录
+                    // 方法1: 使用子查询删除重复记录 (PostgreSQL)
                     String deleteSql = String.format(
-                        "DELETE FROM `%s` WHERE `%s` = ? " +
-                        "AND CONCAT_WS(',', `%s`, IFNULL(CAST(id AS CHAR), '')) NOT IN ( " +
-                        "  SELECT * FROM ( " +
-                        "    SELECT CONCAT_WS(',', `%s`, IFNULL(CAST(MIN(id) AS CHAR), '')) " +
-                        "    FROM `%s` WHERE `%s` = ? " +
-                        "  ) AS temp " +
+                        "DELETE FROM \"%s\" WHERE \"%s\" = ? " +
+                        "AND CONCAT_WS(',', \"%s\"::text, COALESCE(id::text, '')) NOT IN ( " +
+                        "  SELECT CONCAT_WS(',', \"%s\"::text, COALESCE(MIN(id)::text, '')) " +
+                        "  FROM \"%s\" WHERE \"%s\" = ? " +
                         ")",
                         tableName, primaryKeyColumn, primaryKeyColumn,
                         primaryKeyColumn, tableName, primaryKeyColumn
@@ -213,10 +211,10 @@ public class DatabaseUtil {
                         // 如果上面的方法失败，使用更简单的方法
                         log.debug("尝试第二种删除方式: {}", e1.getMessage());
 
-                        // 方法2: 先查找要保留的记录，然后删除其他的
+                        // 方法2: 先查找要保留的记录，然后删除其他的 (PostgreSQL)
                         // 查找该主键值的所有记录，获取最小的id（或其他唯一标识）
                         String findMinIdSql = String.format(
-                            "SELECT MIN(id) as min_id FROM `%s` WHERE `%s` = ?",
+                            "SELECT MIN(id) as min_id FROM \"%s\" WHERE \"%s\" = ?",
                             tableName, primaryKeyColumn
                         );
 
@@ -225,20 +223,20 @@ public class DatabaseUtil {
                         if (minId != null) {
                             // 删除除了最小id之外的所有记录
                             String deleteByIdSql = String.format(
-                                "DELETE FROM `%s` WHERE `%s` = ? AND id != ?",
+                                "DELETE FROM \"%s\" WHERE \"%s\" = ? AND id != ?",
                                 tableName, primaryKeyColumn
                             );
                             deleted = jdbcTemplate.update(deleteByIdSql, pkValue, minId);
                         } else {
-                            // 如果表没有id列，使用LIMIT方式
-                            log.debug("表没有id列，使用保守删除方式");
+                            // 如果表没有id列，使用ctid方式 (PostgreSQL)
+                            log.debug("表没有id列，使用ctid删除方式");
                             deleted = 0;
 
-                            // 重复删除，每次删除一条（除了第一条）
+                            // PostgreSQL 使用 ctid 删除重复记录
                             for (int i = 1; i < count; i++) {
                                 String deleteLimitSql = String.format(
-                                    "DELETE FROM `%s` WHERE `%s` = ? LIMIT 1",
-                                    tableName, primaryKeyColumn
+                                    "DELETE FROM \"%s\" WHERE ctid = (SELECT ctid FROM \"%s\" WHERE \"%s\" = ? LIMIT 1)",
+                                    tableName, tableName, primaryKeyColumn
                                 );
                                 deleted += jdbcTemplate.update(deleteLimitSql, pkValue);
                             }
@@ -264,14 +262,14 @@ public class DatabaseUtil {
 
 
     /**
-     * 判断列是否为数值类型
+     * 判断列是否为数值类型 (PostgreSQL)
      */
     private static boolean isNumericType(String tableName, String columnName) {
         JdbcTemplate jdbcTemplate = getJdbcTemplate();
 
         try {
-            String sql = "SELECT DATA_TYPE FROM information_schema.COLUMNS " +
-                        "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?";
+            String sql = "SELECT data_type FROM information_schema.columns " +
+                        "WHERE table_schema = current_schema() AND table_name = ? AND column_name = ?";
 
             String dataType = jdbcTemplate.queryForObject(sql, String.class, tableName, columnName);
 
@@ -322,10 +320,10 @@ public class DatabaseUtil {
                 deleteSql = "DELETE FROM " + tableName;
                 log.debug("执行条件删除: {}", deleteSql);
             } else {
-                // 不包含WHERE条件，优先使用TRUNCATE（更快且重置自增ID）
+                // 不包含WHERE条件，优先使用TRUNCATE（更快且重置序列）(PostgreSQL)
                 // 但如果表有外键约束，则回退到DELETE
                 try {
-                    deleteSql = "TRUNCATE TABLE `" + tableName + "`";
+                    deleteSql = "TRUNCATE TABLE \"" + tableName + "\" RESTART IDENTITY";
                     jdbcTemplate.execute(deleteSql);
                     log.debug("使用TRUNCATE清空表: {}", tableName);
                     commitTransaction(transactionStatus);
@@ -333,7 +331,7 @@ public class DatabaseUtil {
                 } catch (Exception truncateEx) {
                     // TRUNCATE失败（可能是外键约束），使用DELETE
                     log.debug("TRUNCATE失败，改用DELETE: {}", truncateEx.getMessage());
-                    deleteSql = "DELETE FROM `" + tableName + "`";
+                    deleteSql = "DELETE FROM \"" + tableName + "\"";
                 }
             }
 
@@ -350,11 +348,13 @@ public class DatabaseUtil {
     }
 
     /**
-     * 获取表的主键字段名
+     * 获取表的主键字段名 (PostgreSQL)
      */
     public static String getPrimaryKeyColumn(String tableName) {
-        String sql = "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE " +
-                     "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND CONSTRAINT_NAME = 'PRIMARY'";
+        String sql = "SELECT kcu.column_name FROM information_schema.table_constraints tc " +
+                     "JOIN information_schema.key_column_usage kcu " +
+                     "ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema " +
+                     "WHERE tc.table_schema = current_schema() AND tc.table_name = ? AND tc.constraint_type = 'PRIMARY KEY'";
         try {
             return jdbcTemplate.queryForObject(sql, String.class, tableName);
         } catch (EmptyResultDataAccessException e) {
@@ -444,8 +444,8 @@ public class DatabaseUtil {
                     // 扩展为实际长度的1.2倍，避免频繁扩展
                     int newLength = (int) (valueLength * 1.2);
                     if (newLength > 16383) {
-                        // VARCHAR 最大长度限制，超过则转为 TEXT
-                        String alterSql = String.format("ALTER TABLE `%s` MODIFY COLUMN `%s` TEXT",
+                        // VARCHAR 最大长度限制，超过则转为 TEXT (PostgreSQL)
+                        String alterSql = String.format("ALTER TABLE \"%s\" ALTER COLUMN \"%s\" TYPE TEXT",
                                 tableName, columnName);
                         jdbcTemplate.execute(alterSql);
                         log.info("字段 {} 长度超限({})，已转为TEXT类型", columnName, valueLength);
@@ -543,11 +543,11 @@ public class DatabaseUtil {
         }
 
         List<String> wrappedColumns = columns.stream()
-                .map(column -> "`" + column + "`")
+                .map(column -> "\"" + column + "\"")
                 .collect(Collectors.toList());
 
-        // **5. 生成 SQL 语句**
-        String sql = String.format("INSERT INTO %s (%s) VALUES (%s)",
+        // **5. 生成 SQL 语句** (PostgreSQL: 使用双引号包裹表名)
+        String sql = String.format("INSERT INTO \"%s\" (%s) VALUES (%s)",
                 tableName,
                 String.join(",", wrappedColumns),
                 String.join(",", Collections.nCopies(columns.size(), "?")));
@@ -587,7 +587,7 @@ public class DatabaseUtil {
 
 
     /**
-     * 获取总记录数（带优化）
+     * 获取总记录数（带优化）(PostgreSQL)
      * - 对于大表（>10万行），先尝试从统计信息获取估算值
      * - 如果COUNT(*)超时，返回估算值
      */
@@ -595,9 +595,9 @@ public class DatabaseUtil {
         JdbcTemplate jdbcTemplate = DatabaseUtil.getJdbcTemplate();
 
         try {
-            // 先尝试从 INFORMATION_SCHEMA 获取估算值（非常快）
-            String estimateSql = "SELECT TABLE_ROWS FROM INFORMATION_SCHEMA.TABLES " +
-                                 "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?";
+            // 先尝试从 pg_class 获取估算值（非常快）(PostgreSQL)
+            String estimateSql = "SELECT reltuples::bigint FROM pg_class " +
+                                 "WHERE relnamespace = (SELECT oid FROM pg_namespace WHERE nspname = current_schema()) AND relname = ?";
             Long estimatedRows = jdbcTemplate.queryForObject(estimateSql, Long.class, tabName);
 
             // 如果估算值显示数据量很大（>100,000），直接返回估算值，避免慢查询
@@ -649,60 +649,68 @@ public class DatabaseUtil {
     }
 
     public static List<String> getTableNamesByPrefix(String prefix) {
-        String sql = "SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name LIKE ?";
+        String sql = "SELECT table_name FROM information_schema.tables WHERE table_schema = current_schema() AND table_name LIKE ?";
         return jdbcTemplate.queryForList(sql, String.class, prefix + "%");
     }
 
     public static List<String> getTableNamesByPrefix(String prefix, String databaseName) {
-        String sql = "SELECT table_name FROM information_schema.tables WHERE table_schema = ? AND table_name LIKE ?";
+        String sql = "SELECT table_name FROM information_schema.tables WHERE table_catalog = ? AND table_schema = 'public' AND table_name LIKE ?";
         return DatabaseUtil.getJdbcTemplate(databaseName).queryForList(sql, String.class, databaseName, prefix + "%");
     }
 
     public static boolean tableExists(String tableName) {
-        String sql = "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?";
+        String sql = "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = ?";
         Integer count = jdbcTemplate.queryForObject(sql, Integer.class, tableName);
         return count != null && count > 0;
     }
 
     public static boolean tableExists(String tableName, String databaseName) {
-        String sql = "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = ? AND table_name = ?";
+        String sql = "SELECT COUNT(*) FROM information_schema.tables WHERE table_catalog = ? AND table_schema = 'public' AND table_name = ?";
         Integer count = getJdbcTemplate(databaseName).queryForObject(sql, Integer.class, databaseName, tableName);
         return count != null && count > 0;
     }
+
     public static List<String> listAllDatabases() {
-        String sql = "SHOW DATABASES";
+        // PostgreSQL: 查询所有数据库
+        String sql = "SELECT datname FROM pg_database WHERE datistemplate = false";
         return jdbcTemplate.queryForList(sql, String.class);
     }
 
     public static String getDbName(){
-        return jdbcTemplate.queryForObject("SELECT DATABASE()", String.class);
+        return jdbcTemplate.queryForObject("SELECT current_database()", String.class);
     }
 
     public static String getTableDDL(String tableName) {
-        // 获取原始的 CREATE TABLE 语句
-        String sql = "SHOW CREATE TABLE " + tableName;
-        String ddl = jdbcTemplate.queryForObject(sql, (rs, rowNum) -> rs.getString("Create Table"));
+        // PostgreSQL: 从 information_schema 获取表结构
+        String sql = "SELECT column_name, data_type, character_maximum_length, is_nullable, column_default " +
+                     "FROM information_schema.columns " +
+                     "WHERE table_schema = current_schema() AND table_name = ? " +
+                     "ORDER BY ordinal_position";
 
-        // 使用正则表达式提取字段名
-        Pattern pattern = Pattern.compile("`(\\w+)`\\s+");  // 匹配字段名
-        Matcher matcher = pattern.matcher(ddl);
+        List<Map<String, Object>> columns = jdbcTemplate.queryForList(sql, tableName);
 
-        StringBuilder cleanedDDL = new StringBuilder("CREATE TABLE `" + tableName + "` (\n");
+        StringBuilder ddl = new StringBuilder("CREATE TABLE \"" + tableName + "\" (\n");
 
-        // 遍历所有匹配的字段名并构建简化后的 DDL
-        while (matcher.find()) {
-            cleanedDDL.append("  `").append(matcher.group(1)).append("`,\n");
+        for (int i = 0; i < columns.size(); i++) {
+            Map<String, Object> col = columns.get(i);
+            String colName = (String) col.get("column_name");
+            String dataType = (String) col.get("data_type");
+            Object maxLen = col.get("character_maximum_length");
+
+            ddl.append("  \"").append(colName).append("\" ").append(dataType.toUpperCase());
+            if (maxLen != null) {
+                ddl.append("(").append(maxLen).append(")");
+            }
+
+            if (i < columns.size() - 1) {
+                ddl.append(",");
+            }
+            ddl.append("\n");
         }
 
-        // 去除最后一个多余的逗号
-        if (cleanedDDL.length() > 0) {
-            // 去除最后的逗号和换行
-            cleanedDDL.setLength(cleanedDDL.length() - 2);
-        }
+        ddl.append(");");
 
-        cleanedDDL.append("\n);");
-
-        return cleanedDDL.toString();
+        return ddl.toString();
     }
 
     public static JSONRecord getDistinctValuesWithCount(String tableName, boolean subTab, String fields) throws SQLException {
@@ -784,24 +792,30 @@ public class DatabaseUtil {
                     if("string".equals(fieldTypeMap.get(columnName.toLowerCase()))){
                         sql = sql + " ORDER BY cnt DESC";
                     }else{
-                        sql = sql + " ORDER BY CAST("+columnName+" AS UNSIGNED) DESC";
+                        sql = sql + " ORDER BY CAST("+columnName+" AS INTEGER) DESC";
                     }
 
                     if(StringUtils.hasLength(fieldValueMap2.get(columnName.toLowerCase()))){
                         String likeVal = fieldValueMap2.get(columnName.toLowerCase()).replace("*", "%");
-                        String sp = "-1";
+                        // PostgreSQL: 使用 split_part 替代 SUBSTRING_INDEX
+                        // 对于前缀匹配（%xxx），取分隔符前的部分；对于后缀匹配（xxx%），取分隔符后的部分
+                        String delimiter = likeVal.replace("%", "");
                         if(likeVal.startsWith("%")){
-                            sp = "1";
+                            // 后缀匹配，取第一部分
+                            sql = String.format("SELECT split_part(%s,'%s',1) AS name_prefix,COUNT(*) AS cnt " +
+                                    "FROM %s WHERE %s LIKE '%s' GROUP BY name_prefix",
+                                    columnName, delimiter, tableName, columnName, likeVal);
+                        } else {
+                            // 前缀匹配，取最后部分 - 使用 regexp_replace
+                            sql = String.format("SELECT regexp_replace(%s, '^.*%s', '') AS name_prefix,COUNT(*) AS cnt " +
+                                    "FROM %s WHERE %s LIKE '%s' GROUP BY name_prefix",
+                                    columnName, delimiter, tableName, columnName, likeVal);
                         }
-
-                        sql = String.format("SELECT SUBSTRING_INDEX(%s,'%s',%s) AS name_prefix,COUNT(*) AS cnt " +
-                                "FROM %s WHERE %s LIKE '%s' GROUP BY name_prefix",
-                                columnName,likeVal.replace("%", ""), sp, tableName, columnName, likeVal);
 
                         if("string".equals(fieldTypeMap.get(columnName.toLowerCase()))){
                             sql = sql + " ORDER BY cnt DESC";
                         }else{
-                            sql = sql + " ORDER BY CAST("+columnName+" AS UNSIGNED) DESC";
+                            sql = sql + " ORDER BY CAST("+columnName+" AS INTEGER) DESC";
                         }
                     }
 
@@ -890,15 +904,15 @@ public class DatabaseUtil {
     }
 
     /**
-     * 获取指定表中某字段的最大长度（仅适用于 VARCHAR 类型字段）
+     * 获取指定表中某字段的最大长度（仅适用于 VARCHAR 类型字段）(PostgreSQL)
      * @param tableName 表名
      * @param columnName 字段名
      * @return 字段的最大长度（如 VARCHAR(255) 返回 255）
      * @throws Exception 如果字段不存在
      */
     public static int getColumnLength(String tableName, String columnName)  {
-        String sql = "SELECT CHARACTER_MAXIMUM_LENGTH FROM information_schema.columns " +
-                "WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?";
+        String sql = "SELECT character_maximum_length FROM information_schema.columns " +
+                "WHERE table_schema = current_schema() AND table_name = ? AND column_name = ?";
         try {
             return jdbcTemplate.queryForObject(sql, Integer.class, tableName, columnName);
         } catch (EmptyResultDataAccessException e) {
@@ -907,24 +921,24 @@ public class DatabaseUtil {
     }
 
     /**
-     * 如果字段类型是 VARCHAR 且长度不足，则自动修改为目标长度
+     * 如果字段类型是 VARCHAR 且长度不足，则自动修改为目标长度 (PostgreSQL)
      * @param tableName 表名
      * @param columnName 字段名
      * @param requiredLength 期望长度
      * @throws Exception 字段不存在或 SQL 执行失败
      */
     public static void ensureVarcharLengthIfNeeded(String tableName, String columnName, int requiredLength) throws Exception {
-        String typeSql = "SELECT DATA_TYPE FROM information_schema.columns " +
-                "WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?";
+        String typeSql = "SELECT data_type FROM information_schema.columns " +
+                "WHERE table_schema = current_schema() AND table_name = ? AND column_name = ?";
         String dataType = jdbcTemplate.queryForObject(typeSql, String.class, tableName, columnName);
-        if (!"varchar".equalsIgnoreCase(dataType)) {
+        if (!"character varying".equalsIgnoreCase(dataType) && !"varchar".equalsIgnoreCase(dataType)) {
             log.warn("字段 [{}] 不是 VARCHAR 类型，跳过调整", columnName);
             return;
         }
 
         int currentLength = getColumnLength(tableName, columnName);
         if (currentLength < requiredLength) {
-            String alterSql = String.format("ALTER TABLE `%s` MODIFY COLUMN `%s` VARCHAR(%d)",
+            String alterSql = String.format("ALTER TABLE \"%s\" ALTER COLUMN \"%s\" TYPE VARCHAR(%d)",
                     tableName, columnName, requiredLength);
             jdbcTemplate.execute(alterSql);
             log.info("已将字段 [{}] 长度由 {} 调整为 {}", columnName, currentLength, requiredLength);

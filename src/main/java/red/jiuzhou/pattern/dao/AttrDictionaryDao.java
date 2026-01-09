@@ -290,14 +290,14 @@ public class AttrDictionaryDao {
     }
 
     /**
-     * 批量插入
+     * 批量插入 (PostgreSQL)
      */
     public void batchInsert(List<AttrDictionary> attrs) {
         String sql = "INSERT INTO attr_dictionary (attr_code, attr_name, attr_category, " +
                 "value_unit, is_percentage, source_file, description) " +
                 "VALUES (?, ?, ?, ?, ?, ?, ?) " +
-                "ON DUPLICATE KEY UPDATE attr_name = VALUES(attr_name), " +
-                "attr_category = VALUES(attr_category)";
+                "ON CONFLICT (attr_code) DO UPDATE SET attr_name = EXCLUDED.attr_name, " +
+                "attr_category = EXCLUDED.attr_category";
 
         jdbcTemplate.batchUpdate(sql, attrs, attrs.size(), (ps, attr) -> {
             ps.setString(1, attr.getAttrCode());

@@ -66,7 +66,7 @@ public class EnumQuery {
 
     // 使用 JdbcTemplate 从数据库加载表名
     private void loadTableNames() {
-        String sql = "SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE()";
+        String sql = "SELECT table_name FROM information_schema.tables WHERE table_schema = current_schema()";
         List<String> tableNames = jdbcTemplate.queryForList(sql, String.class);
         ObservableList<String> allTables = FXCollections.observableArrayList(tableNames);
         tableComboBox.setItems(allTables);
@@ -81,7 +81,7 @@ public class EnumQuery {
         String tableName = tableComboBox.getValue();
         if (tableName == null) return;
 
-        String sql = "SELECT column_name FROM information_schema.columns WHERE table_name = ? AND table_schema = DATABASE()";
+        String sql = "SELECT column_name FROM information_schema.columns WHERE table_name = ? AND table_schema = current_schema()";
         List<String> columns = jdbcTemplate.queryForList(sql, String.class, tableName);
         log.info("columnNames:{}", columns.toString());
         columnComboBox.setItems(FXCollections.observableArrayList(columns));

@@ -50,18 +50,19 @@ public class EncodingMetadataManager {
             // 计算文件哈希（用于往返验证）
             String fileHash = cn.hutool.crypto.digest.DigestUtil.md5Hex(cn.hutool.core.io.FileUtil.readBytes(xmlFile));
 
+            // PostgreSQL: 使用 ON CONFLICT ... DO UPDATE SET
             String sql = """
                 INSERT INTO file_encoding_metadata
                 (table_name, map_type, original_encoding, has_bom, original_file_path, original_file_hash, file_size_bytes, last_import_time, import_count)
                 VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), 1)
-                ON DUPLICATE KEY UPDATE
-                    original_encoding = VALUES(original_encoding),
-                    has_bom = VALUES(has_bom),
-                    original_file_path = VALUES(original_file_path),
-                    original_file_hash = VALUES(original_file_hash),
-                    file_size_bytes = VALUES(file_size_bytes),
+                ON CONFLICT (table_name, map_type) DO UPDATE SET
+                    original_encoding = EXCLUDED.original_encoding,
+                    has_bom = EXCLUDED.has_bom,
+                    original_file_path = EXCLUDED.original_file_path,
+                    original_file_hash = EXCLUDED.original_file_hash,
+                    file_size_bytes = EXCLUDED.file_size_bytes,
                     last_import_time = NOW(),
-                    import_count = import_count + 1
+                    import_count = file_encoding_metadata.import_count + 1
                 """;
 
             jdbcTemplate.update(sql,

@@ -182,19 +182,19 @@ public enum SqlExampleLibrary {
 
         // ========== 元数据查询 ==========
         addExample("查询所有物品表",
-            "SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name LIKE '%item%' LIMIT 50",
+            "SELECT table_name FROM information_schema.tables WHERE table_schema = current_schema() AND table_name LIKE '%item%' LIMIT 50",
             "元数据");
 
         addExample("列出所有表",
-            "SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE() ORDER BY table_name LIMIT 100",
+            "SELECT table_name FROM information_schema.tables WHERE table_schema = current_schema() ORDER BY table_name LIMIT 100",
             "元数据");
 
         addExample("查询表的字段信息",
-            "SELECT column_name, column_type, column_comment FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'item_armors' ORDER BY ordinal_position",
+            "SELECT column_name, column_type, column_comment FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'item_armors' ORDER BY ordinal_position",
             "元数据");
 
         addExample("查询包含skill的表",
-            "SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name LIKE '%skill%' LIMIT 50",
+            "SELECT table_name FROM information_schema.tables WHERE table_schema = current_schema() AND table_name LIKE '%skill%' LIMIT 50",
             "元数据");
 
         log.info("SQL示例库初始化完成，共加载 {} 个示例", allExamples.size());

@@ -65,6 +65,7 @@ public class DataSnapshot {
         if (jdbcTemplate == null) return;
 
         try {
+            // PostgreSQL: 使用 TEXT 替代 LONGTEXT
             jdbcTemplate.execute("""
                 CREATE TABLE IF NOT EXISTS data_snapshots (
                     snapshot_id VARCHAR(50) PRIMARY KEY,
@@ -73,15 +74,18 @@ public class DataSnapshot {
                     table_name VARCHAR(100) NOT NULL,
                     primary_key_column VARCHAR(100) NOT NULL,
                     row_count INT DEFAULT 0,
-                    snapshot_data LONGTEXT,
+                    snapshot_data TEXT,
                     sql_executed TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     expires_at TIMESTAMP,
-                    restored_at TIMESTAMP NULL,
-                    INDEX idx_workflow_id (workflow_id),
-                    INDEX idx_expires_at (expires_at)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                    restored_at TIMESTAMP NULL
+                )
             """);
+
+            // PostgreSQL: 单独创建索引
+            jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_snapshot_workflow_id ON data_snapshots (workflow_id)");
+            jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_expires_at ON data_snapshots (expires_at)");
+
             log.info("数据快照表初始化完成");
         } catch (Exception e) {
             log.warn("创建快照表失败（可能已存在）: {}", e.getMessage());
@@ -357,10 +361,20 @@ public class DataSnapshot {
         if (jdbcTemplate == null) return null;
 
         try {
-            List<Map<String, Object>> keys = jdbcTemplate.queryForList(
-                    "SHOW KEYS FROM `" + tableName + "` WHERE Key_name = 'PRIMARY'");
+            // PostgreSQL: 通过 information_schema 查询主键
+            String sql = """
+                SELECT kcu.column_name
+                FROM information_schema.table_constraints tc
+                JOIN information_schema.key_column_usage kcu
+                    ON tc.constraint_name = kcu.constraint_name
+                    AND tc.table_schema = kcu.table_schema
+                WHERE tc.table_schema = current_schema()
+                    AND tc.table_name = ?
+                    AND tc.constraint_type = 'PRIMARY KEY'
+                """;
+            List<Map<String, Object>> keys = jdbcTemplate.queryForList(sql, tableName);
             if (!keys.isEmpty()) {
-                return (String) keys.get(0).get("Column_name");
+                return (String) keys.get(0).get("column_name");
             }
         } catch (Exception e) {
             log.debug("检测主键失败: {}", e.getMessage());

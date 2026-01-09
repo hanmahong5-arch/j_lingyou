@@ -144,15 +144,15 @@ public class XMLToMySQLGenerator {
 
             processedTables.add(tableName);
             tableDefinitions.put(tableName, generateCreateTableSQL(element, context, tableName, !isRoot));
-            // 如果不是根表，则让子表的 `id` 继承父表的 `id`
+            // 如果不是根表，则让子表的 id 继承父表的 id (PostgreSQL语法)
             if (!isRoot) {
                 parentTable = getRealParentTable(element.getParent(), parentTable);
                 String tabFirstField = "__parent_" + context.getFirstField();
                 if(parentTable.equals(context.getFileName())){
                     tabFirstField = context.getFirstField();
                 }
-                String foreignKeySQL = "ALTER TABLE " + tableName + " ADD CONSTRAINT fk_" + tableName +
-                        " FOREIGN KEY (__parent_"+context.getFirstField()+") REFERENCES " + parentTable + "("+tabFirstField+") ON DELETE CASCADE ON UPDATE CASCADE;";
+                String foreignKeySQL = "ALTER TABLE \"" + tableName + "\" ADD CONSTRAINT \"fk_" + tableName +
+                        "\" FOREIGN KEY (\"__parent_"+context.getFirstField()+"\") REFERENCES \"" + parentTable + "\"(\""+tabFirstField+"\") ON DELETE CASCADE ON UPDATE CASCADE;";
                 //foreignKeys.put(tableName, foreignKeySQL);
             }
         }
@@ -177,8 +177,6 @@ public class XMLToMySQLGenerator {
     }
 
     private static String generateCreateTableSQL(Element element, GenerationContext context, String tableName, boolean isChildTable) {
-        final String dbName = DatabaseUtil.getDbName();
-
         List<Element> fields = element.elements();
         List<Attribute> attributes = element.attributes();
 
@@ -190,43 +188,33 @@ public class XMLToMySQLGenerator {
             }
         }
 
-        // 根据字段数量选择行格式和字段类型策略
-        // - 超过150个字段: 使用DYNAMIC格式 + TEXT
-        // - 超过50个字段: 使用DYNAMIC格式 + TEXT
-        // - 其他: 使用DYNAMIC格式 + VARCHAR
-        // 注意: COMPRESSED + MEDIUMTEXT 会导致 "Row size too large" 错误
-        // MySQL InnoDB限制: COMPRESSED行格式单行最大约8KB，大量TEXT列会超限
-        // 解决方案: 统一使用DYNAMIC行格式，TEXT列会自动off-page存储
-        String rowFormat = "DYNAMIC";
+        // PostgreSQL: 字段数量过多时使用TEXT类型
         int fieldTypeLevel = totalFieldCount > 50 ? 1 : 0;
 
-        StringBuilder sql = new StringBuilder("DROP TABLE IF EXISTS " + dbName + "." + tableName + ";\n" +
-                "CREATE TABLE "  + dbName + "." + tableName + " (\n");
-        String tabFirstField = "`" + context.getFirstField() + "`";
+        // PostgreSQL DDL (使用双引号包裹标识符)
+        StringBuilder sql = new StringBuilder("DROP TABLE IF EXISTS \"" + tableName + "\" CASCADE;\n" +
+                "CREATE TABLE \"" + tableName + "\" (\n");
+
+        String tabFirstField = "\"" + context.getFirstField() + "\"";
         if(context.isWorld()){
-            // 主表的 id 是自增，子表的 id 继承父表
-            tabFirstField = "`__parent_" + context.getFirstField() + "`";
+            tabFirstField = "\"__parent_" + context.getFirstField() + "\"";
         }
 
         if (isChildTable) {
-            sql.append("    ").append(tabFirstField).append(" VARCHAR(255) COMMENT '继承父").append(context.getFirstField()).append("',\n");
-            sql.append("    `").append(ORDER_COLUMN).append("` INT NOT NULL DEFAULT 0 COMMENT '顺序索引',\n");
+            sql.append("    ").append(tabFirstField).append(" VARCHAR(255),\n");
+            sql.append("    \"").append(ORDER_COLUMN).append("\" INT NOT NULL DEFAULT 0,\n");
         } else {
-            sql.append("    `").append(context.getFirstField()).append("` VARCHAR(255) PRIMARY KEY COMMENT '").append(context.getFirstField()).append("',\n");
-            sql.append("    `").append(ORDER_COLUMN).append("` INT NOT NULL DEFAULT 0 COMMENT '顺序索引',\n");
+            sql.append("    \"").append(context.getFirstField()).append("\" VARCHAR(255) PRIMARY KEY,\n");
+            sql.append("    \"").append(ORDER_COLUMN).append("\" INT NOT NULL DEFAULT 0,\n");
         }
-        // fieldTypeLevel: 0=VARCHAR, 1=TEXT, 2=MEDIUMTEXT
-        // MySQL InnoDB 单行最大约8KB, 大量VARCHAR字段会导致 "Row size too large" 错误
+
         // 解析字段
         int i = 0;
         if(WORLD_SPECIAL_TAB_NAMES.contains(tableName)){
-            sql.append("    ").append("`world__id`").append(" ").append("VARCHAR(64)")
-                    .append(" COMMENT '").append("world__id").append("',\n");
-
+            sql.append("    \"world__id\" VARCHAR(64),\n");
         }
         if(context.isWorld()){
-            sql.append("    ").append("`mapTp`").append(" ").append("VARCHAR(64)")
-                    .append(" COMMENT '").append("mapTp").append("',\n");
+            sql.append("    \"mapTp\" VARCHAR(64),\n");
         }
         for (Element field : fields) {
             i++;
@@ -235,25 +223,29 @@ public class XMLToMySQLGenerator {
             }
             String fieldType = getColumnType(field.getName(), fieldTypeLevel, context);
             String fieldName = field.getName();
-            sql.append("    ").append("`" + fieldName + "`").append(" ").append(fieldType)
-                    .append(" COMMENT '").append( AliyunTranslateUtil.translate(fieldName)).append("',\n");
+            sql.append("    \"").append(fieldName).append("\" ").append(fieldType).append(",\n");
             if(field.elements().isEmpty() && !field.attributes().isEmpty()){
                 field.attributes().forEach( attribute -> {
-                    sql.append("    ").append("`_attr__" +field.getName() + "__" + attribute.getName() + "`").append(" ").append("VARCHAR(128)")
-                            .append(" COMMENT '").append( AliyunTranslateUtil.translate(attribute.getName())).append("',\n");
+                    sql.append("    \"_attr__").append(field.getName()).append("__").append(attribute.getName())
+                       .append("\" VARCHAR(128),\n");
                 });
             }
         }
         for (Attribute attribute : attributes) {
             String attributeName = attribute.getName();
-            sql.append("    ").append("`_attr_" + attributeName + "`").append(" ").append("VARCHAR(128)")
-                    .append(" COMMENT '").append( AliyunTranslateUtil.translate(attributeName)).append("',\n");
+            sql.append("    \"_attr_").append(attributeName).append("\" VARCHAR(128),\n");
         }
 
         // 去掉最后的逗号
         sql.setLength(sql.length() - 2);
-        sql.append("\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 ROW_FORMAT=").append(rowFormat)
-           .append(" COMMENT = '").append(AliyunTranslateUtil.translate(tableName)).append("';");
+        sql.append("\n);\n");
+
+        // PostgreSQL: 添加表注释
+        String tableComment = AliyunTranslateUtil.translate(tableName);
+        if (tableComment != null && !tableComment.isEmpty()) {
+            sql.append("COMMENT ON TABLE \"").append(tableName).append("\" IS '")
+               .append(tableComment.replace("'", "''")).append("';\n");
+        }
 
         return sql.toString();
     }

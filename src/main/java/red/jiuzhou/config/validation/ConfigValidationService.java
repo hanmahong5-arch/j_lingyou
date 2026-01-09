@@ -126,14 +126,14 @@ public class ConfigValidationService {
         // 数据库配置 (必填)
         new ConfigRequirement(
             "spring.datasource.url", "数据库连接URL", true,
-            "MySQL数据库连接地址，格式: jdbc:mysql://host:port/database",
+            "数据库连接地址，支持 PostgreSQL (jdbc:postgresql://) 或 MySQL (jdbc:mysql://)",
             null, ConfigCategory.DATABASE,
             value -> {
                 if (value == null || value.isBlank()) {
                     return ValidationResult.error("数据库URL不能为空");
                 }
-                if (!value.startsWith("jdbc:mysql://")) {
-                    return ValidationResult.error("必须是有效的MySQL JDBC URL");
+                if (!value.startsWith("jdbc:postgresql://") && !value.startsWith("jdbc:mysql://")) {
+                    return ValidationResult.error("必须是有效的 PostgreSQL 或 MySQL JDBC URL");
                 }
                 return ValidationResult.ok();
             }

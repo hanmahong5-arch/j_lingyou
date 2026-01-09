@@ -213,7 +213,8 @@ public class GameDataTools {
         log.info("列出所有表，关键字: {}", keyword);
 
         try {
-            String sql = "SHOW TABLES";
+            // PostgreSQL: 使用 pg_tables 替代 SHOW TABLES
+            String sql = "SELECT tablename FROM pg_tables WHERE schemaname = current_schema()";
             List<String> tables = jdbcTemplate.queryForList(sql, String.class);
 
             if (keyword != null && !keyword.isEmpty()) {

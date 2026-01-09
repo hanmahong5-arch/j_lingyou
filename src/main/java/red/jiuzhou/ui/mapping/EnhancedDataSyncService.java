@@ -1088,7 +1088,7 @@ public class EnhancedDataSyncService {
                                     DatabaseTableScanner.ColumnInfo columnInfo) throws SQLException {
         // 首先检查列是否已存在
         String checkSql = "SELECT COUNT(*) FROM information_schema.COLUMNS " +
-                         "WHERE TABLE_SCHEMA = DATABASE() " +
+                         "WHERE table_schema = current_schema() " +
                          "AND TABLE_NAME = ? " +
                          "AND COLUMN_NAME = ?";
 
@@ -1236,27 +1236,31 @@ public class EnhancedDataSyncService {
         String tableName = tableInfo.getTableName();
         log.info("为表 {} 创建主键...", tableName);
 
-        // 检查表中是否已有 id 字段
+        // 检查表中是否已有 id 字段 (PostgreSQL)
         boolean hasIdColumn = false;
         String idColumnType = null;
 
-        try (Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery("SHOW COLUMNS FROM " + tableName)) {
-            while (rs.next()) {
-                String columnName = rs.getString("Field");
-                if ("id".equalsIgnoreCase(columnName)) {
-                    hasIdColumn = true;
-                    idColumnType = rs.getString("Type");
-                    break;
+        try (PreparedStatement pstmt = conn.prepareStatement(
+                "SELECT column_name, data_type FROM information_schema.columns " +
+                "WHERE table_schema = current_schema() AND table_name = ?")) {
+            pstmt.setString(1, tableName);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    String columnName = rs.getString("column_name");
+                    if ("id".equalsIgnoreCase(columnName)) {
+                        hasIdColumn = true;
+                        idColumnType = rs.getString("data_type");
+                        break;
+                    }
                 }
             }
         }
 
-        // 如果没有 id 字段，先添加一个
+        // 如果没有 id 字段，先添加一个 (PostgreSQL: 使用 SERIAL)
         if (!hasIdColumn) {
             log.info("表 {} 没有 id 字段，添加 id 字段...", tableName);
             String addColumnSql = String.format(
-                "ALTER TABLE %s ADD COLUMN id INT AUTO_INCREMENT UNIQUE FIRST",
+                "ALTER TABLE %s ADD COLUMN id SERIAL UNIQUE",
                 tableName
             );
             try (Statement stmt = conn.createStatement()) {
@@ -1303,12 +1307,16 @@ public class EnhancedDataSyncService {
         String tableName = tableInfo.getTableName();
         log.info("为子表 {} 创建复合主键（外键: {}）...", tableName, foreignKeyColumn);
 
-        // 检查表中的字段
+        // 检查表中的字段 (PostgreSQL)
         List<String> existingColumns = new ArrayList<>();
-        try (Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery("SHOW COLUMNS FROM " + tableName)) {
-            while (rs.next()) {
-                existingColumns.add(rs.getString("Field").toLowerCase());
+        try (PreparedStatement pstmt = conn.prepareStatement(
+                "SELECT column_name FROM information_schema.columns " +
+                "WHERE table_schema = current_schema() AND table_name = ?")) {
+            pstmt.setString(1, tableName);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    existingColumns.add(rs.getString("column_name").toLowerCase());
+                }
             }
         }
 

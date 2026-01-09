@@ -645,7 +645,7 @@ public class PaginatedTable{
                     String realTableName = tableMatcher.group(1);
                     // 获取当前长度
                     String infoSchemaSql = "SELECT CHARACTER_MAXIMUM_LENGTH FROM INFORMATION_SCHEMA.COLUMNS " +
-                            "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?";
+                            "WHERE table_schema = current_schema() AND TABLE_NAME = ? AND COLUMN_NAME = ?";
                     Integer oldLength = DatabaseUtil.getJdbcTemplate().queryForObject(infoSchemaSql, new Object[]{realTableName, columnName}, Integer.class);
 
                     if (oldLength == null || oldLength <= 0) {

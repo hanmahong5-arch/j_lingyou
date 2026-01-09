@@ -225,7 +225,7 @@ public class ContextCollector {
             jdbcTemplate.query(
                 "SELECT COLUMN_NAME, DATA_TYPE, COLUMN_COMMENT, COLUMN_KEY, IS_NULLABLE, COLUMN_DEFAULT " +
                 "FROM INFORMATION_SCHEMA.COLUMNS " +
-                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? " +
+                "WHERE table_schema = current_schema() AND TABLE_NAME = ? " +
                 "ORDER BY ORDINAL_POSITION",
                 rs -> {
                     ColumnMetadata col = new ColumnMetadata();

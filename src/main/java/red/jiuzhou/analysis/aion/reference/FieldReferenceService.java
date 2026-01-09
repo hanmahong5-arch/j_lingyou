@@ -322,34 +322,60 @@ public class FieldReferenceService {
     }
 
     /**
-     * 确保数据库表存在
+     * 确保数据库表存在 (PostgreSQL)
      */
     private void ensureTableExists(JdbcTemplate jdbc) {
         try {
             if (!DatabaseUtil.tableExists("field_references")) {
-                String createSql = "CREATE TABLE IF NOT EXISTS `field_references` (" +
-                        "`id` BIGINT AUTO_INCREMENT PRIMARY KEY, " +
-                        "`source_file` VARCHAR(512) NOT NULL, " +
-                        "`source_file_name` VARCHAR(128) NOT NULL, " +
-                        "`source_field` VARCHAR(128) NOT NULL, " +
-                        "`source_field_path` VARCHAR(512) NOT NULL, " +
-                        "`source_mechanism` VARCHAR(64), " +
-                        "`target_system` VARCHAR(64) NOT NULL, " +
-                        "`target_table` VARCHAR(128) NOT NULL, " +
-                        "`reference_count` INT DEFAULT 0, " +
-                        "`distinct_values` INT DEFAULT 0, " +
-                        "`valid_references` INT DEFAULT 0, " +
-                        "`invalid_references` INT DEFAULT 0, " +
-                        "`sample_values` TEXT, " +
-                        "`sample_names` TEXT, " +
-                        "`confidence` DECIMAL(4,3) DEFAULT 1.000, " +
-                        "`last_analysis_time` DATETIME, " +
-                        "`created_at` DATETIME DEFAULT CURRENT_TIMESTAMP, " +
-                        "`updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, " +
-                        "UNIQUE KEY `uk_field_ref` (`source_file`(191), `source_field_path`(191), `target_system`)" +
-                        ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+                // PostgreSQL: 使用 BIGSERIAL，移除 ENGINE 和 CHARSET
+                String createSql = "CREATE TABLE IF NOT EXISTS field_references (" +
+                        "id BIGSERIAL PRIMARY KEY, " +
+                        "source_file VARCHAR(512) NOT NULL, " +
+                        "source_file_name VARCHAR(128) NOT NULL, " +
+                        "source_field VARCHAR(128) NOT NULL, " +
+                        "source_field_path VARCHAR(512) NOT NULL, " +
+                        "source_mechanism VARCHAR(64), " +
+                        "target_system VARCHAR(64) NOT NULL, " +
+                        "target_table VARCHAR(128) NOT NULL, " +
+                        "reference_count INT DEFAULT 0, " +
+                        "distinct_values INT DEFAULT 0, " +
+                        "valid_references INT DEFAULT 0, " +
+                        "invalid_references INT DEFAULT 0, " +
+                        "sample_values TEXT, " +
+                        "sample_names TEXT, " +
+                        "confidence DECIMAL(4,3) DEFAULT 1.000, " +
+                        "last_analysis_time TIMESTAMP, " +
+                        "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+                        "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP" +
+                        ")";
 
                 jdbc.execute(createSql);
+
+                // PostgreSQL: 使用 MD5 哈希创建唯一约束（绕过长度限制）
+                jdbc.execute("CREATE UNIQUE INDEX IF NOT EXISTS uk_field_ref ON field_references " +
+                        "(md5(source_file), md5(source_field_path), target_system)");
+
+                // PostgreSQL: 创建触发器函数用于自动更新 updated_at
+                jdbc.execute("""
+                    CREATE OR REPLACE FUNCTION update_field_references_updated_at()
+                    RETURNS TRIGGER AS $$
+                    BEGIN
+                        NEW.updated_at = CURRENT_TIMESTAMP;
+                        RETURN NEW;
+                    END;
+                    $$ LANGUAGE plpgsql
+                    """);
+
+                // PostgreSQL: 创建触发器
+                jdbc.execute("""
+                    DROP TRIGGER IF EXISTS trigger_update_field_references_updated_at ON field_references
+                    """);
+                jdbc.execute("""
+                    CREATE TRIGGER trigger_update_field_references_updated_at
+                    BEFORE UPDATE ON field_references
+                    FOR EACH ROW EXECUTE FUNCTION update_field_references_updated_at()
+                    """);
+
                 log.info("已创建 field_references 表");
             }
         } catch (Exception e) {

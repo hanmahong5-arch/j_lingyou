@@ -72,9 +72,10 @@ public class WorkflowAuditLog {
         if (jdbcTemplate == null) return;
 
         try {
+            // PostgreSQL: 使用 BIGSERIAL 替代 AUTO_INCREMENT
             jdbcTemplate.execute("""
                 CREATE TABLE IF NOT EXISTS workflow_audit_log (
-                    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                    id BIGSERIAL PRIMARY KEY,
                     workflow_id VARCHAR(50) NOT NULL,
                     workflow_type VARCHAR(30),
                     step_id VARCHAR(50),
@@ -85,11 +86,14 @@ public class WorkflowAuditLog {
                     sql_executed TEXT,
                     affected_rows INT DEFAULT 0,
                     data_snapshot_id VARCHAR(50),
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    INDEX idx_workflow_id (workflow_id),
-                    INDEX idx_created_at (created_at)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
             """);
+
+            // PostgreSQL: 单独创建索引
+            jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_workflow_id ON workflow_audit_log (workflow_id)");
+            jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_audit_created_at ON workflow_audit_log (created_at)");
+
             log.info("工作流审计日志表初始化完成");
         } catch (Exception e) {
             log.warn("创建审计日志表失败（可能已存在）: {}", e.getMessage());

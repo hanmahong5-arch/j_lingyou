@@ -877,7 +877,7 @@ public class FileStatusPanel extends VBox {
         try {
             var jdbc = DatabaseUtil.getJdbcTemplate();
             String sql = "SELECT COUNT(*) FROM information_schema.tables " +
-                         "WHERE table_schema = DATABASE() AND table_name = ?";
+                         "WHERE table_schema = current_schema() AND table_name = ?";
             Integer count = jdbc.queryForObject(sql, Integer.class, tableName);
             return count != null && count > 0;
         } catch (Exception e) {

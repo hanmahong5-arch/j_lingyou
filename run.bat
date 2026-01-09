@@ -70,7 +70,7 @@ if %ERRORLEVEL% NEQ 0 (
     echo.
     echo 常见问题排查：
     echo 1. 检查数据库连接配置（application.yml）
-    echo 2. 确认 MySQL 服务已启动
+    echo 2. 确认 PostgreSQL 服务已启动
     echo 3. 检查端口 8081 是否被占用
     echo 4. 查看上方错误日志
     echo.

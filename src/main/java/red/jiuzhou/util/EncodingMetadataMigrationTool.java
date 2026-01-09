@@ -270,17 +270,16 @@ public class EncodingMetadataMigrationTool {
         List<String> tables = new ArrayList<>();
 
         try {
-            // 从数据库获取所有表名
+            // 从数据库获取所有表名 (PostgreSQL)
             JdbcTemplate jdbcTemplate = DatabaseUtil.getJdbcTemplate();
-            String sql = "SHOW TABLES";
-            List<Map<String, Object>> result = jdbcTemplate.queryForList(sql);
+            String sql = "SELECT tablename FROM pg_tables WHERE schemaname = current_schema()";
+            List<String> result = jdbcTemplate.queryForList(sql, String.class);
 
-            for (Map<String, Object> row : result) {
-                String tableName = (String) row.values().iterator().next();
+            for (String tableName : result) {
                 // 排除系统表和元数据表
                 if (!tableName.equals("file_encoding_metadata") &&
                     !tableName.startsWith("sys_") &&
-                    !tableName.startsWith("mysql_")) {
+                    !tableName.startsWith("pg_")) {
                     tables.add(tableName);
                 }
             }
@@ -301,11 +300,10 @@ public class EncodingMetadataMigrationTool {
         try {
             JdbcTemplate jdbcTemplate = DatabaseUtil.getJdbcTemplate();
 
-            // 获取所有数据库表
+            // 获取所有数据库表 (PostgreSQL)
             Set<String> existingTables = new HashSet<>();
-            String showTablesSql = "SHOW TABLES";
-            jdbcTemplate.queryForList(showTablesSql).forEach(row -> {
-                String tableName = (String) row.values().iterator().next();
+            String showTablesSql = "SELECT tablename FROM pg_tables WHERE schemaname = current_schema()";
+            jdbcTemplate.queryForList(showTablesSql, String.class).forEach(tableName -> {
                 existingTables.add(tableName);
             });
 

@@ -681,7 +681,7 @@ public class DesignRuleStage extends Stage {
             try {
                 // 从数据库获取表的列信息
                 String sql = "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS " +
-                             "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? " +
+                             "WHERE table_schema = current_schema() AND TABLE_NAME = ? " +
                              "ORDER BY ORDINAL_POSITION";
 
                 List<String> fields = jdbcTemplate.queryForList(sql, String.class, tableName);

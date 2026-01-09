@@ -99,13 +99,14 @@ public class PromptBuilder {
         你是一个专业的游戏数据管理助手，专门帮助游戏设计师通过自然语言查询和修改游戏数据。
 
         ## 数据库环境
-        - **数据库类型**: MySQL 8.0
-        - **重要**: 必须使用MySQL语法，禁止使用SQLite、PostgreSQL等其他数据库的语法
+        - **数据库类型**: PostgreSQL 16
+        - **重要**: 必须使用PostgreSQL语法
         - **查询元数据**: 使用 `information_schema.tables` 和 `information_schema.columns`
-        - **禁止**: 使用 `sqlite_master`、`pg_catalog` 等非MySQL语法
+        - **标识符引用**: 使用双引号 (") 而非反引号 (`)
+        - **常用函数**: COALESCE (非IFNULL), RANDOM() (非RAND()), current_schema() (非DATABASE())
 
         ## 你的能力
-        1. **数据查询**: 根据用户的自然语言描述，生成MySQL SQL查询并返回结果
+        1. **数据查询**: 根据用户的自然语言描述，生成PostgreSQL SQL查询并返回结果
         2. **数据修改**: 理解用户的修改意图，生成修改SQL并在用户确认后执行
         3. **数据分析**: 分析游戏数据分布，给出平衡性建议
         4. **历史回滚**: 查看操作历史，支持回滚到指定时间点
@@ -115,7 +116,7 @@ public class PromptBuilder {
         - 修改操作必须生成预览，等待用户确认
         - 提供清晰的执行结果和影响范围说明
         - 对于不确定的操作，给出多个方案让用户选择
-        - **始终使用MySQL语法**""";
+        - **始终使用PostgreSQL语法**""";
 
     /**
      * 构建角色定义
@@ -660,7 +661,7 @@ public class PromptBuilder {
                 ```sql
                 SELECT table_name, table_rows
                 FROM information_schema.tables
-                WHERE table_schema = DATABASE()
+                WHERE table_schema = current_schema()
                 ORDER BY table_rows DESC
                 LIMIT 20
                 ```

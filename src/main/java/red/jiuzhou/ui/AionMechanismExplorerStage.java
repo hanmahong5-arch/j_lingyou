@@ -1874,7 +1874,7 @@ public class AionMechanismExplorerStage extends Stage {
                 try {
                     // 查询表是否存在
                     String checkSql = "SELECT COUNT(*) FROM information_schema.TABLES " +
-                                    "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?";
+                                    "WHERE table_schema = current_schema() AND TABLE_NAME = ?";
                     Integer count = jdbcTemplate.queryForObject(checkSql, Integer.class, tableName);
 
                     if (count != null && count > 0) {
@@ -1951,7 +1951,7 @@ public class AionMechanismExplorerStage extends Stage {
                 try {
                     // 先检查表是否存在
                     String checkSql = "SELECT COUNT(*) FROM information_schema.TABLES " +
-                                    "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?";
+                                    "WHERE table_schema = current_schema() AND TABLE_NAME = ?";
                     Integer count = jdbcTemplate.queryForObject(checkSql, Integer.class, tableName);
 
                     if (count != null && count > 0) {
@@ -2064,7 +2064,7 @@ public class AionMechanismExplorerStage extends Stage {
                 try {
                     // 先检查表是否存在
                     String checkSql = "SELECT COUNT(*) FROM information_schema.TABLES " +
-                                    "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?";
+                                    "WHERE table_schema = current_schema() AND TABLE_NAME = ?";
                     Integer tableExists = jdbcTemplate.queryForObject(checkSql, Integer.class, tableName);
 
                     if (tableExists != null && tableExists > 0) {

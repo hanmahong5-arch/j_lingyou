@@ -177,16 +177,16 @@ public class MultiTableQueryBuilder {
      */
     public QueryResult buildItemSourceQuery(String itemId) {
         StringBuilder sql = new StringBuilder();
-        sql.append("-- 物品来源追溯\n");
+        sql.append("-- 物品来源追溯 (PostgreSQL)\n");
         sql.append("SELECT \n");
         sql.append("  i.id, i.name as 物品名, i.level as 等级, i.quality as 品质,\n");
         sql.append("  (\n");
-        sql.append("    SELECT GROUP_CONCAT(CONCAT(s.name, '(', s.price, ')') SEPARATOR ', ')\n");
+        sql.append("    SELECT STRING_AGG(s.name || '(' || s.price || ')', ', ')\n");
         sql.append("    FROM shop_templates s WHERE s.item_id = i.id\n");
         sql.append("  ) as 商店来源,\n");
         sql.append("  (\n");
-        sql.append("    SELECT GROUP_CONCAT(q.name SEPARATOR ', ')\n");
-        sql.append("    FROM client_quests q WHERE q.reward_item LIKE CONCAT('%', i.id, '%')\n");
+        sql.append("    SELECT STRING_AGG(q.name, ', ')\n");
+        sql.append("    FROM client_quests q WHERE q.reward_item LIKE '%' || i.id || '%'\n");
         sql.append("  ) as 任务奖励,\n");
         sql.append("  (\n");
         sql.append("    SELECT COUNT(*) FROM drop_templates d WHERE d.item_id = i.id\n");
@@ -206,15 +206,15 @@ public class MultiTableQueryBuilder {
      */
     public QueryResult buildNpcFullInfoQuery(String npcId) {
         StringBuilder sql = new StringBuilder();
-        sql.append("-- NPC完整信息查询\n");
+        sql.append("-- NPC完整信息查询 (PostgreSQL)\n");
         sql.append("SELECT \n");
         sql.append("  n.id, n.name as NPC名称, n.level as 等级,\n");
         sql.append("  -- 相关任务\n");
-        sql.append("  (SELECT GROUP_CONCAT(q.name SEPARATOR ', ') FROM client_quests q WHERE q.start_npc = n.id OR q.end_npc = n.id) as 相关任务,\n");
+        sql.append("  (SELECT STRING_AGG(q.name, ', ') FROM client_quests q WHERE q.start_npc = n.id OR q.end_npc = n.id) as 相关任务,\n");
         sql.append("  -- 商店\n");
         sql.append("  (SELECT COUNT(*) FROM shop_templates s WHERE s.npc_id = n.id) as 商店数量,\n");
         sql.append("  -- 掉落\n");
-        sql.append("  (SELECT GROUP_CONCAT(DISTINCT i.name SEPARATOR ', ') FROM drop_npc dn \n");
+        sql.append("  (SELECT STRING_AGG(DISTINCT i.name, ', ') FROM drop_npc dn \n");
         sql.append("   LEFT JOIN drop_templates dt ON dn.drop_id = dt.id\n");
         sql.append("   LEFT JOIN client_items i ON dt.item_id = i.id\n");
         sql.append("   WHERE dn.npc_id = n.id LIMIT 5) as 掉落物品\n");

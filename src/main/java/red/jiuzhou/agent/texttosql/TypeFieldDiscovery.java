@@ -128,7 +128,7 @@ public class TypeFieldDiscovery {
             // 查询所有包含"type"的字段
             String sql = "SELECT table_name, column_name, column_type, column_comment " +
                         "FROM information_schema.columns " +
-                        "WHERE table_schema = DATABASE() " +
+                        "WHERE table_schema = current_schema() " +
                         "AND (LOWER(column_name) LIKE '%type%' " +
                         "     OR LOWER(column_name) LIKE '%kind%' " +
                         "     OR LOWER(column_name) LIKE '%category%' " +

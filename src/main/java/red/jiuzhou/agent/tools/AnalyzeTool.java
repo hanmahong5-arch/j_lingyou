@@ -133,7 +133,7 @@ public class AnalyzeTool implements AgentTool {
             String columnsSql = String.format(
                 "SELECT COLUMN_NAME, DATA_TYPE, COLUMN_COMMENT " +
                 "FROM information_schema.COLUMNS " +
-                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '%s' " +
+                "WHERE table_schema = current_schema() AND TABLE_NAME = '%s' " +
                 "ORDER BY ORDINAL_POSITION", tableName);
 
             List<Map<String, Object>> columns = context.getJdbcTemplate().queryForList(columnsSql);
@@ -240,7 +240,7 @@ public class AnalyzeTool implements AgentTool {
             // 获取数值类型字段
             String numFieldsSql = String.format(
                 "SELECT COLUMN_NAME FROM information_schema.COLUMNS " +
-                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '%s' " +
+                "WHERE table_schema = current_schema() AND TABLE_NAME = '%s' " +
                 "AND DATA_TYPE IN ('int', 'bigint', 'decimal', 'float', 'double', 'tinyint', 'smallint')",
                 tableName);
 
@@ -315,7 +315,7 @@ public class AnalyzeTool implements AgentTool {
         for (String field : possibleFields) {
             String checkSql = String.format(
                 "SELECT COUNT(*) FROM information_schema.COLUMNS " +
-                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '%s' " +
+                "WHERE table_schema = current_schema() AND TABLE_NAME = '%s' " +
                 "AND COLUMN_NAME = '%s'", tableName, field);
             Integer count = context.getJdbcTemplate().queryForObject(checkSql, Integer.class);
             if (count != null && count > 0) {
