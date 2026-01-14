@@ -52,6 +52,12 @@ public class BatchImportDiagnosticDialog extends Stage {
     private VBox failedLabel;
     private VBox skippedLabel;
 
+    // 统计数值标签（用于更新）
+    private Label totalValueLabel;
+    private Label successValueLabel;
+    private Label failedValueLabel;
+    private Label skippedValueLabel;
+
     private PieChart categoryChart;
     private BarChart<String, Number> levelChart;
 
@@ -140,10 +146,11 @@ public class BatchImportDiagnosticDialog extends Stage {
         box.setStyle("-fx-background-color: white; -fx-background-radius: 8; " +
                      "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 5, 0, 0, 2);");
 
-        totalLabel = createStatLabel("总计", "0", "#3498db");
-        successLabel = createStatLabel("成功", "0", "#27ae60");
-        failedLabel = createStatLabel("失败", "0", "#e74c3c");
-        skippedLabel = createStatLabel("跳过", "0", "#f39c12");
+        // 创建统计标签并保存值标签引用
+        totalLabel = createStatLabel("总计", "0", "#3498db", l -> totalValueLabel = l);
+        successLabel = createStatLabel("成功", "0", "#27ae60", l -> successValueLabel = l);
+        failedLabel = createStatLabel("失败", "0", "#e74c3c", l -> failedValueLabel = l);
+        skippedLabel = createStatLabel("跳过", "0", "#f39c12", l -> skippedValueLabel = l);
 
         box.getChildren().addAll(totalLabel, createSeparator(),
                                 successLabel, createSeparator(),
@@ -156,7 +163,7 @@ public class BatchImportDiagnosticDialog extends Stage {
     /**
      * 创建统计标签
      */
-    private VBox createStatLabel(String title, String value, String color) {
+    private VBox createStatLabel(String title, String value, String color, java.util.function.Consumer<Label> valueLabelConsumer) {
         VBox box = new VBox(5);
         box.setAlignment(Pos.CENTER);
         box.setPrefWidth(120);
@@ -166,6 +173,11 @@ public class BatchImportDiagnosticDialog extends Stage {
 
         Label valueLabel = new Label(value);
         valueLabel.setStyle(String.format("-fx-font-size: 28px; -fx-font-weight: bold; -fx-text-fill: %s;", color));
+
+        // 保存 valueLabel 引用
+        if (valueLabelConsumer != null) {
+            valueLabelConsumer.accept(valueLabel);
+        }
 
         box.getChildren().addAll(titleLabel, valueLabel);
         return box;
@@ -381,10 +393,10 @@ public class BatchImportDiagnosticDialog extends Stage {
      * 更新统计概览
      */
     private void updateStatistics() {
-        ((Label) totalLabel.getChildren().get(1)).setText(String.valueOf(result.getTotal()));
-        ((Label) successLabel.getChildren().get(1)).setText(String.valueOf(result.getSuccess()));
-        ((Label) failedLabel.getChildren().get(1)).setText(String.valueOf(result.getFailed()));
-        ((Label) skippedLabel.getChildren().get(1)).setText(String.valueOf(result.getSkipped()));
+        totalValueLabel.setText(String.valueOf(result.getTotal()));
+        successValueLabel.setText(String.valueOf(result.getSuccess()));
+        failedValueLabel.setText(String.valueOf(result.getFailed()));
+        skippedValueLabel.setText(String.valueOf(result.getSkipped()));
     }
 
     /**
