@@ -71,6 +71,59 @@ public class ErrorDiagnosticsEngine {
     // ==================== 报告方法 ====================
 
     /**
+     * 静态分析方法（无需Spring依赖）
+     *
+     * 用于在非Spring上下文中快速分析异常，例如批量导入失败记录
+     *
+     * @param throwable 异常对象
+     * @param component 组件名
+     * @param contextMap 上下文信息
+     * @return 结构化错误对象
+     */
+    public static StructuredError analyze(
+            Throwable throwable,
+            String component,
+            Map<String, String> contextMap) {
+
+        if (throwable == null) {
+            throw new IllegalArgumentException("throwable cannot be null");
+        }
+
+        ErrorCodes code = ErrorCodes.fromException(throwable);
+        ErrorCategory category = ErrorCategory.fromException(throwable);
+
+        StructuredError.Builder builder = StructuredError.builder()
+            .errorCode(code.getCode())
+            .level(code.getLevel())
+            .category(category)
+            .title(code.getTitle())
+            .message(throwable.getMessage())
+            .component(component != null ? component : "Unknown")
+            .stackTrace(getStaticStackTraceString(throwable))
+            .cause(throwable)
+            .documentationUrl(code.getDocUrl());
+
+        // 添加上下文信息
+        if (contextMap != null) {
+            contextMap.forEach(builder::addContext);
+        }
+
+        builder.addContext("exception_type", throwable.getClass().getName());
+
+        return builder.build();
+    }
+
+    /**
+     * 获取异常堆栈的字符串表示（静态版本）
+     */
+    private static String getStaticStackTraceString(Throwable t) {
+        StringWriter sw = new StringWriter();
+        PrintWriter pw = new PrintWriter(sw);
+        t.printStackTrace(pw);
+        return sw.toString();
+    }
+
+    /**
      * 报告异常
      */
     public void report(Throwable throwable, String context, String component) {

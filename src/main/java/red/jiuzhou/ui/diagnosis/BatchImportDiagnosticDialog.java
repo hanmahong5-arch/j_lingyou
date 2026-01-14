@@ -47,10 +47,10 @@ public class BatchImportDiagnosticDialog extends Stage {
     private final BatchXmlImporter.BatchImportResult result;
 
     // UI 组件
-    private Label totalLabel;
-    private Label successLabel;
-    private Label failedLabel;
-    private Label skippedLabel;
+    private VBox totalLabel;
+    private VBox successLabel;
+    private VBox failedLabel;
+    private VBox skippedLabel;
 
     private PieChart categoryChart;
     private BarChart<String, Number> levelChart;

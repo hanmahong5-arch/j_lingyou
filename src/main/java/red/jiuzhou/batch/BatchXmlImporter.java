@@ -16,7 +16,9 @@ import red.jiuzhou.validation.PreflightReport;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
@@ -122,31 +124,6 @@ public class BatchXmlImporter {
             }
 
             return sb.toString();
-        }
-    }
-
-    /**
-     * 失败文件记录（已废弃）
-     *
-     * @deprecated 已被 DiagnosticFailure 取代，提供更强大的诊断能力
-     * @see red.jiuzhou.batch.diagnosis.DiagnosticFailure
-     */
-    @Deprecated(since = "2026-01-15", forRemoval = true)
-    public static class FailedFile {
-        private String path;
-        private String error;
-
-        public FailedFile(String path, String error) {
-            this.path = path;
-            this.error = error;
-        }
-
-        public String getPath() { return path; }
-        public String getError() { return error; }
-
-        @Override
-        public String toString() {
-            return path + ": " + error;
         }
     }
 
@@ -438,7 +415,7 @@ public class BatchXmlImporter {
             File dir = new File(directory);
             if (!dir.exists() || !dir.isDirectory()) {
                 BatchImportResult result = new BatchImportResult();
-                result.getFailedFiles().add(new FailedFile(directory, "目录不存在或不是目录"));
+                result.getFailedFiles().add(red.jiuzhou.batch.diagnosis.DiagnosticFailure.fromLegacyFailedFile(directory, "目录不存在或不是目录"));
                 result.setFailed(1);
                 return result;
             }
@@ -586,7 +563,7 @@ public class BatchXmlImporter {
             return importDirectoryXml(directory, recursive, options, null).get();
         } catch (Exception e) {
             BatchImportResult result = new BatchImportResult();
-            result.getFailedFiles().add(new FailedFile(directory, e.getMessage()));
+            result.getFailedFiles().add(red.jiuzhou.batch.diagnosis.DiagnosticFailure.fromLegacyFailedFile(directory, e.getMessage()));
             result.setFailed(1);
             return result;
         }
