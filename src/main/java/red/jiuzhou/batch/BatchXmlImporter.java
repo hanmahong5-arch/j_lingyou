@@ -42,7 +42,7 @@ public class BatchXmlImporter {
     private static final List<String> WORLD_TABLES = Arrays.asList("world");
 
     /**
-     * 批量导入结果
+     * 批量导入结果（增强版 - 支持智能诊断）
      */
     public static class BatchImportResult {
         private int total;          // 总文件数
@@ -50,7 +50,11 @@ public class BatchXmlImporter {
         private int failed;         // 失败数
         private int skipped;        // 跳过数
         private List<String> successFiles = new ArrayList<>();
-        private List<FailedFile> failedFiles = new ArrayList<>();
+        private List<red.jiuzhou.batch.diagnosis.DiagnosticFailure> failedFiles = new ArrayList<>();
+
+        // 新增：错误统计（用于可视化）
+        private Map<red.jiuzhou.ui.error.structured.ErrorCategory, Integer> errorsByCategory = new HashMap<>();
+        private Map<red.jiuzhou.ui.error.structured.ErrorLevel, Integer> errorsByLevel = new HashMap<>();
 
         public int getTotal() { return total; }
         public void setTotal(int total) { this.total = total; }
@@ -65,17 +69,69 @@ public class BatchXmlImporter {
         public void setSkipped(int skipped) { this.skipped = skipped; }
 
         public List<String> getSuccessFiles() { return successFiles; }
-        public List<FailedFile> getFailedFiles() { return failedFiles; }
+        public List<red.jiuzhou.batch.diagnosis.DiagnosticFailure> getFailedFiles() { return failedFiles; }
+
+        public Map<red.jiuzhou.ui.error.structured.ErrorCategory, Integer> getErrorsByCategory() {
+            return errorsByCategory;
+        }
+
+        public Map<red.jiuzhou.ui.error.structured.ErrorLevel, Integer> getErrorsByLevel() {
+            return errorsByLevel;
+        }
 
         public String getSummary() {
             return String.format("总计: %d, 成功: %d, 失败: %d, 跳过: %d",
                 total, success, failed, skipped);
         }
+
+        /**
+         * 获取可重试的失败项
+         */
+        public List<red.jiuzhou.batch.diagnosis.DiagnosticFailure> getRetryableFailures() {
+            return failedFiles.stream()
+                .filter(red.jiuzhou.batch.diagnosis.DiagnosticFailure::retryable)
+                .filter(f -> !f.hasExceededRetryLimit())
+                .collect(java.util.stream.Collectors.toList());
+        }
+
+        /**
+         * 获取高优先级失败项（ERROR 或 FATAL）
+         */
+        public List<red.jiuzhou.batch.diagnosis.DiagnosticFailure> getHighPriorityFailures() {
+            return failedFiles.stream()
+                .filter(red.jiuzhou.batch.diagnosis.DiagnosticFailure::isHighPriority)
+                .collect(java.util.stream.Collectors.toList());
+        }
+
+        /**
+         * 获取诊断摘要（包含错误分类统计）
+         */
+        public String getDiagnosticSummary() {
+            StringBuilder sb = new StringBuilder(getSummary());
+
+            if (!errorsByCategory.isEmpty()) {
+                sb.append("\n\n错误分类:");
+                errorsByCategory.forEach((category, count) ->
+                    sb.append(String.format("\n  - %s: %d", category.getDisplayName(), count))
+                );
+            }
+
+            int retryableCount = getRetryableFailures().size();
+            if (retryableCount > 0) {
+                sb.append(String.format("\n\n可重试项: %d", retryableCount));
+            }
+
+            return sb.toString();
+        }
     }
 
     /**
-     * 失败文件记录
+     * 失败文件记录（已废弃）
+     *
+     * @deprecated 已被 DiagnosticFailure 取代，提供更强大的诊断能力
+     * @see red.jiuzhou.batch.diagnosis.DiagnosticFailure
      */
+    @Deprecated(since = "2026-01-15", forRemoval = true)
     public static class FailedFile {
         private String path;
         private String error;
@@ -103,6 +159,10 @@ public class BatchXmlImporter {
         private String mapType;             // 地图类型（World类型文件用）
         private boolean clearTableFirst = true; // 导入前是否清空表
 
+        // 新增：冲突解决策略（默认为覆盖更新）
+        private ConflictResolutionStrategy conflictStrategy = ConflictResolutionStrategy.REPLACE_UPDATE;
+        private boolean applyToAllFiles = false;  // 批量导入时，策略是否应用到所有文件
+
         public String getAiModule() { return aiModule; }
         public void setAiModule(String aiModule) { this.aiModule = aiModule; }
 
@@ -114,6 +174,23 @@ public class BatchXmlImporter {
 
         public boolean isClearTableFirst() { return clearTableFirst; }
         public void setClearTableFirst(boolean clearTableFirst) { this.clearTableFirst = clearTableFirst; }
+
+        // 新增 getter/setter
+        public ConflictResolutionStrategy getConflictStrategy() {
+            return conflictStrategy;
+        }
+
+        public void setConflictStrategy(ConflictResolutionStrategy strategy) {
+            this.conflictStrategy = strategy;
+        }
+
+        public boolean isApplyToAllFiles() {
+            return applyToAllFiles;
+        }
+
+        public void setApplyToAllFiles(boolean apply) {
+            this.applyToAllFiles = apply;
+        }
     }
 
     /**
@@ -136,14 +213,21 @@ public class BatchXmlImporter {
             ImportOptions options) {
 
         return CompletableFuture.supplyAsync(() -> {
+            File xmlFile = new File(xmlFilePath);
+            String currentPhase = "初始化";  // 跟踪当前执行阶段
+            Map<String, Object> context = new HashMap<>();  // 上下文信息
+
             try {
                 log.info("开始导入XML: {}", xmlFilePath);
 
                 // 从文件名提取表名
                 String fileName = FileUtil.getName(xmlFilePath);
                 String tableName = fileName.substring(0, fileName.lastIndexOf('.'));
+                context.put("table", tableName);
+                context.put("file_size", xmlFile.length());
 
                 // ==================== 导入前自动建表（2025-12-29新增）====================
+                currentPhase = "DDL生成与建表";
                 // 检查表是否存在，如果不存在则先执行DDL建表
                 try {
                     boolean tableExists = DatabaseUtil.tableExists(tableName);
@@ -153,6 +237,7 @@ public class BatchXmlImporter {
                         // 生成DDL SQL脚本
                         String sqlDdlFilePath = XmlProcess.parseXmlFile(xmlFilePath);
                         log.info("DDL脚本已生成: {}", sqlDdlFilePath);
+                        context.put("ddl_script", sqlDdlFilePath);
 
                         // 执行DDL脚本建表
                         DatabaseUtil.executeSqlScript(sqlDdlFilePath);
@@ -162,13 +247,17 @@ public class BatchXmlImporter {
                     }
                 } catch (Exception ddlException) {
                     log.error("自动建表失败，表: {}", tableName, ddlException);
-                    throw new RuntimeException("自动建表失败: " + ddlException.getMessage(), ddlException);
+                    context.put("ddl_error", ddlException.getMessage());
+                    throw ddlException;  // 继续抛出以被外层捕获
                 }
                 // =======================================================================
 
                 // 判断是否为World类型
+                currentPhase = "数据导入";
                 boolean isWorldType = isWorldTable(tableName);
                 String mapType = options != null ? options.getMapType() : null;
+                context.put("is_world_type", isWorldType);
+                context.put("map_type", mapType);
 
                 if (isWorldType && mapType != null) {
                     // World类型文件
@@ -186,15 +275,30 @@ public class BatchXmlImporter {
 
                     String aiModule = options != null ? options.getAiModule() : null;
                     List<String> selectedColumns = options != null ? options.getSelectedColumns() : null;
-                    generator.xmlTodb(aiModule, selectedColumns);
+
+                    if (aiModule != null) {
+                        currentPhase = "AI处理";
+                        context.put("ai_module", aiModule);
+                        context.put("ai_columns", selectedColumns);
+                    }
+
+                    // 新增：传递 options 以支持冲突解决策略
+                    generator.xmlTodb(aiModule, selectedColumns, options);
                 }
 
                 log.info("导入成功: {}", xmlFilePath);
                 return true;
 
             } catch (Exception e) {
-                log.error("导入失败: " + xmlFilePath, e);
-                throw new RuntimeException("导入失败: " + e.getMessage(), e);
+                log.error("导入失败: {} [阶段: {}]", xmlFilePath, currentPhase, e);
+
+                // 创建 DiagnosticFailure 并包装为 DiagnosticImportException
+                red.jiuzhou.batch.diagnosis.DiagnosticFailure failure =
+                    red.jiuzhou.batch.diagnosis.DiagnosticFailure.fromException(
+                        xmlFile, e, currentPhase, context
+                    );
+
+                throw new red.jiuzhou.batch.diagnosis.DiagnosticImportException(failure, e);
             }
         });
     }
@@ -259,10 +363,50 @@ public class BatchXmlImporter {
 
                     log.info("✅ 进度 [{}/{}] 导入成功: {}", current, result.getTotal(), fileName);
 
-                } catch (Exception e) {
-                    result.getFailedFiles().add(new FailedFile(filePath, e.getMessage()));
+                } catch (java.util.concurrent.CompletionException ce) {
+                    // CompletableFuture.join() 会包装异常为 CompletionException
+                    Throwable cause = ce.getCause();
+
+                    red.jiuzhou.batch.diagnosis.DiagnosticFailure failure;
+
+                    if (cause instanceof red.jiuzhou.batch.diagnosis.DiagnosticImportException) {
+                        // 已包含诊断信息，直接提取
+                        failure = ((red.jiuzhou.batch.diagnosis.DiagnosticImportException) cause)
+                            .getDiagnosticFailure();
+                        log.debug("提取 DiagnosticFailure: {}", failure.getErrorCode());
+                    } else {
+                        // 其他异常，创建 DiagnosticFailure
+                        failure = red.jiuzhou.batch.diagnosis.DiagnosticFailure.fromException(
+                            file, cause != null ? cause : ce, "批量导入", Map.of()
+                        );
+                        log.debug("创建 DiagnosticFailure: {}", failure.getErrorCode());
+                    }
+
+                    // 添加到失败列表
+                    result.getFailedFiles().add(failure);
                     result.setFailed(result.getFailed() + 1);
-                    log.error("❌ 进度 [{}/{}] 导入失败: {}", processed.get(), result.getTotal(), fileName, e);
+
+                    // 更新错误统计（用于可视化）
+                    result.getErrorsByCategory().merge(failure.getCategory(), 1, Integer::sum);
+                    result.getErrorsByLevel().merge(failure.getLevel(), 1, Integer::sum);
+
+                    log.error("❌ 进度 [{}/{}] 导入失败: {} - {} [{}]",
+                        processed.get(), result.getTotal(), fileName,
+                        failure.structuredError().title(), failure.getErrorCode());
+
+                } catch (Exception e) {
+                    // 其他未预期的异常（保底处理）
+                    red.jiuzhou.batch.diagnosis.DiagnosticFailure failure =
+                        red.jiuzhou.batch.diagnosis.DiagnosticFailure.fromException(
+                            file, e, "未知阶段", Map.of()
+                        );
+
+                    result.getFailedFiles().add(failure);
+                    result.setFailed(result.getFailed() + 1);
+                    result.getErrorsByCategory().merge(failure.getCategory(), 1, Integer::sum);
+                    result.getErrorsByLevel().merge(failure.getLevel(), 1, Integer::sum);
+
+                    log.error("❌ 进度 [{}/{}] 导入失败（未预期异常）: {}", processed.get(), result.getTotal(), fileName, e);
                 }
             }
 

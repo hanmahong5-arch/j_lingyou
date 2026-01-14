@@ -432,6 +432,13 @@ public class BatchOperationDialog extends Stage {
                         showCancelledImportResult(result);
                     } else {
                         showImportResult(result);
+
+                        // 新增：如果有失败项，弹出智能诊断对话框
+                        if (result.getFailed() > 0) {
+                            red.jiuzhou.ui.diagnosis.BatchImportDiagnosticDialog diagnosticDialog =
+                                new red.jiuzhou.ui.diagnosis.BatchImportDiagnosticDialog(result);
+                            diagnosticDialog.show();
+                        }
                     }
 
                     log.info("XML导入完成: {}", result.getSummary());
@@ -525,10 +532,12 @@ public class BatchOperationDialog extends Stage {
             sb.append("\n───────────────────────────────────────\n");
             sb.append("❌ 失败详情（这些文件的数据未导入）:\n\n");
             result.getFailedFiles().forEach(f -> {
-                sb.append("  • ").append(getFileName(f.getPath())).append("\n");
-                sb.append("    原因: ").append(simplifyErrorMessage(f.getError())).append("\n\n");
+                sb.append("  • ").append(f.fileName()).append("\n");
+                sb.append("    原因: ").append(f.structuredError().title()).append("\n");
+                sb.append("    错误码: ").append(f.getErrorCode()).append("\n\n");
             });
             sb.append("💡 失败的数据已自动回滚，不影响其他数据\n");
+            sb.append("💡 查看详细诊断请点击弹出的诊断对话框\n");
         }
 
         resultArea.setText(sb.toString());

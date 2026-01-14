@@ -17,7 +17,7 @@
 | Java 版本 | **Java 25 (LTS)** |
 | GUI 框架 | OpenJFX 25 + JFoenix + ControlsFX |
 | 应用框架 | Spring Boot 4.0.1 |
-| 数据库 | MySQL 9.1 + Spring JDBC |
+| 数据库 | **PostgreSQL 16** + Spring JDBC |
 | XML 处理 | Dom4j 2.1.4 |
 | AI 服务 | LangChain4j + DashScope SDK |
 
@@ -27,7 +27,7 @@
 
 - JDK 25 LTS
 - Maven 3.9+
-- MySQL 9.x
+- **PostgreSQL 16** (项目已从 MySQL 迁移)
 
 ### 配置
 

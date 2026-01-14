@@ -165,7 +165,8 @@ public class AttrDictionaryDao {
             String sql = "UPDATE attr_dictionary SET total_usage = total_usage + 1 WHERE attr_code = ?";
             return jdbcTemplate.update(sql, attrCode);
         } else {
-            String sql = "UPDATE attr_dictionary SET " + column + " = " + column + " + 1, " +
+            // PostgreSQL: Use double quotes for column names
+            String sql = "UPDATE attr_dictionary SET \"" + column + "\" = \"" + column + "\" + 1, " +
                     "total_usage = total_usage + 1 WHERE attr_code = ?";
             return jdbcTemplate.update(sql, attrCode);
         }

@@ -313,8 +313,9 @@ public class PaginatedTable{
         List<Map<String, Object>> sampleData = null;
         try  {
             // 优化：只使用 LIMIT 1 获取列结构，加载更快
+            // PostgreSQL: 表名使用双引号
             sampleData = DatabaseUtil.getJdbcTemplate()
-                    .queryForList("SELECT * FROM " + tabName + " limit 1");
+                    .queryForList("SELECT * FROM \"" + tabName + "\" LIMIT 1");
         } catch (Exception e) {
             log.error("获取数据失败:{}", e.getMessage());
             if (logPanel != null) {

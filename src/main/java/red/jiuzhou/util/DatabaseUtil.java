@@ -316,8 +316,9 @@ public class DatabaseUtil {
             // 判断是否包含WHERE条件
             String deleteSql;
             if (tableName.toLowerCase().contains(" where ")) {
-                // 包含WHERE条件，使用DELETE FROM
-                deleteSql = "DELETE FROM " + tableName;
+                // 包含WHERE条件，使用DELETE FROM (表名加引号)
+                String whereClause = tableName.substring(tableName.toLowerCase().indexOf(" where "));
+                deleteSql = "DELETE FROM \"" + checkTableName + "\" " + whereClause;
                 log.debug("执行条件删除: {}", deleteSql);
             } else {
                 // 不包含WHERE条件，优先使用TRUNCATE（更快且重置序列）(PostgreSQL)
@@ -607,7 +608,7 @@ public class DatabaseUtil {
             }
 
             // 数据量不大，执行精确 COUNT(*)
-            Integer exactCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM " + tabName, Integer.class);
+            Integer exactCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM \"" + tabName + "\"", Integer.class);
             return exactCount != null ? exactCount : 0;
 
         } catch (Exception e) {
@@ -781,18 +782,18 @@ public class DatabaseUtil {
                         continue; // 如果设置了 include 列表，且当前字段不在其中，就跳过
                     }
 
-                    String sql = String.format("SELECT %s, COUNT(*) AS cnt FROM %s GROUP BY %s", columnName, tableName,  columnName);
+                    String sql = String.format("SELECT \"%s\", COUNT(*) AS cnt FROM \"%s\" GROUP BY \"%s\"", columnName, tableName,  columnName);
 
                     if(StringUtils.hasLength(fieldValueMap.get(columnName.toLowerCase()))){
                         // 构造 SQL：统计每个值的数量
-                        sql = String.format("SELECT %s, COUNT(*) AS cnt FROM %s WHERE %s LIKE '%s' GROUP BY %s", columnName, tableName, columnName,
+                        sql = String.format("SELECT \"%s\", COUNT(*) AS cnt FROM \"%s\" WHERE \"%s\" LIKE '%s' GROUP BY \"%s\"", columnName, tableName, columnName,
                                 fieldValueMap.get(columnName.toLowerCase()).replace("*", "%"), columnName);
                     }
 
                     if("string".equals(fieldTypeMap.get(columnName.toLowerCase()))){
                         sql = sql + " ORDER BY cnt DESC";
                     }else{
-                        sql = sql + " ORDER BY CAST("+columnName+" AS INTEGER) DESC";
+                        sql = sql + " ORDER BY CAST(\""+columnName+"\" AS INTEGER) DESC";
                     }
 
                     if(StringUtils.hasLength(fieldValueMap2.get(columnName.toLowerCase()))){
@@ -802,20 +803,20 @@ public class DatabaseUtil {
                         String delimiter = likeVal.replace("%", "");
                         if(likeVal.startsWith("%")){
                             // 后缀匹配，取第一部分
-                            sql = String.format("SELECT split_part(%s,'%s',1) AS name_prefix,COUNT(*) AS cnt " +
-                                    "FROM %s WHERE %s LIKE '%s' GROUP BY name_prefix",
+                            sql = String.format("SELECT split_part(\"%s\",'%s',1) AS name_prefix,COUNT(*) AS cnt " +
+                                    "FROM \"%s\" WHERE \"%s\" LIKE '%s' GROUP BY name_prefix",
                                     columnName, delimiter, tableName, columnName, likeVal);
                         } else {
                             // 前缀匹配，取最后部分 - 使用 regexp_replace
-                            sql = String.format("SELECT regexp_replace(%s, '^.*%s', '') AS name_prefix,COUNT(*) AS cnt " +
-                                    "FROM %s WHERE %s LIKE '%s' GROUP BY name_prefix",
+                            sql = String.format("SELECT regexp_replace(\"%s\", '^.*%s', '') AS name_prefix,COUNT(*) AS cnt " +
+                                    "FROM \"%s\" WHERE \"%s\" LIKE '%s' GROUP BY name_prefix",
                                     columnName, delimiter, tableName, columnName, likeVal);
                         }
 
                         if("string".equals(fieldTypeMap.get(columnName.toLowerCase()))){
                             sql = sql + " ORDER BY cnt DESC";
                         }else{
-                            sql = sql + " ORDER BY CAST("+columnName+" AS INTEGER) DESC";
+                            sql = sql + " ORDER BY CAST(\""+columnName+"\" AS INTEGER) DESC";
                         }
                     }
 
@@ -893,7 +894,7 @@ public class DatabaseUtil {
         }
     }
     public static List<String> getColumnNamesFromDb(String tableName) {
-        return jdbcTemplate.query("SELECT * FROM " + tableName + " LIMIT 1", rs -> {
+        return jdbcTemplate.query("SELECT * FROM \"" + tableName + "\" LIMIT 1", rs -> {
             ResultSetMetaData metaData = rs.getMetaData();
             List<String> columns = new ArrayList<>();
             for (int i = 1; i <= metaData.getColumnCount(); i++) {
@@ -944,6 +945,29 @@ public class DatabaseUtil {
             log.info("已将字段 [{}] 长度由 {} 调整为 {}", columnName, currentLength, requiredLength);
         }
     }
+    /**
+     * 获取表的记录数
+     *
+     * @param tableName 表名
+     * @return 记录数
+     */
+    public static int getTableRowCount(String tableName) {
+        String sql = String.format("SELECT COUNT(*) FROM \"%s\"", tableName);
+        Integer count = jdbcTemplate.queryForObject(sql, Integer.class);
+        return count != null ? count : 0;
+    }
+
+    /**
+     * 清空表数据（使用 TRUNCATE）
+     *
+     * @param tableName 表名
+     */
+    public static void clearTable(String tableName) {
+        String sql = String.format("TRUNCATE TABLE \"%s\" RESTART IDENTITY CASCADE", tableName);
+        jdbcTemplate.execute(sql);
+        log.info("已清空表数据: {}", tableName);
+    }
+
     public static void main(String[] args) throws Exception {
         int len = getColumnLength("client_strings_item", "body");
         System.out.println(len);

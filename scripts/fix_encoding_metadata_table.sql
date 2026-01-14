@@ -1,14 +1,17 @@
 -- =====================================================
--- 文件编码元数据表 (PostgreSQL 16)
--- 功能：记录每个XML文件的原始编码信息，确保往返一致性
--- 日期：2025-12-28
--- 更新：2026-01-14 迁移到 PostgreSQL 语法
+-- 修复 file_encoding_metadata 表结构
+-- 问题：旧表结构缺少字段，导致 Java 代码 INSERT 失败
+-- 解决：删除旧表，创建新表（符合 PostgreSQL 语法）
+-- 日期：2026-01-14
 -- =====================================================
 
--- 删除旧表（如果存在）
-DROP TABLE IF EXISTS file_encoding_metadata;
+-- 1. 备份现有数据（如果需要）
+-- CREATE TABLE file_encoding_metadata_backup AS SELECT * FROM file_encoding_metadata;
 
--- 创建编码元数据表（支持 World 表的 mapType 区分）
+-- 2. 删除旧表
+DROP TABLE IF EXISTS file_encoding_metadata CASCADE;
+
+-- 3. 创建新表（完整结构）
 CREATE TABLE file_encoding_metadata (
     table_name VARCHAR(100) NOT NULL,
     map_type VARCHAR(50) NOT NULL DEFAULT '',
@@ -28,18 +31,17 @@ CREATE TABLE file_encoding_metadata (
     notes TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-
     PRIMARY KEY (table_name, map_type)
 );
 
--- PostgreSQL: Create indexes separately
+-- 4. 创建索引
 CREATE INDEX idx_encoding ON file_encoding_metadata(original_encoding);
 CREATE INDEX idx_last_import ON file_encoding_metadata(last_import_time);
 CREATE INDEX idx_last_export ON file_encoding_metadata(last_export_time);
 CREATE INDEX idx_validation_result ON file_encoding_metadata(last_validation_result);
 
--- PostgreSQL: Add column comments
-COMMENT ON TABLE file_encoding_metadata IS 'XML文件编码元数据表 - 保证导入导出往返一致性（支持World表多版本）';
+-- 5. 添加列注释
+COMMENT ON TABLE file_encoding_metadata IS 'XML文件编码元数据表 - 保证导入导出往返一致性';
 COMMENT ON COLUMN file_encoding_metadata.table_name IS '表名（与数据库表对应）';
 COMMENT ON COLUMN file_encoding_metadata.map_type IS 'World表专用：China/Korea/Japan等，普通表为空字符串';
 COMMENT ON COLUMN file_encoding_metadata.original_encoding IS '原始编码：UTF-16BE, UTF-16LE, UTF-8, GBK等';
@@ -50,16 +52,10 @@ COMMENT ON COLUMN file_encoding_metadata.original_file_hash IS '原始文件MD5�
 COMMENT ON COLUMN file_encoding_metadata.file_size_bytes IS '原始文件大小（字节）';
 COMMENT ON COLUMN file_encoding_metadata.last_import_time IS '最后导入时间';
 COMMENT ON COLUMN file_encoding_metadata.last_export_time IS '最后导出时间';
-COMMENT ON COLUMN file_encoding_metadata.last_validation_time IS '最后验证时间';
-COMMENT ON COLUMN file_encoding_metadata.last_validation_result IS '最后验证结果（true=一致，false=不一致）';
 COMMENT ON COLUMN file_encoding_metadata.import_count IS '导入次数统计';
 COMMENT ON COLUMN file_encoding_metadata.export_count IS '导出次数统计';
-COMMENT ON COLUMN file_encoding_metadata.validation_count IS '验证次数统计';
-COMMENT ON COLUMN file_encoding_metadata.notes IS '备注信息';
-COMMENT ON COLUMN file_encoding_metadata.created_at IS '创建时间';
-COMMENT ON COLUMN file_encoding_metadata.updated_at IS '更新时间';
 
--- PostgreSQL: Create trigger for updated_at auto-update
+-- 6. 创建触发器（自动更新 updated_at）
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -68,15 +64,13 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS update_file_encoding_metadata_updated_at ON file_encoding_metadata;
 CREATE TRIGGER update_file_encoding_metadata_updated_at
     BEFORE UPDATE ON file_encoding_metadata
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
--- 示例数据（可选）
--- INSERT INTO file_encoding_metadata
--- (table_name, original_encoding, has_bom, original_file_path, file_size_bytes)
--- VALUES
--- ('skill_base', 'UTF-16BE', TRUE, 'D:\AionReal58\AionMap\XML\skill_base.xml', 85983232);
+-- 7. 验证表结构
+\d file_encoding_metadata
 
-SELECT '✅ file_encoding_metadata 表创建成功 (PostgreSQL)' AS status;
+SELECT '✅ file_encoding_metadata 表修复完成！' AS status;

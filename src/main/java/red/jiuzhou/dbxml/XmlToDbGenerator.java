@@ -17,7 +17,11 @@ import red.jiuzhou.util.FileEncodingDetector;
 import red.jiuzhou.util.EncodingFallbackStrategy;
 import red.jiuzhou.util.EncodingMetadataManager;
 import red.jiuzhou.util.BomAwareFileReader;
+import red.jiuzhou.util.SmartInsertExecutor;
 import red.jiuzhou.validation.XmlFieldValidator;
+import red.jiuzhou.batch.ConflictResolutionStrategy;
+import red.jiuzhou.batch.DataConflictException;
+import red.jiuzhou.batch.BatchXmlImporter;
 
 import java.io.File;
 import java.nio.charset.StandardCharsets;
@@ -113,7 +117,14 @@ public class XmlToDbGenerator {
 
     }
 
-    public void xmlTodb(String aiModule, List<String> selectedColumns) {
+    /**
+     * XML to Database import with conflict resolution support
+     *
+     * @param aiModule AI module name (optional)
+     * @param selectedColumns Columns to process with AI (optional)
+     * @param options Import options including conflict strategy
+     */
+    public void xmlTodb(String aiModule, List<String> selectedColumns, BatchXmlImporter.ImportOptions options) {
         xmlToDb(table, document);
         List<String> allTableNameList = table.getAllTableNameList();
         if("world".equals(table.getTableName())){
@@ -130,7 +141,13 @@ public class XmlToDbGenerator {
         int totalRecords = totalMain + totalSub;
         final int[] processedRecords = {0};
 
-        System.out.printf("开始数据导入，总记录数: %d (主表: %d, 子表: %d)\n", totalRecords, totalMain, totalSub);
+        // Get conflict resolution strategy
+        ConflictResolutionStrategy strategy = (options != null && options.getConflictStrategy() != null)
+            ? options.getConflictStrategy()
+            : ConflictResolutionStrategy.REPLACE_UPDATE;
+
+        System.out.printf("开始数据导入，总记录数: %d (主表: %d, 子表: %d)，冲突策略: %s\n",
+            totalRecords, totalMain, totalSub, strategy.getDisplayName());
 
         // ==================== 数据验证（在事务外进行，基于服务器日志分析）====================
         log.info("开始数据验证...");
@@ -186,20 +203,20 @@ public class XmlToDbGenerator {
             final List<String> finalTableList = allTableNameList;
             finalTableList.forEach(DatabaseUtil::delTable);
 
-            // 2. 插入主表数据
+            // 2. 插入主表数据（使用智能插入执行器）
             List<List<Map<String, String>>> mainBatches = splitList(mainTabList, 1000);
             for (List<Map<String, String>> batch : mainBatches) {
-                DatabaseUtil.batchInsert(table.getTableName(), batch);
+                SmartInsertExecutor.executeBatchInsert(table.getTableName(), batch, strategy);
                 processedRecords[0] += batch.size();
                 printProgress(processedRecords[0], totalRecords);
             }
 
-            // 3. 插入子表数据
+            // 3. 插入子表数据（使用智能插入执行器）
             for (Map.Entry<String, List<Map<String, String>>> entry : subTabList.entrySet()) {
                 String tableName = entry.getKey();
                 List<Map<String, String>> list = entry.getValue();
                 for (List<Map<String, String>> batch : splitList(list, 1000)) {
-                    DatabaseUtil.batchInsert(tableName, batch);
+                    SmartInsertExecutor.executeBatchInsert(tableName, batch, strategy);
                     processedRecords[0] += batch.size();
                     printProgress(processedRecords[0], totalRecords);
                 }
@@ -209,12 +226,27 @@ public class XmlToDbGenerator {
             DatabaseUtil.commitTransaction(globalTransaction);
             System.out.println("数据导入完成！");
 
+        } catch (DataConflictException e) {
+            // 用户选择取消导入（冲突策略为CANCEL_IMPORT时触发）
+            log.warn("用户取消导入: {}", e.getMessage());
+            DatabaseUtil.rollbackTransaction(globalTransaction);
+            throw new RuntimeException("导入已取消: " + e.getMessage(), e);
         } catch (Exception e) {
             // 任何失败都回滚，保证数据一致性
             log.error("导入失败，回滚事务: {}", e.getMessage());
             DatabaseUtil.rollbackTransaction(globalTransaction);
             throw new RuntimeException("数据导入失败，已回滚: " + e.getMessage(), e);
         }
+    }
+
+    /**
+     * Legacy method for backward compatibility
+     * Calls new method with default options (REPLACE_UPDATE strategy)
+     */
+    public void xmlTodb(String aiModule, List<String> selectedColumns) {
+        BatchXmlImporter.ImportOptions defaultOptions = new BatchXmlImporter.ImportOptions();
+        defaultOptions.setConflictStrategy(ConflictResolutionStrategy.REPLACE_UPDATE);
+        xmlTodb(aiModule, selectedColumns, defaultOptions);
     }
 
     public double getProgress() {

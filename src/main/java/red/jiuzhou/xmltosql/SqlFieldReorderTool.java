@@ -6,6 +6,14 @@ import java.nio.file.*;
 import java.util.*;
 import java.util.regex.*;
 
+/**
+ * SQL 字段重排工具
+ *
+ * @deprecated 此工具使用 MySQL 语法（反引号、ENGINE=），已过时。
+ *             项目已迁移到 PostgreSQL 16，不再使用此工具。
+ *             保留用于参考，未来版本可能删除。
+ */
+@Deprecated(since = "1.0.0", forRemoval = true)
 public class SqlFieldReorderTool {
 
     // 自定义字段优先顺序

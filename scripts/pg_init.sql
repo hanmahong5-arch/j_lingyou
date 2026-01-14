@@ -7,21 +7,34 @@
 -- 2. 连接到数据库后执行以下脚本
 -- \c xmldb_suiyue
 
--- 3. 创建编码元数据表
+-- 3. 创建编码元数据表 (完整版本，与 Java 代码一致)
 CREATE TABLE IF NOT EXISTS file_encoding_metadata (
-    id BIGSERIAL PRIMARY KEY,
-    table_name VARCHAR(255) NOT NULL,
-    map_type VARCHAR(255) NOT NULL DEFAULT '',
-    original_encoding VARCHAR(50) NOT NULL,
-    has_bom BOOLEAN NOT NULL DEFAULT FALSE,
-    detected_by VARCHAR(50),
-    confidence INTEGER DEFAULT 0,
-    file_path TEXT,
-    file_hash VARCHAR(64),
+    table_name VARCHAR(100) NOT NULL,
+    map_type VARCHAR(50) NOT NULL DEFAULT '',
+    original_encoding VARCHAR(20) NOT NULL,
+    has_bom BOOLEAN DEFAULT FALSE,
+    xml_version VARCHAR(10) DEFAULT '1.0',
+    original_file_path TEXT,
+    original_file_hash VARCHAR(64),
+    file_size_bytes BIGINT,
+    last_import_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_export_time TIMESTAMP NULL,
+    last_validation_time TIMESTAMP NULL,
+    last_validation_result BOOLEAN NULL,
+    import_count INT DEFAULT 1,
+    export_count INT DEFAULT 0,
+    validation_count INT DEFAULT 0,
+    notes TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT uk_table_map UNIQUE (table_name, map_type)
+    PRIMARY KEY (table_name, map_type)
 );
+
+-- 创建索引
+CREATE INDEX IF NOT EXISTS idx_encoding ON file_encoding_metadata(original_encoding);
+CREATE INDEX IF NOT EXISTS idx_last_import ON file_encoding_metadata(last_import_time);
+CREATE INDEX IF NOT EXISTS idx_last_export ON file_encoding_metadata(last_export_time);
+CREATE INDEX IF NOT EXISTS idx_validation_result ON file_encoding_metadata(last_validation_result);
 
 -- 4. 创建聊天记忆表
 CREATE TABLE IF NOT EXISTS chat_memory (

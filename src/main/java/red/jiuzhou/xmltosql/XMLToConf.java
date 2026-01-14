@@ -53,7 +53,7 @@ public class XMLToConf {
             }
 
             jsonConf.put("table_name", tabName);
-            jsonConf.put("sql", "select * from " + tabName + " order by CAST(\"" + firstField + "\" AS INTEGER) ASC");
+            jsonConf.put("sql", "select * from \"" + tabName + "\" order by CAST(\"" + firstField + "\" AS INTEGER) ASC");
             parseElement(root, jsonConf, null, "");
             Object clone = jsonConf.getOrCreateRecordset("list").list().get(0).getOrCreateRecordset("list").clone();
             jsonConf.getOrCreateRecordset("list").clear();
@@ -89,7 +89,7 @@ public class XMLToConf {
         subCmap.put("db_column", element.getName());
         subCmap.put("xml_tag", element.getName());
         subCmap.put("addDataNode", "");
-        subCmap.put("sql", "select * from " + tableName + " where "+firstField+" = '#associated_filed' order by CAST(\"" + firstField + "\" AS INTEGER) ASC");
+        subCmap.put("sql", "select * from \"" + tableName + "\" where \""+firstField+"\" = '#associated_filed' order by CAST(\"" + firstField + "\" AS INTEGER) ASC");
         subCmap.put("associatedFiled", firstField);
         if(StringUtils.hasLength(parentTable) && element.getParent() != null && element.getParent().elements().size() == 1
                 && !element.getParent().elements().get(0).elements().isEmpty()){
