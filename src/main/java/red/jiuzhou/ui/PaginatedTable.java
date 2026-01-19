@@ -66,6 +66,9 @@ public class PaginatedTable{
 
     private String tabFilePath;
 
+    // 保存 Tab 引用，用于在操作时同步最新的 userData（文件路径）
+    private Tab currentTab;
+
     private TableView<Map<String, Object>> tableView;
     // 总行数
     private int totalRows;
@@ -100,6 +103,7 @@ public class PaginatedTable{
                 return new VBox();
             }
             this.tabName = tabName;
+            this.currentTab = tab;  // 保存 Tab 引用
             this.tabFilePath = tab.getUserData() + "";
             log.info("tabFilePath init: {}", tabFilePath);
 
@@ -472,6 +476,7 @@ public class PaginatedTable{
      * 创建某个分页的数据页面（异步加载优化）
      */
     private VBox createPage(int pageIndex) {
+        syncTabFilePath();  // 同步最新路径，确保分页查询使用正确的配置
         // 创建加载指示器
         ProgressIndicator loadingIndicator = new ProgressIndicator();
         loadingIndicator.setPrefSize(50, 50);
@@ -592,7 +597,8 @@ public class PaginatedTable{
      * 进度条导入数据（模拟）
      */
     private void xmlToDb(String filePath, List<String> selectedColumns, String aiModule) {
-        tabIsExist();
+        // 使用传入的 filePath 验证配置是否存在，而不是 tabFilePath
+        tabIsExist(filePath);
         if ("world".equals(tabName)) {
             if (mapType == null || mapType.trim().isEmpty()) {
                 logPanel.error("请选择地图类型");
@@ -604,7 +610,9 @@ public class PaginatedTable{
         executor.execute(() -> {
             updateProgress(0, "导入数据中...");
             logPanel.info("XML导入任务开始，文件: " + filePath);
-            XmlToDbGenerator xmlToDbGenerator = new XmlToDbGenerator(tabName, mapType, filePath, tabFilePath);
+            // 修复：使用 filePath 计算配置文件路径，而不是旧的 tabFilePath
+            // 这样当用户选择新文件时，配置文件会从正确的目录加载
+            XmlToDbGenerator xmlToDbGenerator = new XmlToDbGenerator(tabName, mapType, filePath, filePath);
 
             AtomicReference<Throwable> threadException = new AtomicReference<>();
             // 启动线程
@@ -897,9 +905,72 @@ public class PaginatedTable{
         alert.show();
     }
 
+    /**
+     * 同步 tabFilePath 到 Tab 的最新 userData
+     *
+     * 问题背景：当用户在文件树中点击不同目录下的同名文件时，
+     * Tab 的 userData 会更新，但 PaginatedTable 的 tabFilePath 不会自动同步。
+     * 这会导致操作（导入/导出/查询）使用旧的配置文件路径。
+     *
+     * @return 同步后的文件路径
+     */
+    private String syncTabFilePath() {
+        if (currentTab != null && currentTab.getUserData() != null) {
+            String newPath = currentTab.getUserData().toString();
+            if (!newPath.equals(tabFilePath)) {
+                log.info("同步 tabFilePath: {} -> {}", tabFilePath, newPath);
+                tabFilePath = newPath;
+            }
+        }
+        return tabFilePath;
+    }
+
+    /**
+     * 状态一致性断言（调试模式下使用）
+     *
+     * 检查 tabFilePath 是否与 Tab.userData 一致。
+     * 不一致时记录警告日志，帮助追踪状态同步问题。
+     *
+     * 设计原理（控制论视角）：
+     * 这是一个闭环反馈机制，用于检测状态熵增（不一致）。
+     * 在生产环境中仅记录日志，不中断执行。
+     */
+    private void assertStateConsistency() {
+        if (currentTab == null) {
+            return;
+        }
+
+        Object userData = currentTab.getUserData();
+        if (userData == null) {
+            log.warn("状态断言: Tab.userData 为 null，tabName={}", tabName);
+            return;
+        }
+
+        String expected = userData.toString();
+        if (!expected.equals(tabFilePath)) {
+            log.warn("状态不一致检测: tabName={}, expected(Tab.userData)={}, actual(tabFilePath)={}",
+                    tabName, expected, tabFilePath);
+            // 自动修复：同步状态
+            syncTabFilePath();
+        }
+    }
+
+    /**
+     * 检查配置是否存在（使用同步后的 tabFilePath）
+     */
     private void tabIsExist(){
+        syncTabFilePath();  // 同步最新路径
+        tabIsExist(tabFilePath);
+    }
+
+    /**
+     * 检查指定文件路径的配置是否存在
+     *
+     * @param configFilePath 用于定位配置文件的 XML 文件路径
+     */
+    private void tabIsExist(String configFilePath){
         try {
-            TableConf tale = TabConfLoad.getTale(tabName, tabFilePath);
+            TableConf tale = TabConfLoad.getTale(tabName, configFilePath);
         } catch (Exception e) {
             String message = e.getMessage();
             if(message.contains("表配置文件不存在")){
