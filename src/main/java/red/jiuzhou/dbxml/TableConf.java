@@ -6,7 +6,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 /**
  * @className: red.jiuzhou.dbxml.TableConf.java
@@ -17,6 +19,12 @@ import java.util.stream.Collectors;
  */
 public class TableConf {
     private static final Logger log = LoggerFactory.getLogger(DbToXmlGenerator.class);
+
+    // ========== 索引缓存（性能优化：O(n) -> O(1)）==========
+    // 使用 transient 避免序列化，使用 volatile 保证多线程可见性
+    private transient volatile Map<String, ColumnMapping> columnMappingIndex;
+    private transient volatile Map<String, ColumnMapping> xmlTagMappingIndex;
+    private transient volatile List<String> listDbColumnListCache;
 
     @JSONField(name = "file_path")
     private String filePath;
@@ -92,21 +100,53 @@ public class TableConf {
         this.realTableName = realTableName;
     }
 
-    public List<String> getListDbcolumnList() {
-        List<String> dbColumnList = new ArrayList<>();
-        getList().forEach( columnMapping -> {
-            if(!columnMapping.getAddDataNode().isEmpty()){
-                if(columnMapping.getAddDataNode().contains(":")){
-                    String[] split = columnMapping.getAddDataNode().split(":");
-                    dbColumnList.add(split[0]);
-                }else{
-                    dbColumnList.add(columnMapping.getAddDataNode());
-                }
-            }else{
-                dbColumnList.add(columnMapping.getDbColumn());
+    /**
+     * Get primary key column name for this table configuration.
+     * Uses the first DB column from the mapping list, or defaults to "id".
+     * @return primary key column name
+     */
+    public String getPrimaryKey() {
+        // Try to get first column from mapping as primary key
+        if (list != null && !list.isEmpty()) {
+            ColumnMapping firstMapping = list.get(0);
+            String dbColumn = firstMapping.getDbColumn();
+            if (StringUtils.hasLength(dbColumn)) {
+                return dbColumn;
             }
-        });
-        return dbColumnList;
+        }
+        // Default to "id" if no mapping available
+        return "id";
+    }
+
+    /**
+     * 获取所有数据库列名列表（带缓存）
+     *
+     * 优化：避免每次调用都创建新 ArrayList
+     */
+    public List<String> getListDbcolumnList() {
+        if (listDbColumnListCache != null) {
+            return listDbColumnListCache;
+        }
+
+        synchronized (this) {
+            if (listDbColumnListCache == null) {
+                List<String> dbColumnList = new ArrayList<>();
+                getList().forEach(columnMapping -> {
+                    if (!columnMapping.getAddDataNode().isEmpty()) {
+                        if (columnMapping.getAddDataNode().contains(":")) {
+                            String[] split = columnMapping.getAddDataNode().split(":");
+                            dbColumnList.add(split[0]);
+                        } else {
+                            dbColumnList.add(columnMapping.getAddDataNode());
+                        }
+                    } else {
+                        dbColumnList.add(columnMapping.getDbColumn());
+                    }
+                });
+                listDbColumnListCache = dbColumnList;
+            }
+        }
+        return listDbColumnListCache;
     }
 
     public List<String> getListXmlTagList() {
@@ -116,27 +156,136 @@ public class TableConf {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * 根据数据库列名获取 ColumnMapping（带索引缓存）
+     *
+     * 优化：O(n) -> O(1) 查询复杂度
+     *
+     * @param dbColumn 数据库列名或 addDataNode
+     * @return 匹配的 ColumnMapping，未找到返回 null
+     */
     public ColumnMapping getColumnMapping(String dbColumn) {
-        for (ColumnMapping columnMapping : getList()) {
-            if (columnMapping.getAddDataNode().equals(dbColumn) || columnMapping.getAddDataNode().contains(dbColumn + ":")) {
-                return columnMapping;
+        if (dbColumn == null) return null;
+
+        // 构建索引（双重检查锁定）
+        if (columnMappingIndex == null) {
+            synchronized (this) {
+                if (columnMappingIndex == null) {
+                    columnMappingIndex = buildColumnMappingIndex();
+                }
             }
-            if (columnMapping.getAddDataNode().trim().isEmpty() && columnMapping.getDbColumn().equals(dbColumn)) {
+        }
+
+        // 先尝试直接查找
+        ColumnMapping result = columnMappingIndex.get(dbColumn);
+        if (result != null) {
+            return result;
+        }
+
+        // 回退到线性查找（处理包含 ":" 的特殊情况）
+        for (ColumnMapping columnMapping : getList()) {
+            String addDataNode = columnMapping.getAddDataNode();
+            if (addDataNode.contains(dbColumn + ":")) {
                 return columnMapping;
             }
         }
         return null;
     }
+
+    /**
+     * 根据 XML 标签获取 ColumnMapping（带索引缓存）
+     *
+     * 优化：O(n) -> O(1) 查询复杂度
+     *
+     * @param xmlTag XML 标签名
+     * @return 匹配的 ColumnMapping，未找到返回 null
+     */
     public ColumnMapping getColumnMappingByXmlTag(String xmlTag) {
-        for (ColumnMapping columnMapping : getList()) {
-            if (columnMapping.getAddDataNode().equals(xmlTag) || columnMapping.getAddDataNode().contains(xmlTag + ":")) {
-                return columnMapping;
+        if (xmlTag == null) return null;
+
+        // 构建索引（双重检查锁定）
+        if (xmlTagMappingIndex == null) {
+            synchronized (this) {
+                if (xmlTagMappingIndex == null) {
+                    xmlTagMappingIndex = buildXmlTagMappingIndex();
+                }
             }
-            if (columnMapping.getAddDataNode().trim().isEmpty() && columnMapping.getXmlTag().equals(xmlTag)) {
+        }
+
+        // 先尝试直接查找
+        ColumnMapping result = xmlTagMappingIndex.get(xmlTag);
+        if (result != null) {
+            return result;
+        }
+
+        // 回退到线性查找（处理包含 ":" 的特殊情况）
+        for (ColumnMapping columnMapping : getList()) {
+            String addDataNode = columnMapping.getAddDataNode();
+            if (addDataNode.contains(xmlTag + ":")) {
                 return columnMapping;
             }
         }
         return null;
+    }
+
+    /**
+     * 构建列名索引
+     */
+    private Map<String, ColumnMapping> buildColumnMappingIndex() {
+        Map<String, ColumnMapping> index = new HashMap<>();
+        for (ColumnMapping cm : getList()) {
+            // 索引 addDataNode
+            String addDataNode = cm.getAddDataNode();
+            if (addDataNode != null && !addDataNode.trim().isEmpty()) {
+                // 处理 "nodeName:suffix" 格式
+                if (addDataNode.contains(":")) {
+                    String[] parts = addDataNode.split(":");
+                    index.put(parts[0], cm);
+                } else {
+                    index.put(addDataNode, cm);
+                }
+            }
+            // 索引 dbColumn
+            String dbColumn = cm.getDbColumn();
+            if (dbColumn != null && !dbColumn.isEmpty()) {
+                index.putIfAbsent(dbColumn, cm);
+            }
+        }
+        return index;
+    }
+
+    /**
+     * 构建 XML 标签索引
+     */
+    private Map<String, ColumnMapping> buildXmlTagMappingIndex() {
+        Map<String, ColumnMapping> index = new HashMap<>();
+        for (ColumnMapping cm : getList()) {
+            // 索引 addDataNode
+            String addDataNode = cm.getAddDataNode();
+            if (addDataNode != null && !addDataNode.trim().isEmpty()) {
+                if (addDataNode.contains(":")) {
+                    String[] parts = addDataNode.split(":");
+                    index.put(parts[0], cm);
+                } else {
+                    index.put(addDataNode, cm);
+                }
+            }
+            // 索引 xmlTag
+            String xmlTag = cm.getXmlTag();
+            if (xmlTag != null && !xmlTag.isEmpty()) {
+                index.putIfAbsent(xmlTag, cm);
+            }
+        }
+        return index;
+    }
+
+    /**
+     * 清除索引缓存（当列表变更时调用）
+     */
+    public void clearIndexCache() {
+        columnMappingIndex = null;
+        xmlTagMappingIndex = null;
+        listDbColumnListCache = null;
     }
 
      public void chk(){

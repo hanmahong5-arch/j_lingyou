@@ -46,6 +46,14 @@ public class DatabaseUtil {
     public static final int ROWS_PER_PAGE = 15;
     private static final Map<String, JdbcTemplate> jdbcTemplateCache = new HashMap<>();
 
+    // ========== 元信息缓存（性能优化）==========
+    // 主键缓存: tableName -> primaryKeyColumn
+    private static final Map<String, String> PRIMARY_KEY_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
+    // 列长度缓存: tableName.columnName -> length
+    private static final Map<String, Integer> COLUMN_LENGTH_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
+    // 表存在性缓存: tableName -> exists
+    private static final Map<String, Boolean> TABLE_EXISTS_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
+
     // 静态代码块初始化
     static {
         // 1. 读取 application.yml 配置
@@ -349,17 +357,30 @@ public class DatabaseUtil {
     }
 
     /**
-     * 获取表的主键字段名 (PostgreSQL)
+     * 获取表的主键字段名 (PostgreSQL)（带缓存）
+     *
+     * 优化：元信息查询结果缓存，避免重复查询 information_schema
      */
     public static String getPrimaryKeyColumn(String tableName) {
+        if (tableName == null) return null;
+
+        // 先查缓存
+        String cached = PRIMARY_KEY_CACHE.get(tableName);
+        if (cached != null) {
+            return cached.isEmpty() ? null : cached; // 空字符串表示"无主键"
+        }
+
         String sql = "SELECT kcu.column_name FROM information_schema.table_constraints tc " +
                      "JOIN information_schema.key_column_usage kcu " +
                      "ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema " +
                      "WHERE tc.table_schema = current_schema() AND tc.table_name = ? AND tc.constraint_type = 'PRIMARY KEY'";
         try {
-            return jdbcTemplate.queryForObject(sql, String.class, tableName);
+            String result = jdbcTemplate.queryForObject(sql, String.class, tableName);
+            PRIMARY_KEY_CACHE.put(tableName, result != null ? result : "");
+            return result;
         } catch (EmptyResultDataAccessException e) {
-            // 表没有主键
+            // 表没有主键，缓存空字符串表示"无主键"
+            PRIMARY_KEY_CACHE.put(tableName, "");
             return null;
         } catch (Exception e) {
             log.warn("获取表 {} 的主键失败: {}", tableName, e.getMessage());
@@ -905,17 +926,55 @@ public class DatabaseUtil {
     }
 
     /**
+     * Alias for getColumnNamesFromDb for backward compatibility
+     * @param tableName table name
+     * @return list of column names
+     */
+    public static List<String> getColumnNames(String tableName) {
+        return getColumnNamesFromDb(tableName);
+    }
+
+    /**
+     * Get table metadata including column names, types, and other information
+     * @param tableName table name
+     * @return list of maps containing column metadata
+     */
+    public static List<Map<String, Object>> getTableMetadata(String tableName) {
+        String sql = "SELECT column_name, data_type, character_maximum_length, is_nullable, column_default " +
+                "FROM information_schema.columns " +
+                "WHERE table_schema = current_schema() AND table_name = ? " +
+                "ORDER BY ordinal_position";
+        return jdbcTemplate.queryForList(sql, tableName);
+    }
+
+    /**
      * 获取指定表中某字段的最大长度（仅适用于 VARCHAR 类型字段）(PostgreSQL)
      * @param tableName 表名
      * @param columnName 字段名
      * @return 字段的最大长度（如 VARCHAR(255) 返回 255）
      * @throws Exception 如果字段不存在
      */
-    public static int getColumnLength(String tableName, String columnName)  {
+    /**
+     * 获取指定表中某字段的最大长度（仅适用于 VARCHAR 类型字段）(PostgreSQL)（带缓存）
+     *
+     * 优化：元信息查询结果缓存，避免重复查询 information_schema
+     */
+    public static int getColumnLength(String tableName, String columnName) {
+        String cacheKey = tableName + "." + columnName;
+
+        // 先查缓存
+        Integer cached = COLUMN_LENGTH_CACHE.get(cacheKey);
+        if (cached != null) {
+            return cached;
+        }
+
         String sql = "SELECT character_maximum_length FROM information_schema.columns " +
                 "WHERE table_schema = current_schema() AND table_name = ? AND column_name = ?";
         try {
-            return jdbcTemplate.queryForObject(sql, Integer.class, tableName, columnName);
+            Integer result = jdbcTemplate.queryForObject(sql, Integer.class, tableName, columnName);
+            int length = result != null ? result : 0;
+            COLUMN_LENGTH_CACHE.put(cacheKey, length);
+            return length;
         } catch (EmptyResultDataAccessException e) {
             throw new RuntimeException(String.format("字段 [%s.%s] 不存在！", tableName, columnName));
         }
@@ -966,6 +1025,49 @@ public class DatabaseUtil {
         String sql = String.format("TRUNCATE TABLE \"%s\" RESTART IDENTITY CASCADE", tableName);
         jdbcTemplate.execute(sql);
         log.info("已清空表数据: {}", tableName);
+    }
+
+    // ========== 缓存管理方法 ==========
+
+    /**
+     * 清除指定表的元信息缓存
+     *
+     * @param tableName 表名，如果为 null 则清空所有缓存
+     */
+    public static void clearMetadataCache(String tableName) {
+        if (tableName == null) {
+            clearAllMetadataCache();
+            return;
+        }
+
+        PRIMARY_KEY_CACHE.remove(tableName);
+        TABLE_EXISTS_CACHE.remove(tableName);
+
+        // 清除该表的所有列长度缓存
+        String prefix = tableName + ".";
+        COLUMN_LENGTH_CACHE.entrySet().removeIf(e -> e.getKey().startsWith(prefix));
+
+        log.debug("已清除表 {} 的元信息缓存", tableName);
+    }
+
+    /**
+     * 清空所有元信息缓存
+     */
+    public static void clearAllMetadataCache() {
+        PRIMARY_KEY_CACHE.clear();
+        COLUMN_LENGTH_CACHE.clear();
+        TABLE_EXISTS_CACHE.clear();
+        log.info("已清空所有元信息缓存");
+    }
+
+    /**
+     * 获取缓存统计信息
+     */
+    public static String getMetadataCacheStats() {
+        return String.format("DatabaseUtil 元信息缓存: 主键=%d, 列长度=%d, 表存在=%d",
+                PRIMARY_KEY_CACHE.size(),
+                COLUMN_LENGTH_CACHE.size(),
+                TABLE_EXISTS_CACHE.size());
     }
 
     public static void main(String[] args) throws Exception {
